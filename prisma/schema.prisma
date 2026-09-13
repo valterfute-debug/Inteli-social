@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+enum Front {
+  CCPA
+  CASADOTE
+  CED
+}
+enum Sexo {
+  MACHO
+  FEMEA
+}
+enum Porte {
+  PEQUENO
+  MEDIO
+  GRANDE
+}
+model Species {
+  id String @id @default(uuid())
+  name String @unique
+  breeds Breed[]
+  animals Animal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+model Breed {
+  id String @id @default(uuid())
+  name String
+  speciesId String
+  species Species @relation(fields: [speciesId], references: [id])
+  animals Animal[]
+  @@unique([speciesId, name])
+}
+model Unit {
+  id String @id @default(uuid())
+  name String @unique
+  endereco String?
+  horariosFuncionamento String?
+  locations Location[]
+  animals Animal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+model Location {
+  id String @id @default(uuid())
+  name String
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id])
+  animals Animal[]
+  @@unique([unitId, name])
+}
+model Responsible {
+  id String @id @default(uuid())
+  name String
+  endereco String?
+  email String?
+  telefone String?
+  active Boolean @default(true)
+  animals Animal[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+}
+model Animal {
+  id String @id
+  name String?
+  publicId String @unique
+  microchip String?
+  dataEntrada DateTime?
+  sexo Sexo?
+  idadeAproximadaMeses Int?
+  pesoKg Decimal? @db.Decimal(6, 2)
+  porte Porte?
+  cor String?
+  speciesId String
+  species Species @relation(fields: [speciesId], references: [id])
+  breedId String?
+  breed Breed? @relation(fields: [breedId], references: [id])
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id])
+  locationId String
+  location Location @relation(fields: [locationId], references: [id])
+  responsibleId String
+  responsible Responsible @relation(fields: [responsibleId], references: [id])
+  front Front
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  @@index([name])
+  @@index([speciesId])
+}

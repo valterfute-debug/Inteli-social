@@ -1,0 +1,2493 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Ampara Animal — contrato do Ciclo 1",
+    "version": "0.1.0",
+    "description": "Somente /api/health implementado. Demais rotas planejadas; autenticação não implementada. IDs e dados dos exemplos são sintéticos. Nomes de domínio em português propostos para acordo com frontend; não existe integração real comprovada. Mesmo UUID e Idempotency-Key com mesmo conteúdo retorna recurso original (200 em reenvio); conteúdo divergente retorna 409. PATCH/DELETE com versão divergente retorna 409. Rascunho offline não equivale a admissão concluída. Foto permanece local até envio e confirmação; POST animals exige foto confirmada. Políticas de expiração, tamanho máximo e limpeza de órfãos pendentes."
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "consultarSaude",
+        "summary": "Verificar disponibilidade da aplicação",
+        "description": "Implementado. Não consulta PostgreSQL. Exceção de saúde sem versão.",
+        "x-situacao": "implementado",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Aplicação disponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Saude"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/animals": {
+      "get": {
+        "summary": "Listar animais ativos",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaAnimais"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "nome",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "identificadorPublico",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "especieId",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "description": "Identificador UUID",
+              "format": "uuid"
+            }
+          }
+        ]
+      },
+      "post": {
+        "summary": "Concluir admissão com foto confirmada",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reenvio idempotente do mesmo conteúdo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Animal"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Animal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarAnimal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/animals/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do recurso",
+          "schema": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Consultar animal",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Animal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Atualizar animal verificando versão",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Animal"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarAnimal"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Arquivar animal",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Operação concluída sem corpo"
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "versao",
+            "in": "query",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/species": {
+      "get": {
+        "summary": "Listar espécies",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/breeds": {
+      "get": {
+        "summary": "Listar raças",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "especieId",
+            "in": "query",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "description": "Identificador UUID",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/units": {
+      "get": {
+        "summary": "Listar unidades",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/locations": {
+      "get": {
+        "summary": "Listar localizações",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "description": "Identificador UUID",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/responsibles": {
+      "get": {
+        "summary": "Listar responsáveis",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaCatalogo"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/fronts": {
+      "get": {
+        "summary": "Listar frentes",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaFrentes"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/fotos": {
+      "post": {
+        "summary": "Solicitar envio de foto",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnvioFoto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FotoSolicitada"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/fotos/{id}/confirmacao": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do recurso",
+          "schema": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "summary": "Confirmar existência e validade do arquivo enviado",
+        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
+        "x-situacao": "planejado",
+        "security": [
+          {
+            "acessoPlanejado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FotoConfirmada"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Erro": {
+        "type": "object",
+        "required": [
+          "statusCode",
+          "mensagem",
+          "caminho",
+          "timestamp"
+        ],
+        "properties": {
+          "statusCode": {
+            "type": "integer"
+          },
+          "mensagem": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          },
+          "caminho": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time"
+          }
+        },
+        "example": {
+          "statusCode": 409,
+          "mensagem": "Versão desatualizada",
+          "caminho": "/api/v1/animals/56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "timestamp": "2026-09-13T12:00:00Z"
+        }
+      },
+      "Saude": {
+        "type": "object",
+        "required": [
+          "status",
+          "timestamp"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time"
+          }
+        },
+        "example": {
+          "status": "ok",
+          "timestamp": "2026-09-13T12:00:00Z"
+        }
+      },
+      "CriarAnimal": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Proposta para conclusão no servidor. Foto previamente confirmada é obrigatória. Campos opcionais refletem schema provisório, sujeitos à validação da Ampara.",
+        "required": [
+          "id",
+          "identificadorPublico",
+          "especieId",
+          "unidadeId",
+          "localizacaoId",
+          "responsavelId",
+          "frente",
+          "fotoEntradaId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "identificadorPublico": {
+            "type": "string",
+            "description": "Identificador público; formação pendente"
+          },
+          "nome": {
+            "type": "string",
+            "description": "Nome conhecido",
+            "nullable": true
+          },
+          "microchip": {
+            "type": "string",
+            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "example": "000123456789",
+            "nullable": true
+          },
+          "especieId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "racaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid",
+            "nullable": true
+          },
+          "unidadeId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "localizacaoId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "responsavelId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "frente": {
+            "type": "string",
+            "description": "Classificação atual; demais nomes aguardam validação",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED"
+            ]
+          },
+          "dataEntrada": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sexo": {
+            "type": "string",
+            "description": "Sexo informado",
+            "enum": [
+              "MACHO",
+              "FEMEA"
+            ],
+            "nullable": true
+          },
+          "idadeAproximadaMeses": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Meses; unidade proposta"
+          },
+          "pesoKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Peso atual em kg, duas casas decimais; não há histórico"
+          },
+          "porte": {
+            "type": "string",
+            "description": "Porte",
+            "enum": [
+              "PEQUENO",
+              "MEDIO",
+              "GRANDE"
+            ],
+            "nullable": true
+          },
+          "cor": {
+            "type": "string",
+            "description": "Cor",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "identificadorPublico": "EXEMPLO-001",
+          "nome": "Luna",
+          "microchip": null,
+          "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "racaId": null,
+          "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "frente": "CASADOTE",
+          "fotoEntradaId": "56b9f220-3c58-4adc-9dfa-102b90720e12"
+        }
+      },
+      "AtualizarAnimal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "versao"
+        ],
+        "minProperties": 2,
+        "properties": {
+          "nome": {
+            "type": "string",
+            "description": "Nome conhecido",
+            "nullable": true
+          },
+          "microchip": {
+            "type": "string",
+            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "example": "000123456789",
+            "nullable": true
+          },
+          "especieId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "racaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid",
+            "nullable": true
+          },
+          "unidadeId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "localizacaoId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "responsavelId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "frente": {
+            "type": "string",
+            "description": "Classificação atual; demais nomes aguardam validação",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED"
+            ]
+          },
+          "dataEntrada": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sexo": {
+            "type": "string",
+            "description": "Sexo informado",
+            "enum": [
+              "MACHO",
+              "FEMEA"
+            ],
+            "nullable": true
+          },
+          "idadeAproximadaMeses": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Meses; unidade proposta"
+          },
+          "pesoKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Peso atual em kg, duas casas decimais; não há histórico"
+          },
+          "porte": {
+            "type": "string",
+            "description": "Porte",
+            "enum": [
+              "PEQUENO",
+              "MEDIO",
+              "GRANDE"
+            ],
+            "nullable": true
+          },
+          "cor": {
+            "type": "string",
+            "description": "Cor",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Versão esperada; divergência retorna 409"
+          }
+        }
+      },
+      "Animal": {
+        "type": "object",
+        "required": [
+          "id",
+          "identificadorPublico",
+          "versao",
+          "criadoEm",
+          "atualizadoEm",
+          "fotoEntradaId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "identificadorPublico": {
+            "type": "string",
+            "description": "Identificador público; formação pendente"
+          },
+          "nome": {
+            "type": "string",
+            "description": "Nome conhecido",
+            "nullable": true
+          },
+          "microchip": {
+            "type": "string",
+            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "example": "000123456789",
+            "nullable": true
+          },
+          "especieId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "racaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid",
+            "nullable": true
+          },
+          "unidadeId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "localizacaoId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "responsavelId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "frente": {
+            "type": "string",
+            "description": "Classificação atual; demais nomes aguardam validação",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED"
+            ]
+          },
+          "dataEntrada": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time",
+            "nullable": true
+          },
+          "sexo": {
+            "type": "string",
+            "description": "Sexo informado",
+            "enum": [
+              "MACHO",
+              "FEMEA"
+            ],
+            "nullable": true
+          },
+          "idadeAproximadaMeses": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Meses; unidade proposta"
+          },
+          "pesoKg": {
+            "type": "number",
+            "minimum": 0,
+            "nullable": true,
+            "description": "Peso atual em kg, duas casas decimais; não há histórico"
+          },
+          "porte": {
+            "type": "string",
+            "description": "Porte",
+            "enum": [
+              "PEQUENO",
+              "MEDIO",
+              "GRANDE"
+            ],
+            "nullable": true
+          },
+          "cor": {
+            "type": "string",
+            "description": "Cor",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "criadoEm": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time"
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time"
+          },
+          "arquivadoEm": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "identificadorPublico": "EXEMPLO-001",
+          "nome": "Luna",
+          "microchip": null,
+          "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "racaId": null,
+          "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "frente": "CASADOTE",
+          "fotoEntradaId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "versao": 1,
+          "criadoEm": "2026-09-13T12:00:00Z",
+          "atualizadoEm": "2026-09-13T12:00:00Z",
+          "arquivadoEm": null
+        }
+      },
+      "Catalogo": {
+        "type": "object",
+        "required": [
+          "id",
+          "nome"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string",
+            "description": "Nome de catálogo"
+          },
+          "especieId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "unidadeId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "nome": "Exemplo de desenvolvimento"
+        }
+      },
+      "Frente": {
+        "type": "object",
+        "required": [
+          "codigo",
+          "nome"
+        ],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "description": "Classificação atual; demais nomes aguardam validação",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED"
+            ]
+          },
+          "nome": {
+            "type": "string",
+            "description": "Nome de exibição"
+          }
+        },
+        "example": {
+          "codigo": "CASADOTE",
+          "nome": "CasAdote"
+        }
+      },
+      "FotoSolicitada": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "tipoMidia",
+          "tamanhoBytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "tipoMidia": {
+            "type": "string",
+            "description": "Tipos aceitos ainda sujeitos a acordo",
+            "enum": [
+              "image/jpeg",
+              "image/png"
+            ]
+          },
+          "tamanhoBytes": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "tipoMidia": "image/jpeg",
+          "tamanhoBytes": 123456
+        }
+      },
+      "EnvioFoto": {
+        "type": "object",
+        "required": [
+          "id",
+          "urlEnvio",
+          "expiraEm"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "urlEnvio": {
+            "type": "string",
+            "description": "URL assinada temporária para PUT binário; não registrar em logs",
+            "format": "uri"
+          },
+          "expiraEm": {
+            "type": "string",
+            "description": "Instante ISO-8601",
+            "format": "date-time"
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "urlEnvio": "https://example.invalid/envio",
+          "expiraEm": "2026-09-13T12:15:00Z"
+        }
+      },
+      "FotoConfirmada": {
+        "type": "object",
+        "required": [
+          "id",
+          "situacao"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "situacao": {
+            "type": "string",
+            "enum": [
+              "CONFIRMADA"
+            ]
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "situacao": "CONFIRMADA"
+        }
+      },
+      "PaginaAnimais": {
+        "type": "object",
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Animal"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PaginaCatalogo": {
+        "type": "object",
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Catalogo"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "PaginaFrentes": {
+        "type": "object",
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Frente"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "acessoPlanejado": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Autenticação futura; mecanismo/provedor a confirmar. Nenhuma segurança funcional declarada."
+      }
+    }
+  }
+}
