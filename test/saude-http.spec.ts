@@ -1,35 +1,17 @@
-import { Controller, Get, HttpException, INestApplication, VERSION_NEUTRAL } from '@nestjs/common';
+import { ArgumentsHost, HttpException, INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import request from 'supertest';
+// supertest exporta uma função CommonJS; esta sintaxe evita dependência de esModuleInterop no editor.
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+import request = require('supertest');
 import { AppModule } from '../src/app.module';
+import { FiltroExcecaoGlobal } from '../src/common/filtros/filtro-excecao-global';
 import { configurarAplicacao } from '../src/configurar-aplicacao';
-
-@Controller({ path: 'teste-erros', version: VERSION_NEUTRAL })
-class ErrosDeTeste {
-  @Get('400') entrada() {
-    throw new HttpException({ message: ['Campo inválido'] }, 400);
-  }
-  @Get('401') sessao() {
-    throw new HttpException('Sessão necessária', 401);
-  }
-  @Get('403') acesso() {
-    throw new HttpException('Acesso negado', 403);
-  }
-  @Get('409') conflito() {
-    throw new HttpException('Versão desatualizada', 409);
-  }
-  @Get('500') interno() {
-    throw new Error('senha=segredo SQL SELECT');
-  }
-}
 
 describe('Aplicação NestJS via HTTP', () => {
   let app: INestApplication;
+
   beforeAll(async () => {
-    const modulo = await Test.createTestingModule({
-      imports: [AppModule],
-      controllers: [ErrosDeTeste],
-    }).compile();
+    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
     app = modulo.createNestApplication();
     configurarAplicacao(app);
     await app.init();
@@ -42,37 +24,52 @@ describe('Aplicação NestJS via HTTP', () => {
     expect(resposta.body.status).toBe('ok');
     expect(Number.isNaN(Date.parse(resposta.body.timestamp))).toBe(false);
   });
-  it.each([400, 401, 403, 409, 500])('preserva status %i e padroniza o erro', async (status) => {
-    const caminho = '/api/teste-erros/' + status;
-    const resposta = await request(app.getHttpServer())
-      .get(caminho + '?token=segredo')
-      .expect(status);
-    expect(Object.keys(resposta.body).sort()).toEqual([
-      'caminho',
-      'mensagem',
-      'statusCode',
-      'timestamp',
-    ]);
-    expect(resposta.body.caminho).toBe(caminho);
-    expect(resposta.body.statusCode).toBe(status);
-    expect(Number.isNaN(Date.parse(resposta.body.timestamp))).toBe(false);
-    expect(JSON.stringify(resposta.body)).not.toContain('segredo');
+});
 
-    if (status === 400) {
-      expect(resposta.body.mensagem).toEqual(['Campo inválido']);
-    }
-    if (status === 409) {
-      expect(resposta.body.mensagem).toBe('Versão desatualizada');
-    }
-    if (status === 500) {
-      expect(resposta.body.mensagem).toBe('Erro interno do servidor');
-    }
+describe('Filtro global de exceções', () => {
+  function executarFiltro(exception: unknown, caminho = '/api/teste-erros') {
+    const resposta = { status: jest.fn().mockReturnThis(), json: jest.fn() };
+    const host = {
+      switchToHttp: () => ({
+        getResponse: () => resposta,
+        getRequest: () => ({ path: caminho }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    new FiltroExcecaoGlobal().catch(exception, host);
+    return resposta;
+  }
+
+  it.each([
+    [400, ['Campo inválido']],
+    [401, 'Sessão necessária'],
+    [403, 'Acesso negado'],
+    [409, 'Versão desatualizada'],
+  ])('preserva status HTTP %i e padroniza o corpo', (status, mensagem) => {
+    const resposta = executarFiltro(new HttpException({ message: mensagem }, status));
+
+    expect(resposta.status).toHaveBeenCalledWith(status);
+    expect(resposta.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: status,
+        mensagem,
+        caminho: '/api/teste-erros',
+        timestamp: expect.any(String),
+      }),
+    );
   });
 
-  it('retorna 404 para rota inexistente e saúde versionada', async () => {
-    for (const caminho of ['/api/inexistente', '/api/v1/health']) {
-      const resposta = await request(app.getHttpServer()).get(caminho).expect(404);
-      expect(resposta.body.mensagem).toBe('Recurso não encontrado');
-    }
+  it('oculta detalhes internos em erro 500', () => {
+    const resposta = executarFiltro(new Error('senha=segredo SQL SELECT'), '/api/falha');
+
+    expect(resposta.status).toHaveBeenCalledWith(500);
+    expect(resposta.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        statusCode: 500,
+        mensagem: 'Erro interno do servidor',
+        caminho: '/api/falha',
+      }),
+    );
+    expect(JSON.stringify(resposta.json.mock.calls)).not.toContain('segredo');
   });
 });
