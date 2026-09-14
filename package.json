@@ -26,6 +26,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "overrides": {
+    "multer": "2.3.0"
+  },
   "type": "commonjs",
   "bugs": {
     "url": "https://github.com/valterfute-debug/Inteli-social/issues"

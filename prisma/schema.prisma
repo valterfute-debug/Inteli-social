@@ -36,6 +36,7 @@ model Breed {
   species Species @relation(fields: [speciesId], references: [id])
   animals Animal[]
   @@unique([speciesId, name])
+  @@unique([id, speciesId])
 }
 model Unit {
   id String @id @default(uuid())
@@ -55,6 +56,7 @@ model Location {
   unit Unit @relation(fields: [unitId], references: [id])
   animals Animal[]
   @@unique([unitId, name])
+  @@unique([id, unitId])
 }
 model Responsible {
   id String @id @default(uuid())

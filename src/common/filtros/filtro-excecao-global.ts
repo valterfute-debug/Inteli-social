@@ -27,13 +27,11 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
         : status === 404
           ? mensagens[404]
           : (original ?? mensagens[status] ?? 'Falha na requisição');
-    response
-      .status(status)
-      .json({
-        statusCode: status,
-        mensagem,
-        caminho: request.path,
-        timestamp: new Date().toISOString(),
-      });
+    response.status(status).json({
+      statusCode: status,
+      mensagem,
+      caminho: request.path,
+      timestamp: new Date().toISOString(),
+    });
   }
 }
