@@ -328,12 +328,13 @@ Breed e Location não possuem datas, versão ou exclusão lógica. Espécies adi
 
 ### 3.6.4. Migrations e integridade
 
-Existem duas migrations locais:
+Existem três migrations, todas já aplicadas no ambiente remoto (confirmado via `prisma migrate status` e por consulta direta ao catálogo do PostgreSQL — `pg_constraint`/`pg_indexes` — em 2026-09-23):
 
 1. 20260913170000_init: estrutura inicial e relações.
 2. 20260913230422_adicionar_dados_admissao: enums e campos adicionais opcionais.
+3. 20260914000000_integridade_cruzada: cria índices únicos compostos e FKs compostas para proteger raça/espécie e localização/unidade. É aditiva e preserva dados.
 
-As duas primeiras migrations foram confirmadas em sessão anterior e não devem ser reescritas. A migration `20260914000000_integridade_cruzada` é aditiva: cria índices únicos compostos e FKs compostas para proteger raça/espécie e localização/unidade. Ela preserva dados e deve ser aplicada somente em ambiente autorizado com `prisma migrate deploy`.
+A integridade cruzada foi validada também de forma funcional: uma tentativa de cadastrar um animal com uma raça pertencente a uma espécie diferente da informada foi corretamente rejeitada pelo banco (erro `P2003`).
 
 As FKs simples protegem a existência de referências; as FKs compostas adicionadas protegem a consistência cruzada raça/espécie e localização/unidade. O desenho atual guarda vínculos presentes e não conserva histórico de transferências ou readmissões, assunto da Sprint 2.
 
@@ -455,10 +456,10 @@ Existe uma suíte com um teste unitário de HealthController, que confere status
 | Prisma validate           | Schema aprovado na sessão anterior                                        |
 | Testes automatizados      | Uma suíte e um teste aprovados anteriormente                              |
 | db:check                  | Consulta PostgreSQL bem-sucedida anteriormente                            |
-| Migrations                | Duas aplicadas e status atualizado anteriormente                          |
+| Migrations                | Três aplicadas em ambiente remoto (confirmado em 2026-09-23)              |
 | Contrato OpenAPI completo | Implementado e validado localmente                                        |
 | HTTP automatizado         | Implementado e validado localmente                                        |
-| Integridade cruzada       | Migration aditiva implementada; aplicação em ambiente autorizado pendente |
+| Integridade cruzada       | Migration aplicada e validada funcionalmente em 2026-09-23                |
 | Cobertura percentual      | Sem medição apresentada neste documento                                   |
 | Carga e offline           | Não implementados/testados                                                |
 
@@ -467,8 +468,7 @@ As verificações locais são repetidas na revisão de cada alteração; operaç
 ## 5.2. Plano de testes pendentes
 
 - Confirmar a execução remota do workflow no GitHub, sem `.env` local ou credenciais remotas.
-- Aplicar e verificar a migration de integridade em ambiente isolado e autorizado antes da Sprint 2.
-- Testes de cadastro, foto, concorrência, idempotência e offline serão criados com as funcionalidades da Sprint 2 e do planejamento conjunto com a Sprint 3.
+- Testes de foto, offline e sincronização serão criados com as funcionalidades restantes da Sprint 2 e do planejamento conjunto com a Sprint 3.
 - Medir capacidade depois da confirmação do número de usuários simultâneos.
 
 ## 5.3. Usabilidade
@@ -519,7 +519,7 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 | Entrega                                      | Situação                                                                     |
 | -------------------------------------------- | ---------------------------------------------------------------------------- |
 | Base NestJS e configuração                   | Implementada                                                                 |
-| Modelo e migrations                          | Implementados; migration aditiva de integridade aguarda aplicação autorizada |
+| Modelo e migrations                          | Implementados; as três migrations, incluindo a de integridade cruzada, estão aplicadas em produção |
 | Conexão Supabase de desenvolvimento          | Verificada anteriormente                                                     |
 | Health e Swagger básico                      | Implementados                                                                |
 | Filtro global de erros                       | Implementado e coberto pelos testes HTTP da base                             |
@@ -527,7 +527,7 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 | CI                                           | Implementado com variáveis fictícias; execução remota pendente               |
 | .env.example                                 | Implementado                                                                 |
 | Teste HTTP automatizado                      | Implementado                                                                 |
-| Integridade cruzada de relações              | Migration aditiva implementada; aplicação autorizada pendente                |
+| Integridade cruzada de relações              | Aplicada em produção e validada funcionalmente (2026-09-23)                  |
 | Revisão de segurança Supabase                | Pendente                                                                     |
 | Documentação e coerência dos artefatos       | Atualizada nesta revisão                                                     |
 | Ambientes de homologação e publicação da API | Não verificados/pendentes                                                    |
@@ -536,11 +536,10 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 ## 7.3. Próximos passos priorizados
 
 1. Aprovar o modelo e o contrato com Ampara e frontend.
-2. Aplicar a migration de integridade em ambiente autorizado após revisar registros existentes.
-3. Confirmar execução remota do CI no GitHub.
-4. Revisar Data API, grants e RLS no painel Supabase e guardar evidências.
-5. Definir provedor e configurar ambientes separados para homologação.
-6. Transferir admissão, foto, validações e alterações para Sprint 2; busca/listagem e publicação para Sprint 3; interface/PWA para frontend.
+2. Confirmar execução remota do CI no GitHub.
+3. Revisar Data API, grants e RLS no painel Supabase e guardar evidências.
+4. Definir provedor e configurar ambientes separados para homologação.
+5. Transferir foto, autenticação e sincronização offline para as próximas sprints; publicação para Sprint 3; interface/PWA para frontend.
 
 ## 7.4. Evolução futura
 
@@ -581,9 +580,9 @@ Esperado: ata e contrato aprovados. Bloqueia aprovação da ficha e integração
 Onde: painel do projeto de desenvolvimento. Execute os passos e consultas de [segurança](#seguranca) para Data API, grants, RLS e _prisma_migrations.
 Esperado: evidências das configurações e retirada de acesso desnecessário. Verifique repetindo consultas. Bloqueia uso real; não houve alteração remota nesta tarefa.
 
-## 3. Fechar integridade antes do cadastro
+## 3. Integridade cruzada (concluído)
 
-As FKs atuais não garantem consistência cruzada. A proposta em integridade-admissao.md requer auditoria de registros existentes, nova migration revisada e testes isolados. Não altere migrations aplicadas. Bloqueia cadastro funcional; esta limitação está registrada.
+A migration `20260914000000_integridade_cruzada` está aplicada em produção e foi validada funcionalmente em 2026-09-23: as FKs compostas impedem `Animal.breedId` de apontar para raça de outra `speciesId` e `locationId` de apontar para localização de outra `unitId`. Não é mais um bloqueio para o cadastro.
 
 ## 4. Publicar homologação
 
@@ -699,8 +698,8 @@ Sem commit ou push. O repositório já continha a fundação não commitada; git
 
 ## Integridade e admissão
 
-A aplicação mantém as duas migrations já aplicadas e adiciona `20260914000000_integridade_cruzada`, sem reescrever dados ou histórico. As novas FKs compostas impedem `Animal.breedId` de apontar para raça de outra `speciesId` e `locationId` de apontar para localização de outra `unitId`. A migration ainda não foi aplicada em ambiente remoto e não há teste de banco integrado nesta fundação.
-A correção implementada é FK composta `(breedId, speciesId) → Breed(id, speciesId)` e `(locationId, unitId) → Location(id, unitId)`, com índices únicos correspondentes. Antes da aplicação, consultar inconsistências e acordar a atualização dos vínculos; não preencher ou apagar registros automaticamente. Raça desconhecida permanece `NULL`. Validações transacionais do serviço serão complementares na Sprint 2, não substituem a proteção do banco.
+A aplicação mantém as duas migrations anteriores e adiciona `20260914000000_integridade_cruzada`, sem reescrever dados ou histórico. As novas FKs compostas impedem `Animal.breedId` de apontar para raça de outra `speciesId` e `locationId` de apontar para localização de outra `unitId`. A migration está aplicada em ambiente remoto (confirmado em 2026-09-23 via `prisma migrate status` e consulta direta ao catálogo do PostgreSQL) e foi validada funcionalmente: uma tentativa de vincular uma raça à espécie errada foi rejeitada pelo banco (erro `P2003`).
+A correção implementada é FK composta `(breedId, speciesId) → Breed(id, speciesId)` e `(locationId, unitId) → Location(id, unitId)`, com índices únicos correspondentes. Raça desconhecida permanece `NULL`. O `AnimalsService` (Sprint 2) já traduz violações dessas FKs em respostas HTTP 400 para quem chama a API.
 
 ## Campos provisórios
 
@@ -786,8 +785,8 @@ erDiagram
 ```
 
 Front: CCPA/CASADOTE/CED; Sexo: MACHO/FEMEA; Porte: PEQUENO/MEDIO/GRANDE.
-Breed possui unicidade espécie/nome; Location unidade/nome. Índices de Animal: nome, espécie e publicId único. Chaves físicas são TEXT; uuid() existe nos demais modelos, mas Animal.id é fornecido pelo chamador.
-Veja [integridade e campos opcionais](#integridade). O diagrama não representa uma entidade de foto, histórico de peso ou admissão separada: elas não existem. Localização/unidade e raça/espécie ainda permitem inconsistências cruzadas.
+Breed possui unicidade espécie/nome; Location unidade/nome. Índices de Animal: nome, espécie e publicId único. Chaves físicas são TEXT; uuid() existe nos demais modelos. Animal.id não tem `@default(uuid())` no schema, mas o `AnimalsService` (Sprint 2) já gera esse identificador no servidor ao criar o registro.
+Veja [integridade e campos opcionais](#integridade). O diagrama não representa uma entidade de foto ou histórico de peso: elas não existem. Localização/unidade e raça/espécie não permitem mais inconsistências cruzadas, pois a migration de integridade cruzada já está aplicada em produção.
 
 <a id="seguranca"></a>
 
@@ -875,6 +874,6 @@ Ambientes: desenvolvimento, homologação e produção usam projetos Supabase/ba
 
 Veja [contrato](../contracts/openapi.json), [modelo](#modelo), [limitações de integridade](#integridade), [segurança](#seguranca) e [ações manuais](acoes-manuais-sprint-1.md).
 
-Não há CRUD, upload, autenticação, histórico de peso ou sincronização implementados: são entregas planejadas para a Sprint 2 e/ou Sprint 3, não lacunas da fundação da Sprint 1. O contrato planejado não cria endpoints. A integridade cruzada está codificada em migration aditiva e aguarda aplicação autorizada antes do cadastro funcional.
+O CRUD de Animal e os endpoints de catálogo (espécies, raças, unidades, localizações, responsáveis, frentes) já estão implementados. Não há upload de foto, autenticação, histórico de peso ou sincronização offline implementados: são entregas planejadas para a Sprint 2 e/ou Sprint 3. A integridade cruzada está aplicada em produção (ver [integridade e campos opcionais](#integridade)).
 
 CI está preparado com URLs fictícias e não precisa de secrets; execução GitHub pendente. Não há provedor de API definido, CD ou homologação comprovada. Produção inicia com npm run start após build; orientações de release estão no guia manual.
