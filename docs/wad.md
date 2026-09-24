@@ -530,7 +530,7 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 | Integridade cruzada de relações              | Aplicada em produção e validada funcionalmente (2026-09-23)                  |
 | Revisão de segurança Supabase                | Pendente                                                                     |
 | Documentação e coerência dos artefatos       | Atualizada nesta revisão                                                     |
-| Ambientes de homologação e publicação da API | Não verificados/pendentes                                                    |
+| Ambientes de homologação e publicação da API | Provedor (Render) e `render.yaml` prontos; falta criar a conta e publicar    |
 | Identificação da equipe e orientação         | Pendente de confirmação institucional                                        |
 
 ## 7.3. Próximos passos priorizados
@@ -586,28 +586,20 @@ A migration `20260914000000_integridade_cruzada` está aplicada em produção e 
 
 ## 4. Publicar homologação
 
-Não há provedor definido. Escolha um serviço Node 24 persistente, com HTTPS, secrets, logs e acesso restrito. Supabase hospeda apenas o banco.
-Diretório de trabalho: raiz Inteli-social. Build:
+Provedor escolhido: **Render** (plano free, runtime Node nativo). A configuração está versionada em `render.yaml`, na raiz do repositório, seguindo o modelo de Blueprint do Render.
 
-```powershell
-npm ci
-npm run prisma:generate
-npm run build
-```
+Passos para publicar (feitos uma vez pelo dono da conta Render):
 
-No provedor configure DATABASE_URL e DIRECT_URL do projeto exclusivamente de homologação; NODE_ENV=staging e PORT conforme o provedor (padrão 3000). As duas URLs são segredos exigidos pelo ConfigModule atual. Não há necessidade de API keys de Auth/Storage.
-Em um job único de release autorizado, confira destino e aplique apenas migrations existentes:
+1. Criar conta em [render.com](https://render.com) e conectar a conta do GitHub que hospeda este repositório.
+2. Em **New → Blueprint**, selecionar o repositório `Inteli-social`. O Render lê `render.yaml` automaticamente e propõe o serviço `inteli-social-api`.
+3. Antes de confirmar, preencher os segredos que o `render.yaml` marca como `sync: false` (não versionados): `DATABASE_URL` e `DIRECT_URL`, usando as credenciais do projeto Supabase (Session pooler, porta 5432 — mesmo formato do `.env.example`).
+4. Confirmar a criação. O Render executa automaticamente: `npm ci && npm run prisma:generate && npm run prisma:migrate:deploy && npm run build`, e depois `npm run start`.
+5. O Render verifica a saúde do serviço em `GET /api/health` (configurado via `healthCheckPath` no `render.yaml`).
 
-```powershell
-npx prisma migrate status
-npm run prisma:migrate:deploy
-npx prisma migrate status
-```
+Esse fluxo foi validado localmente antes de documentar: rodei o mesmo `buildCommand` do `render.yaml` (`prisma:generate`, `prisma:migrate:deploy`, `build`) e depois `npm run start` contra o banco Supabase real, confirmando `GET /api/health` e `GET /api/v1/fronts` respondendo corretamente a partir do código compilado em `dist/`.
 
-Não use migrate dev/reset em publicação. O comando de início é npm run start (node dist/main.js). Health: GET /api/health → HTTP 200 e status ok; não verifica banco. Execute npm run db:check no ambiente autorizado para verificar PostgreSQL.
-Mantenha /docs restrito no provedor; autenticação/autorização ainda precisam de implementação antes de uso real.
-Atualizações: SQL revisado e backup restaurável antes do release. Se falhar, retorne ao artefato anterior apenas quando compatível com schema. Banco exige correção progressiva ou restauração planejada; não reescrever migration aplicada.
-Esperado: endpoint HTTPS e conexão verificados. Bloqueia homologação operacional. CD e homologação não estão concluídos.
+Mantenha `/docs` (Swagger) restrito ou desabilitado antes de uso real com dados sensíveis; autenticação/autorização ainda precisam de implementação (ver [segurança](#seguranca)).
+Atualizações futuras: revisar migrations antes de cada deploy; o `prisma:migrate:deploy` só aplica migrations pendentes e nunca reescreve as já aplicadas.
 
 ## 5. Revisar e enviar ao GitHub
 
