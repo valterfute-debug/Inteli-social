@@ -6,6 +6,9 @@ import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
 import { ListarAnimaisQueryDto } from './dto/listar-animais-query.dto';
 import { mapearAnimal } from './animal.mapper';
+import { gerarIdentificadorPublico } from './identificador-publico.util';
+
+const TENTATIVAS_MAXIMAS_IDENTIFICADOR = 3;
 
 @Injectable()
 export class AnimalsService {
@@ -34,30 +37,40 @@ export class AnimalsService {
   }
 
   async criar(dto: CriarAnimalDto) {
-    try {
-      const animal = await this.prisma.animal.create({
-        data: {
-          id: randomUUID(),
-          publicId: dto.identificadorPublico,
-          name: dto.nome,
-          microchip: dto.microchip,
-          speciesId: dto.especieId,
-          breedId: dto.racaId,
-          unitId: dto.unidadeId,
-          locationId: dto.localizacaoId,
-          responsibleId: dto.responsavelId,
-          front: dto.frente,
-          dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
-          sexo: dto.sexo,
-          idadeAproximadaMeses: dto.idadeAproximadaMeses,
-          pesoKg: dto.pesoKg,
-          porte: dto.porte,
-          cor: dto.cor,
-        },
-      });
-      return mapearAnimal(animal);
-    } catch (erro) {
-      this.tratarErroPrisma(erro, dto.identificadorPublico);
+    for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
+      const identificadorPublico = gerarIdentificadorPublico();
+      try {
+        const animal = await this.prisma.animal.create({
+          data: {
+            id: randomUUID(),
+            publicId: identificadorPublico,
+            name: dto.nome,
+            microchip: dto.microchip,
+            speciesId: dto.especieId,
+            breedId: dto.racaId,
+            unitId: dto.unidadeId,
+            locationId: dto.localizacaoId,
+            responsibleId: dto.responsavelId,
+            front: dto.frente,
+            dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
+            sexo: dto.sexo,
+            idadeAproximadaMeses: dto.idadeAproximadaMeses,
+            pesoKg: dto.pesoKg,
+            porte: dto.porte,
+            cor: dto.cor,
+            observacoes: dto.observacoes,
+            fotoEntradaId: dto.fotoEntradaId,
+          },
+        });
+        return mapearAnimal(animal);
+      } catch (erro) {
+        const colisaoDeIdentificador =
+          erro instanceof Prisma.PrismaClientKnownRequestError &&
+          erro.code === 'P2002' &&
+          (erro.meta?.target as string[] | undefined)?.includes('publicId');
+        if (colisaoDeIdentificador && tentativa < TENTATIVAS_MAXIMAS_IDENTIFICADOR) continue;
+        this.tratarErroPrisma(erro);
+      }
     }
   }
 
@@ -93,6 +106,8 @@ export class AnimalsService {
           ...(dados.pesoKg !== undefined ? { pesoKg: dados.pesoKg } : {}),
           ...(dados.porte !== undefined ? { porte: dados.porte } : {}),
           ...(dados.cor !== undefined ? { cor: dados.cor } : {}),
+          ...(dados.observacoes !== undefined ? { observacoes: dados.observacoes } : {}),
+          ...(dados.fotoEntradaId !== undefined ? { fotoEntradaId: dados.fotoEntradaId } : {}),
           version: { increment: 1 },
         },
       });
@@ -118,14 +133,10 @@ export class AnimalsService {
     if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
   }
 
-  private tratarErroPrisma(erro: unknown, identificadorPublico?: string): never {
+  private tratarErroPrisma(erro: unknown): never {
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
       if (erro.code === 'P2002') {
-        throw new ConflictException(
-          identificadorPublico
-            ? `Já existe um animal com o identificador público "${identificadorPublico}"`
-            : 'Violação de unicidade',
-        );
+        throw new ConflictException('Violação de unicidade');
       }
       if (erro.code === 'P2003' || erro.code === 'P2025') {
         throw new BadRequestException(

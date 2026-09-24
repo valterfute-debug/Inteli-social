@@ -18,6 +18,8 @@ export function mapearAnimal(animal: AnimalPrisma) {
     pesoKg: animal.pesoKg === null ? null : Number(animal.pesoKg),
     porte: animal.porte,
     cor: animal.cor,
+    observacoes: animal.observacoes,
+    fotoEntradaId: animal.fotoEntradaId,
     versao: animal.version,
     criadoEm: animal.createdAt.toISOString(),
     atualizadoEm: animal.updatedAt.toISOString(),

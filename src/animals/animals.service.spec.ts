@@ -15,6 +15,8 @@ function criarAnimalFalso(sobrescritas: Partial<Record<string, unknown>> = {}) {
     pesoKg: null,
     porte: null,
     cor: null,
+    observacoes: null,
+    fotoEntradaId: null,
     speciesId: 'especie-1',
     breedId: null,
     unitId: 'unidade-1',
@@ -48,7 +50,6 @@ describe('AnimalsService', () => {
     const service = new AnimalsService(prisma);
 
     const resposta = await service.criar({
-      identificadorPublico: 'QA-001',
       nome: 'Rex',
       especieId: 'especie-1',
       unidadeId: 'unidade-1',
@@ -58,8 +59,8 @@ describe('AnimalsService', () => {
       sexo: Sexo.MACHO,
     });
 
-    expect(resposta.identificadorPublico).toBe('QA-001');
-    expect(resposta.versao).toBe(1);
+    expect(resposta?.identificadorPublico).toBe('QA-001');
+    expect(resposta?.versao).toBe(1);
   });
 
   it('converte violação de identificador público duplicado em 409', async () => {
@@ -74,7 +75,6 @@ describe('AnimalsService', () => {
 
     await expect(
       service.criar({
-        identificadorPublico: 'QA-001',
         especieId: 'especie-1',
         unidadeId: 'unidade-1',
         localizacaoId: 'local-1',

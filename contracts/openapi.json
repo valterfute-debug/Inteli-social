@@ -2292,9 +2292,8 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados para cadastro de admissão. Upload de foto ainda não implementado (pendência registrada).",
+        "description": "Dados para cadastro de admissão. O identificador público é gerado pelo servidor.",
         "required": [
-          "identificadorPublico",
           "especieId",
           "unidadeId",
           "localizacaoId",
@@ -2302,10 +2301,6 @@
           "frente"
         ],
         "properties": {
-          "identificadorPublico": {
-            "type": "string",
-            "description": "Identificador público; formação pendente"
-          },
           "nome": {
             "type": "string",
             "description": "Nome conhecido",
@@ -2393,11 +2388,20 @@
             "type": "string",
             "description": "Cor",
             "nullable": true
+          },
+          "observacoes": {
+            "type": "string",
+            "description": "Ex.: mancha branca na pata dianteira",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Foto de entrada já confirmada (ver POST /fotos). Temporariamente opcional até o fluxo de upload estar validado ponta a ponta."
           }
         },
         "example": {
-          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
-          "identificadorPublico": "EXEMPLO-001",
           "nome": "Luna",
           "microchip": null,
           "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
@@ -2406,7 +2410,8 @@
           "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
-          "fotoEntradaId": "56b9f220-3c58-4adc-9dfa-102b90720e12"
+          "observacoes": null,
+          "fotoEntradaId": null
         }
       },
       "AtualizarAnimal": {
@@ -2509,6 +2514,17 @@
             "type": "integer",
             "minimum": 1,
             "description": "Versão esperada; divergência retorna 409"
+          },
+          "observacoes": {
+            "type": "string",
+            "description": "Ex.: mancha branca na pata dianteira",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Identificador UUID"
           }
         }
       },
@@ -2638,6 +2654,17 @@
             "description": "Instante ISO-8601",
             "format": "date-time",
             "nullable": true
+          },
+          "observacoes": {
+            "type": "string",
+            "description": "Ex.: mancha branca na pata dianteira",
+            "nullable": true
+          },
+          "fotoEntradaId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Identificador UUID"
           }
         },
         "example": {
@@ -2651,11 +2678,12 @@
           "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
-          "fotoEntradaId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "fotoEntradaId": null,
           "versao": 1,
           "criadoEm": "2026-09-13T12:00:00Z",
           "atualizadoEm": "2026-09-13T12:00:00Z",
-          "arquivadoEm": null
+          "arquivadoEm": null,
+          "observacoes": null
         }
       },
       "Catalogo": {

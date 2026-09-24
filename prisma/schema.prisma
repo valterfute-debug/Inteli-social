@@ -25,6 +25,10 @@ enum TipoEventoSaude {
   VERMIFUGO
   CASTRACAO
 }
+enum SituacaoFoto {
+  PENDENTE
+  CONFIRMADA
+}
 model Species {
   id String @id @default(uuid())
   name String @unique
@@ -86,6 +90,9 @@ model Animal {
   pesoKg Decimal? @db.Decimal(6, 2)
   porte Porte?
   cor String?
+  observacoes String?
+  fotoEntradaId String? @unique
+  fotoEntrada Foto? @relation(fields: [fotoEntradaId], references: [id])
   speciesId String
   species Species @relation(fields: [speciesId], references: [id])
   breedId String?
@@ -104,6 +111,17 @@ model Animal {
   healthEvents HealthEvent[]
   @@index([name])
   @@index([speciesId])
+}
+model Foto {
+  id String @id @default(uuid())
+  tipoMidia String
+  tamanhoBytes Int
+  caminhoArmazenamento String
+  situacao SituacaoFoto @default(PENDENTE)
+  expiraEm DateTime
+  animal Animal?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 model HealthEvent {
   id String @id @default(uuid())
