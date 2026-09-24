@@ -1729,6 +1729,383 @@
           }
         ]
       }
+    },
+    "/api/v1/animals/{animalId}/health-events": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do animal",
+          "schema": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Listar eventos de saúde de um animal",
+        "description": "Implementado. Lista eventos ativos (não arquivados) de um animal, com paginação e filtro opcional por tipo.",
+        "x-situacao": "implementado",
+        "security": [],
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "tipo",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "VACINA",
+                "VERMIFUGO",
+                "CASTRACAO"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaEventosSaude"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Registrar evento de saúde (vacina, vermífugo ou castração)",
+        "description": "Implementado.",
+        "x-situacao": "implementado",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarEventoSaude"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventoSaude"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/animals/{animalId}/health-events/{id}": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do animal",
+          "schema": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do recurso",
+          "schema": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "summary": "Arquivar um evento de saúde cadastrado por engano",
+        "description": "Implementado. Arquivamento lógico (soft delete).",
+        "x-situacao": "implementado",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "Operação concluída sem corpo"
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2385,6 +2762,135 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/Frente"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "EventoSaude": {
+        "type": "object",
+        "required": [
+          "id",
+          "animalId",
+          "tipo",
+          "data",
+          "criadoEm",
+          "atualizadoEm"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "animalId": {
+            "type": "string",
+            "description": "Identificador UUID",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "VACINA",
+              "VERMIFUGO",
+              "CASTRACAO"
+            ]
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ex.: nome da vacina (V10, Raiva)"
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Data em que o evento ocorreu"
+          },
+          "observacoes": {
+            "type": "string",
+            "nullable": true
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "arquivadoEm": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "example": {
+          "id": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "animalId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
+          "tipo": "VACINA",
+          "descricao": "V10",
+          "data": "2026-01-10T00:00:00.000Z",
+          "observacoes": null,
+          "criadoEm": "2026-01-10T00:00:00.000Z",
+          "atualizadoEm": "2026-01-10T00:00:00.000Z",
+          "arquivadoEm": null
+        }
+      },
+      "CriarEventoSaude": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "tipo",
+          "data"
+        ],
+        "properties": {
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "VACINA",
+              "VERMIFUGO",
+              "CASTRACAO"
+            ]
+          },
+          "descricao": {
+            "type": "string",
+            "nullable": true
+          },
+          "data": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "observacoes": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "PaginaEventosSaude": {
+        "type": "object",
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EventoSaude"
             }
           },
           "pagina": {

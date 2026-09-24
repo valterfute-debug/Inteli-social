@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { AnimalsModule } from './animals/animals.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
+import { HealthEventsModule } from './health-events/health-events.module';
 @Module({
   imports: [
     PrismaModule,
@@ -27,6 +28,7 @@ import { CatalogosModule } from './catalogos/catalogos.module';
     HealthModule,
     AnimalsModule,
     CatalogosModule,
+    HealthEventsModule,
   ],
 })
 export class AppModule {}
