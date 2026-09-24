@@ -21,6 +21,8 @@ const ENDPOINTS_IMPLEMENTADOS = new Set([
   'POST /api/v1/animals/{animalId}/health-events',
   'DELETE /api/v1/animals/{animalId}/health-events/{id}',
   'GET /api/v1/animals/{id}/prontuario',
+  'POST /api/v1/fotos',
+  'POST /api/v1/fotos/{id}/confirmacao',
 ]);
 
 (async () => {

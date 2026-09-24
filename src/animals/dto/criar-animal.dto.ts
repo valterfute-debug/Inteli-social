@@ -76,13 +76,9 @@ export class CriarAnimalDto {
   observacoes?: string;
 
   @ApiProperty({
-    required: false,
-    nullable: true,
     format: 'uuid',
-    description:
-      'Foto de entrada já confirmada (ver POST /fotos). Temporariamente opcional até o fluxo de upload estar validado ponta a ponta.',
+    description: 'Foto de entrada já confirmada (ver POST /fotos e POST /fotos/{id}/confirmacao)',
   })
-  @IsOptional()
   @IsUUID('4')
-  fotoEntradaId?: string;
+  fotoEntradaId!: string;
 }

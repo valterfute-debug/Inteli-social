@@ -1478,13 +1478,9 @@
     "/api/v1/fotos": {
       "post": {
         "summary": "Solicitar envio de foto",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Gera uma URL assinada temporária (15 min) para envio direto do arquivo ao armazenamento.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "201": {
             "description": "Resultado esperado quando implementado",
@@ -1617,13 +1613,9 @@
       ],
       "post": {
         "summary": "Confirmar existência e validade do arquivo enviado",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Verifica se o arquivo chegou ao armazenamento e marca a foto como confirmada.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -2292,13 +2284,14 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados para cadastro de admissão. O identificador público é gerado pelo servidor.",
+        "description": "Dados para cadastro de admissão. O identificador público é gerado pelo servidor. Foto de entrada obrigatória e já confirmada (fluxo POST /fotos).",
         "required": [
           "especieId",
           "unidadeId",
           "localizacaoId",
           "responsavelId",
-          "frente"
+          "frente",
+          "fotoEntradaId"
         ],
         "properties": {
           "nome": {
@@ -2397,7 +2390,7 @@
           "fotoEntradaId": {
             "type": "string",
             "format": "uuid",
-            "nullable": true,
+            "nullable": false,
             "description": "Foto de entrada já confirmada (ver POST /fotos). Temporariamente opcional até o fluxo de upload estar validado ponta a ponta."
           }
         },
@@ -2411,7 +2404,7 @@
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
           "observacoes": null,
-          "fotoEntradaId": null
+          "fotoEntradaId": "56b9f220-3c58-4adc-9dfa-102b90720e12"
         }
       },
       "AtualizarAnimal": {
@@ -2763,12 +2756,14 @@
             "description": "Tipos aceitos ainda sujeitos a acordo",
             "enum": [
               "image/jpeg",
-              "image/png"
+              "image/png",
+              "image/webp"
             ]
           },
           "tamanhoBytes": {
             "type": "integer",
-            "minimum": 1
+            "minimum": 1,
+            "maximum": 8388608
           }
         },
         "example": {

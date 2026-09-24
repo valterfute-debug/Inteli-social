@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, SituacaoFoto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
@@ -37,6 +37,8 @@ export class AnimalsService {
   }
 
   async criar(dto: CriarAnimalDto) {
+    await this.garantirFotoConfirmada(dto.fotoEntradaId);
+
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
@@ -84,6 +86,9 @@ export class AnimalsService {
     const { versao, ...dados } = dto;
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
+    }
+    if (dados.fotoEntradaId !== undefined) {
+      await this.garantirFotoConfirmada(dados.fotoEntradaId);
     }
 
     try {
@@ -133,10 +138,23 @@ export class AnimalsService {
     if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
   }
 
+  private async garantirFotoConfirmada(fotoEntradaId: string) {
+    const foto = await this.prisma.foto.findUnique({ where: { id: fotoEntradaId } });
+    if (!foto) throw new BadRequestException('Foto não encontrada');
+    if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
+      throw new BadRequestException('Foto ainda não confirmada');
+    }
+  }
+
   private tratarErroPrisma(erro: unknown): never {
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
       if (erro.code === 'P2002') {
-        throw new ConflictException('Violação de unicidade');
+        const alvo = erro.meta?.target as string[] | undefined;
+        throw new ConflictException(
+          alvo?.includes('fotoEntradaId')
+            ? 'Esta foto já está vinculada a outro animal'
+            : 'Violação de unicidade',
+        );
       }
       if (erro.code === 'P2003' || erro.code === 'P2025') {
         throw new BadRequestException(

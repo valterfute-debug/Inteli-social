@@ -7,6 +7,8 @@ import { AnimalsModule } from './animals/animals.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { HealthEventsModule } from './health-events/health-events.module';
 import { ProntuarioModule } from './prontuario/prontuario.module';
+import { StorageModule } from './storage/storage.module';
+import { FotosModule } from './fotos/fotos.module';
 @Module({
   imports: [
     PrismaModule,
@@ -24,6 +26,9 @@ import { ProntuarioModule } from './prontuario/prontuario.module';
         DIRECT_URL: Joi.string()
           .uri({ scheme: ['postgresql', 'postgres'] })
           .required(),
+        SUPABASE_URL: Joi.string().uri().optional(),
+        SUPABASE_SERVICE_ROLE_KEY: Joi.string().optional(),
+        SUPABASE_STORAGE_BUCKET: Joi.string().optional(),
       }),
     }),
     HealthModule,
@@ -31,6 +36,8 @@ import { ProntuarioModule } from './prontuario/prontuario.module';
     CatalogosModule,
     HealthEventsModule,
     ProntuarioModule,
+    StorageModule,
+    FotosModule,
   ],
 })
 export class AppModule {}
