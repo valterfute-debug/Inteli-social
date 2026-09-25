@@ -110,13 +110,9 @@
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista animais ativos (não arquivados) com paginação e filtros por nome, identificador público e espécie.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -266,13 +262,9 @@
       },
       "post": {
         "summary": "Concluir admissão com foto confirmada",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Cadastro de admissão sem exigência de foto (upload de foto ainda não implementado).",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Reenvio idempotente do mesmo conteúdo",
@@ -375,18 +367,6 @@
             }
           }
         },
-        "parameters": [
-          {
-            "name": "Idempotency-Key",
-            "in": "header",
-            "required": true,
-            "description": "Filtro ou controle da requisição",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
-            }
-          }
-        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -415,13 +395,9 @@
       ],
       "get": {
         "summary": "Consultar animal",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Retorna o animal se ele existir e não estiver arquivado.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -517,13 +493,9 @@
       },
       "patch": {
         "summary": "Atualizar animal verificando versão",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Atualização otimista: exige a versão atual (campo versao); divergência retorna 409.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -629,13 +601,9 @@
       },
       "delete": {
         "summary": "Arquivar animal",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Arquivamento lógico (soft delete); não remove o registro do banco.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "204": {
             "description": "Operação concluída sem corpo"
@@ -738,13 +706,9 @@
     "/api/v1/species": {
       "get": {
         "summary": "Listar espécies",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista espécies não arquivadas.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -867,13 +831,9 @@
     "/api/v1/breeds": {
       "get": {
         "summary": "Listar raças",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista raças de uma espécie (especieId obrigatório).",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1007,13 +967,9 @@
     "/api/v1/units": {
       "get": {
         "summary": "Listar unidades",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista unidades não arquivadas.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1136,13 +1092,9 @@
     "/api/v1/locations": {
       "get": {
         "summary": "Listar localizações",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório).",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1276,13 +1228,9 @@
     "/api/v1/responsibles": {
       "get": {
         "summary": "Listar responsáveis",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista responsáveis ativos e não arquivados.",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1405,13 +1353,9 @@
     "/api/v1/fronts": {
       "get": {
         "summary": "Listar frentes",
-        "description": "PLANEJADO — contrato para mocks. Não há implementação HTTP desta operação.",
-        "x-situacao": "planejado",
-        "security": [
-          {
-            "acessoPlanejado": []
-          }
-        ],
+        "description": "Implementado. Lista fixa das três frentes de atuação (CCPA, CasAdote, CED).",
+        "x-situacao": "implementado",
+        "security": [],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1857,23 +1801,16 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Proposta para conclusão no servidor. Foto previamente confirmada é obrigatória. Campos opcionais refletem schema provisório, sujeitos à validação da Ampara.",
+        "description": "Dados para cadastro de admissão. Upload de foto ainda não implementado (pendência registrada).",
         "required": [
-          "id",
           "identificadorPublico",
           "especieId",
           "unidadeId",
           "localizacaoId",
           "responsavelId",
-          "frente",
-          "fotoEntradaId"
+          "frente"
         ],
         "properties": {
-          "id": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
-          },
           "identificadorPublico": {
             "type": "string",
             "description": "Identificador público; formação pendente"
@@ -1965,11 +1902,6 @@
             "type": "string",
             "description": "Cor",
             "nullable": true
-          },
-          "fotoEntradaId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
           }
         },
         "example": {
@@ -2082,11 +2014,6 @@
             "description": "Cor",
             "nullable": true
           },
-          "fotoEntradaId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
-          },
           "versao": {
             "type": "integer",
             "minimum": 1,
@@ -2101,8 +2028,7 @@
           "identificadorPublico",
           "versao",
           "criadoEm",
-          "atualizadoEm",
-          "fotoEntradaId"
+          "atualizadoEm"
         ],
         "properties": {
           "id": {
@@ -2201,11 +2127,6 @@
             "type": "string",
             "description": "Cor",
             "nullable": true
-          },
-          "fotoEntradaId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
           },
           "versao": {
             "type": "integer",
