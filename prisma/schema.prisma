@@ -20,6 +20,15 @@ enum Porte {
   MEDIO
   GRANDE
 }
+enum TipoEventoSaude {
+  VACINA
+  VERMIFUGO
+  CASTRACAO
+}
+enum SituacaoFoto {
+  PENDENTE
+  CONFIRMADA
+}
 model Species {
   id String @id @default(uuid())
   name String @unique
@@ -81,14 +90,17 @@ model Animal {
   pesoKg Decimal? @db.Decimal(6, 2)
   porte Porte?
   cor String?
+  observacoes String?
+  fotoEntradaId String? @unique
+  fotoEntrada Foto? @relation(fields: [fotoEntradaId], references: [id])
   speciesId String
   species Species @relation(fields: [speciesId], references: [id])
   breedId String?
-  breed Breed? @relation(fields: [breedId], references: [id])
+  breed Breed? @relation(fields: [breedId, speciesId], references: [id, speciesId])
   unitId String
   unit Unit @relation(fields: [unitId], references: [id])
   locationId String
-  location Location @relation(fields: [locationId], references: [id])
+  location Location @relation(fields: [locationId, unitId], references: [id, unitId])
   responsibleId String
   responsible Responsible @relation(fields: [responsibleId], references: [id])
   front Front
@@ -96,6 +108,32 @@ model Animal {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
+  healthEvents HealthEvent[]
   @@index([name])
   @@index([speciesId])
+}
+model Foto {
+  id String @id @default(uuid())
+  tipoMidia String
+  tamanhoBytes Int
+  caminhoArmazenamento String
+  situacao SituacaoFoto @default(PENDENTE)
+  expiraEm DateTime
+  animal Animal?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model HealthEvent {
+  id String @id @default(uuid())
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  tipo TipoEventoSaude
+  descricao String?
+  data DateTime
+  observacoes String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  @@index([animalId])
+  @@index([animalId, tipo])
 }

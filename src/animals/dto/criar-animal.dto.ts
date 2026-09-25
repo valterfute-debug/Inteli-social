@@ -1,23 +1,8 @@
 import { Front, Porte, Sexo } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsDateString,
-  IsEnum,
-  IsInt,
-  IsNumber,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Min,
-  MinLength,
-} from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsNumber, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
 export class CriarAnimalDto {
-  @ApiProperty({ description: 'Identificador público do animal (formação livre por enquanto)' })
-  @IsString()
-  @MinLength(1)
-  identificadorPublico!: string;
-
   @ApiProperty({ required: false, nullable: true })
   @IsOptional()
   @IsString()
@@ -84,4 +69,16 @@ export class CriarAnimalDto {
   @IsOptional()
   @IsString()
   cor?: string;
+
+  @ApiProperty({ required: false, nullable: true, description: 'Ex.: mancha branca na pata dianteira' })
+  @IsOptional()
+  @IsString()
+  observacoes?: string;
+
+  @ApiProperty({
+    format: 'uuid',
+    description: 'Foto de entrada já confirmada (ver POST /fotos e POST /fotos/{id}/confirmacao)',
+  })
+  @IsUUID('4')
+  fotoEntradaId!: string;
 }
