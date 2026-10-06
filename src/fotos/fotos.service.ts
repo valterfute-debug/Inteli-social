@@ -1,8 +1,13 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
-import { SolicitarFotoDto } from './dto/solicitar-foto.dto';
+import { SolicitarFotoDto, TAMANHO_MAXIMO_BYTES } from './dto/solicitar-foto.dto';
 
 const MINUTOS_VALIDADE_ENVIO = 15;
 
@@ -23,6 +28,13 @@ export class FotosService {
     const extensao = EXTENSAO_POR_TIPO_MIDIA[dto.tipoMidia];
     const caminhoArmazenamento = `admissao/${dto.id}.${extensao}`;
     const expiraEm = new Date(Date.now() + MINUTOS_VALIDADE_ENVIO * 60 * 1000);
+
+    // Uma foto confirmada pode já estar vinculada a um animal: reescrever caminho/tipo
+    // faria a ficha apontar para um arquivo que não existe. Nova foto = novo id.
+    const existente = await this.prisma.foto.findUnique({ where: { id: dto.id } });
+    if (existente?.situacao === SituacaoFoto.CONFIRMADA) {
+      throw new ConflictException('Foto já confirmada; gere um novo id para enviar outra foto');
+    }
 
     const { urlEnvio } = await this.storage.criarUrlEnvio(caminhoArmazenamento);
 
@@ -55,9 +67,18 @@ export class FotosService {
       return { id: foto.id, situacao: SituacaoFoto.CONFIRMADA };
     }
 
-    const enviado = await this.storage.arquivoExiste(foto.caminhoArmazenamento);
-    if (!enviado) {
+    const metadados = await this.storage.obterMetadados(foto.caminhoArmazenamento);
+    if (!metadados) {
       throw new ConflictException('Arquivo ainda não foi enviado ao armazenamento');
+    }
+    // O tamanho declarado em POST /fotos é do cliente; aqui vale o arquivo real.
+    if (metadados.tamanhoBytes !== null && metadados.tamanhoBytes > TAMANHO_MAXIMO_BYTES) {
+      await this.storage.removerArquivo(foto.caminhoArmazenamento);
+      throw new BadRequestException('Arquivo excede o tamanho máximo de 8 MB');
+    }
+    if (metadados.tipoMidia !== null && metadados.tipoMidia !== foto.tipoMidia) {
+      await this.storage.removerArquivo(foto.caminhoArmazenamento);
+      throw new BadRequestException('Tipo do arquivo enviado difere do informado na solicitação');
     }
 
     await this.prisma.foto.update({

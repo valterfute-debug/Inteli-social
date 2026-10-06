@@ -1,4 +1,4 @@
-import { ConflictException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
 import { FotosService } from './fotos.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,7 +17,8 @@ function criarPrismaFalso() {
 function criarStorageFalso() {
   return {
     criarUrlEnvio: jest.fn(),
-    arquivoExiste: jest.fn(),
+    obterMetadados: jest.fn(),
+    removerArquivo: jest.fn(),
   } as unknown as SupabaseStorageService;
 }
 
@@ -25,7 +26,9 @@ describe('FotosService', () => {
   it('solicita a URL de envio e registra a foto como pendente', async () => {
     const prisma = criarPrismaFalso();
     const storage = criarStorageFalso();
-    (storage.criarUrlEnvio as jest.Mock).mockResolvedValue({ urlEnvio: 'https://exemplo.invalid/envio' });
+    (storage.criarUrlEnvio as jest.Mock).mockResolvedValue({
+      urlEnvio: 'https://exemplo.invalid/envio',
+    });
     (prisma.foto.upsert as jest.Mock).mockResolvedValue({});
     const service = new FotosService(prisma, storage);
 
@@ -54,9 +57,10 @@ describe('FotosService', () => {
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
       id: 'f1',
       situacao: SituacaoFoto.PENDENTE,
+      tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
-    (storage.arquivoExiste as jest.Mock).mockResolvedValue(false);
+    (storage.obterMetadados as jest.Mock).mockResolvedValue(null);
     const service = new FotosService(prisma, storage);
 
     await expect(service.confirmar('f1')).rejects.toBeInstanceOf(ConflictException);
@@ -68,9 +72,13 @@ describe('FotosService', () => {
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
       id: 'f1',
       situacao: SituacaoFoto.PENDENTE,
+      tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
-    (storage.arquivoExiste as jest.Mock).mockResolvedValue(true);
+    (storage.obterMetadados as jest.Mock).mockResolvedValue({
+      tamanhoBytes: 1000,
+      tipoMidia: 'image/jpeg',
+    });
     (prisma.foto.update as jest.Mock).mockResolvedValue({});
     const service = new FotosService(prisma, storage);
 
@@ -92,6 +100,64 @@ describe('FotosService', () => {
     const resposta = await service.confirmar('f1');
 
     expect(resposta.situacao).toBe(SituacaoFoto.CONFIRMADA);
-    expect(storage.arquivoExiste).not.toHaveBeenCalled();
+    expect(storage.obterMetadados).not.toHaveBeenCalled();
+  });
+
+  it('não permite reescrever uma foto já confirmada (evita ficha apontando para arquivo inexistente)', async () => {
+    const prisma = criarPrismaFalso();
+    const storage = criarStorageFalso();
+    (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
+      id: 'f1',
+      situacao: SituacaoFoto.CONFIRMADA,
+    });
+    const service = new FotosService(prisma, storage);
+
+    await expect(
+      service.solicitarEnvio({
+        id: 'f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1',
+        tipoMidia: 'image/png',
+        tamanhoBytes: 1000,
+      }),
+    ).rejects.toBeInstanceOf(ConflictException);
+    expect(storage.criarUrlEnvio).not.toHaveBeenCalled();
+    expect(prisma.foto.upsert).not.toHaveBeenCalled();
+  });
+
+  it('rejeita e remove arquivo real maior que o limite, mesmo que o tamanho declarado fosse válido', async () => {
+    const prisma = criarPrismaFalso();
+    const storage = criarStorageFalso();
+    (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
+      id: 'f1',
+      situacao: SituacaoFoto.PENDENTE,
+      tipoMidia: 'image/jpeg',
+      caminhoArmazenamento: 'admissao/f1.jpg',
+    });
+    (storage.obterMetadados as jest.Mock).mockResolvedValue({
+      tamanhoBytes: 20 * 1024 * 1024,
+      tipoMidia: 'image/jpeg',
+    });
+    const service = new FotosService(prisma, storage);
+
+    await expect(service.confirmar('f1')).rejects.toBeInstanceOf(BadRequestException);
+    expect(storage.removerArquivo).toHaveBeenCalledWith('admissao/f1.jpg');
+    expect(prisma.foto.update).not.toHaveBeenCalled();
+  });
+
+  it('rejeita arquivo cujo tipo real difere do declarado', async () => {
+    const prisma = criarPrismaFalso();
+    const storage = criarStorageFalso();
+    (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
+      id: 'f1',
+      situacao: SituacaoFoto.PENDENTE,
+      tipoMidia: 'image/jpeg',
+      caminhoArmazenamento: 'admissao/f1.jpg',
+    });
+    (storage.obterMetadados as jest.Mock).mockResolvedValue({
+      tamanhoBytes: 1000,
+      tipoMidia: 'application/pdf',
+    });
+    const service = new FotosService(prisma, storage);
+
+    await expect(service.confirmar('f1')).rejects.toBeInstanceOf(BadRequestException);
   });
 });
