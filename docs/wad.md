@@ -1,14 +1,14 @@
 # WAD — Web Application Document
 
-> Este documento registra o estado real da fundação do backend na Sprint 1. Contrato OpenAPI, teste HTTP, exemplo de ambiente e CI com variáveis fictícias estão implementados e validados localmente. A execução remota do CI, a revisão do painel Supabase e a homologação ainda dependem de evidência externa.
+> Este documento registra o estado real do backend ao fim da Sprint 3 (encerramento do Ciclo 1). Admissão com foto e regras por frente, busca/listagem, catálogos com seed, hardening e configuração de produção estão implementados e testados. A publicação em produção, a autenticação e a revisão do painel Supabase dependem de decisões e evidências externas (ver [seção 7.5](#75-sprint-3--busca-hardening-e-publicação)). As seções históricas abaixo descrevem a fundação da Sprint 1; em caso de divergência, prevalece a seção 7.5.
 
 ## Instituto Ampara Animal — Inteli Social
 
 **Projeto:** aplicação web de prontuário e identificação animal  
 **Parceiro:** Instituto Ampara Animal  
 **Iniciativa:** Inteli Social  
-**Estágio documentado:** fundação do backend, Sprint 1 do Ciclo 1  
-**Data da revisão:** 13 de setembro de 2026  
+**Estágio documentado:** backend ao fim da Sprint 3 do Ciclo 1  
+**Data da revisão:** 6 de outubro de 2026  
 **Equipe e orientação:** identificação dos integrantes e do orientador a completar pela equipe.
 
 O conteúdo descreve o projeto Ampara Animal, com base no TAPI, nas anotações de reunião e nos arquivos do repositório. Não transfere integrantes, imagens, resultados de testes ou funcionalidades do projeto de referência.
@@ -19,7 +19,7 @@ O conteúdo descreve o projeto Ampara Animal, com base no TAPI, nas anotações 
 
 A solução pretende centralizar a identificação e o acompanhamento dos animais atendidos pela Ampara, substituindo a dispersão de dados em papel, planilhas e formulários por registros organizados. O Ciclo 1 contempla admissão com foto e localização, seguida de consulta por nome, identificador público ou espécie. O uso operacional será pelo assistente, prioritariamente no computador, com necessidade de continuidade em locais sem internet.
 
-Atualmente existe uma aplicação NestJS, um modelo Prisma e duas migrations cuja aplicação no Supabase de desenvolvimento foi confirmada nas verificações anteriores desta sessão. Ainda não existe o fluxo funcional de cadastro de animais, interface PWA ou sincronização offline. Esta revisão documental não consultou novamente o banco remoto.
+Atualmente o backend NestJS oferece admissão com foto obrigatória e regras por frente, consulta com busca e filtros, catálogos, eventos de saúde e PDF do prontuário (antecipados do Ciclo 2). A interface PWA e a sincronização offline são responsabilidade do frontend. Autenticação ainda não está implementada (decisão pendente com o frontend).
 
 ## Estrutura do repositório
 
@@ -168,19 +168,22 @@ A autorização de assistentes para atualizar saúde foi mencionada na reunião.
 
 | ID   | Requisito/regra                                | Estado real                                                | Evidência ou pendência                                                     |
 | ---- | ---------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| RF01 | Cadastro animal                                | Somente modelo                                             | Animal em schema.prisma; nenhum controller de cadastro                     |
-| RF02 | Foto obrigatória na entrada                    | Confirmado no requisito                                    | Sem coluna/relação de foto ou upload implementado                          |
-| RF03 | Consulta com filtros                           | Planejado                                                  | Documento de contrato; índices já existentes                               |
-| RF04 | Microchip                                      | Coluna opcional implementada                               | String, sem unicidade e sem obrigação de preenchimento                     |
-| RF05 | Atualização e arquivamento                     | Estrutura parcial                                          | version e deletedAt; sem operações HTTP                                    |
-| RF06 | Catálogos operacionais                         | Tabelas/enum presentes                                     | Endpoints e gestão ainda ausentes                                          |
+| RF01 | Cadastro animal                                | Implementado (Sprint 2)                                    | POST /api/v1/animals; AnimalsService                                       |
+| RF02 | Foto obrigatória na entrada                    | Implementado (Sprints 2 e 3)                               | Upload por URL assinada; confirmação confere o arquivo real; URL de leitura na ficha |
+| RF03 | Consulta com filtros                           | Implementado (Sprint 3)                                    | GET /api/v1/animals: busca livre, nome, identificador, microchip, espécie, frente, unidade |
+| RF04 | Microchip                                      | Implementado (Sprint 3)                                    | Só dígitos; obrigatório em CCPA/CED; único entre animais ativos (409)      |
+| RF05 | Atualização e arquivamento                     | Implementado (Sprint 2)                                    | PATCH com versão (409) e DELETE lógico                                     |
+| RF06 | Catálogos operacionais                         | Implementado (Sprint 3)                                    | GET de catálogos, POST /responsibles e seed idempotente                    |
 | RF07 | Offline                                        | Planejado                                                  | Não existe armazenamento local, fila ou sincronização                      |
 | RF08 | Disponibilidade da API                         | Implementado                                               | GET /api/health                                                            |
 | RN01 | Raça deve corresponder à espécie               | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(breedId, speciesId)` referencia `Breed(id, speciesId)` |
 | RN02 | Localização deve pertencer à unidade do animal | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(locationId, unitId)` referencia `Location(id, unitId)` |
-| RN03 | Repetições não podem duplicar cadastro         | Proposta                                                   | Chave primária única não implementa todo o protocolo idempotente           |
-| RN04 | Conflitos devem ser detectados                 | Proposta                                                   | Campo version sem incremento/checagem de negócio implementados             |
-| RN05 | Ficha concluída exige foto                     | Confirmado no requisito                                    | Fluxo e persistência ainda necessários                                     |
+| RN03 | Repetições não podem duplicar cadastro         | Parcial                                                    | Microchip único entre ativos; foto vinculada a um só animal               |
+| RN04 | Conflitos devem ser detectados                 | Implementado                                               | version checada e incrementada; 409 em versão desatualizada               |
+| RN05 | Ficha concluída exige foto                     | Implementado                                               | fotoEntradaId obrigatório e foto CONFIRMADA                                |
+| RN06 | CCPA e CED exigem microchip, sexo, idade, peso e porte | Implementado (Sprint 3)                            | src/animals/regras-admissao.ts, avaliado no estado final (também no PATCH) |
+| RN07 | CasAdote não repete exigências                 | Implementado (Sprint 3)                                    | Animal chega de CCPA/CED com o mesmo microchip: transferência via PATCH   |
+| RN08 | Silvestre é identificado por nome              | Implementado (Sprint 3)                                    | Species.silvestre; nome obrigatório, demais campos dispensados            |
 
 ### 3.1.1. Obrigatoriedade e incertezas
 
@@ -544,6 +547,53 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 ## 7.4. Evolução futura
 
 Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Ciclo 3; saída e acompanhamento posterior, ao Ciclo 4. Foto de saída e data de saída não devem impedir admissão. Histórico de mudanças e readmissão devem ser discutidos antes de ampliar o modelo.
+
+## 7.5. Sprint 3 — busca, hardening e publicação
+
+### Decisões da reunião de validação incorporadas
+
+- **Campos obrigatórios (CCPA e CED):** microchip (numérico), sexo (levantamento estatístico), idade aproximada, peso e porte.
+- **CasAdote:** sem exigência adicional, pois o animal já passou por CCPA ou CED. O animal que chega pelo CED e vai para o CasAdote mantém o mesmo microchip; portanto é o **mesmo registro** (transferência via PATCH), não um novo cadastro.
+- **Silvestres:** identificados pelo nome; dispensam microchip e demais campos (confirmado com a equipe).
+- **Mantenedor:** local onde ficam os silvestres, modelado como unidade do catálogo (seed), não como frente.
+
+### Entregas do backend
+
+| Entrega | Implementação | Evidência |
+| --- | --- | --- |
+| Busca e listagem | `busca` (nome contém, identificador contém, microchip começa com) e filtros por nome, identificador, microchip, espécie, frente e unidade; ordenação estável; texto vazio ignorado | Testes unitários e cenário ponta a ponta |
+| Ficha pronta para exibição | Respostas trazem `especieNome`, `especieSilvestre`, `unidadeNome`, `localizacaoNome` e `fotoEntradaUrl` (URL assinada, 1 h, gerada em lote por página) | `animal.mapper.ts`, `SupabaseStorageService.criarUrlsLeitura` |
+| Regras por frente (pendência da Sprint 2) | `validarRegrasAdmissao` aplicada no POST e no estado final do PATCH | `regras-admissao.spec.ts` |
+| Microchip único | 409 com `detalhes.animalExistenteId` para o frontend oferecer a transferência; animal arquivado libera o número (readmissão) | `animals.service.spec.ts` |
+| Responsáveis | `POST /api/v1/responsibles` (antes não havia como cadastrar tutor) | `catalogos.service.spec.ts` |
+| Seed de catálogos | `npm run db:seed` / `db:seed:prod`; idempotente, roda no build do Render | `seed.spec.ts`; executado 3 vezes sem duplicar |
+| Migration | `20261006120000_especie_silvestre_e_indice_microchip` (aditiva) | Aplicada do zero com as anteriores; diff schema × banco vazio |
+| Hardening: fotos | Foto confirmada não pode ser reescrita (409); confirmação confere tamanho e tipo reais e remove arquivo inválido | `fotos.service.spec.ts` |
+| Hardening: HTTP | Helmet, CORS restrito a `CORS_ORIGINS` (fechado em produção se ausente), rate limit por IP (120/min, `trust proxy`), Swagger desligado em produção, limites nos campos (ex.: `pesoKg` ≤ 9999,99 evita erro 500 do `Decimal(6,2)`) | `test/saude-http.spec.ts` |
+| Hardening: operação | Erros 5xx registrados em log (antes eram silenciados), `GET /api/health/ready` testa o banco, encerramento gracioso, variáveis Supabase obrigatórias em produção | Inicialização em produção sem Supabase recusada |
+| Publicação | `render.yaml` com todas as variáveis; `npm run smoke -- <url>` valida a API publicada | Smoke test aprovado localmente |
+
+### Verificação
+
+- CI local: lint, typecheck, testes, `prisma validate`, `openapi:validate` e build aprovados.
+- Cenário ponta a ponta com a API compilada e PostgreSQL local (PGlite): migrations do zero, seed, cadastro por frente, 409 de microchip, transferência CCPA → CasAdote, silvestre, busca/filtros/paginação, arquivamento e readmissão, CORS, cabeçalhos de segurança e readiness.
+
+### Pendências que dependem da equipe ou da Ampara
+
+| Pendência | Situação |
+| --- | --- |
+| Autenticação/autorização | **Risco alto antes de dados reais**: sem login, quem tiver a URL lê e arquiva fichas e vê contatos de responsáveis. Proposta: Supabase Auth com validação do JWT no backend, a combinar com o frontend |
+| Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados |
+| Lista de espécies, unidades e localizações | Seed inicial derivado do TAPI; revisar com a Ampara |
+| Primeiros usuários | Ampara deve indicar o grupo piloto |
+| Revisão RLS/Data API no Supabase | Pendente (ver [segurança](#seguranca)) |
+
+### Publicação em produção (passo a passo)
+
+1. Criar no Supabase um projeto de produção separado e o bucket privado `fotos-animais`.
+2. No Render, **New → Blueprint** com este repositório; preencher `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `CORS_ORIGINS` (URL do frontend publicado).
+3. O build aplica migrations e seed automaticamente.
+4. Validar com `npm run smoke -- https://<servico>.onrender.com`.
 
 # 8. Referências e fontes
 

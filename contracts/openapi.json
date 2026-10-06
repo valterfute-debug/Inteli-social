@@ -2,8 +2,8 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Ampara Animal — contrato do Ciclo 1",
-    "version": "0.1.0",
-    "description": "Somente /api/health implementado. Demais rotas planejadas; autenticação não implementada. IDs e dados dos exemplos são sintéticos. Nomes de domínio em português propostos para acordo com frontend; não existe integração real comprovada. Mesmo UUID e Idempotency-Key com mesmo conteúdo retorna recurso original (200 em reenvio); conteúdo divergente retorna 409. PATCH/DELETE com versão divergente retorna 409. Rascunho offline não equivale a admissão concluída. Foto permanece local até envio e confirmação; POST animals exige foto confirmada. Políticas de expiração, tamanho máximo e limpeza de órfãos pendentes."
+    "version": "0.3.0",
+    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Autenticação ainda não implementada. IDs e dados dos exemplos são sintéticos."
   },
   "paths": {
     "/api/health": {
@@ -107,10 +107,41 @@
         }
       }
     },
+    "/api/health/ready": {
+      "get": {
+        "operationId": "consultarProntidao",
+        "summary": "Verificar API e banco de dados",
+        "description": "Implementado. Executa SELECT 1 no PostgreSQL; 503 se o banco estiver indisponível. Usado no smoke test pós-deploy.",
+        "x-situacao": "implementado",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "API e banco disponíveis",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Prontidao"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "Implementado. Lista animais ativos (não arquivados) com paginação e filtros por nome, identificador público e espécie.",
+        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/unidade/localização e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -203,6 +234,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -230,31 +271,76 @@
             }
           },
           {
+            "name": "busca",
+            "in": "query",
+            "required": false,
+            "description": "Busca livre: nome (contém), identificador público (contém) ou microchip (começa com), sem diferenciar maiúsculas",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
+          },
+          {
             "name": "nome",
             "in": "query",
             "required": false,
-            "description": "Filtro ou controle da requisição",
+            "description": "Nome contém, sem diferenciar maiúsculas",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 120
             }
           },
           {
             "name": "identificadorPublico",
             "in": "query",
             "required": false,
-            "description": "Filtro ou controle da requisição",
+            "description": "Identificador público exato, sem diferenciar maiúsculas",
             "schema": {
-              "type": "string"
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          {
+            "name": "microchip",
+            "in": "query",
+            "required": false,
+            "description": "Microchip exato",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]{1,20}$"
             }
           },
           {
             "name": "especieId",
             "in": "query",
             "required": false,
-            "description": "Filtro ou controle da requisição",
+            "description": "Espécie",
             "schema": {
               "type": "string",
-              "description": "Identificador UUID",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "frente",
+            "in": "query",
+            "required": false,
+            "description": "Frente atual",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CCPA",
+                "CASADOTE",
+                "CED"
+              ]
+            }
+          },
+          {
+            "name": "unidadeId",
+            "in": "query",
+            "required": false,
+            "description": "Unidade atual",
+            "schema": {
+              "type": "string",
               "format": "uuid"
             }
           }
@@ -262,22 +348,12 @@
       },
       "post": {
         "summary": "Concluir admissão com foto confirmada",
-        "description": "Implementado. Cadastro de admissão sem exigência de foto (upload de foto ainda não implementado).",
+        "description": "Implementado. Exige foto confirmada e aplica as regras por frente (ver CriarAnimal). 409: microchip já cadastrado em animal ativo (detalhes.animalExistenteId) ou foto já vinculada.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
-          "200": {
-            "description": "Reenvio idempotente do mesmo conteúdo",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Animal"
-                }
-              }
-            }
-          },
           "201": {
-            "description": "Resultado esperado quando implementado",
+            "description": "Animal cadastrado",
             "content": {
               "application/json": {
                 "schema": {
@@ -357,6 +433,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -488,12 +574,22 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       },
       "patch": {
         "summary": "Atualizar animal verificando versão",
-        "description": "Implementado. Atualização otimista: exige a versão atual (campo versao); divergência retorna 409.",
+        "description": "Implementado. Regras avaliadas no estado final; 409 para versão desatualizada ou microchip de outro animal.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -578,6 +674,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -687,26 +793,24 @@
                 }
               }
             }
-          }
-        },
-        "parameters": [
-          {
-            "name": "versao",
-            "in": "query",
-            "required": true,
-            "description": "Filtro ou controle da requisição",
-            "schema": {
-              "type": "integer",
-              "minimum": 1
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
             }
           }
-        ]
+        }
       }
     },
     "/api/v1/species": {
       "get": {
         "summary": "Listar espécies",
-        "description": "Implementado. Lista espécies não arquivadas.",
+        "description": "Implementado. Lista espécies ativas; o campo silvestre indica identificação por nome.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -791,6 +895,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -916,6 +1030,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1060,6 +1184,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1177,6 +1311,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1321,6 +1465,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1348,6 +1502,64 @@
             }
           }
         ]
+      },
+      "post": {
+        "summary": "Cadastrar responsável",
+        "description": "Implementado. Cadastra o tutor ou quem entregou o animal, para uso em responsavelId.",
+        "x-situacao": "implementado",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarResponsavel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Responsável cadastrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Responsavel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/fronts": {
@@ -1446,6 +1658,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1478,7 +1700,7 @@
     "/api/v1/fotos": {
       "post": {
         "summary": "Solicitar envio de foto",
-        "description": "Implementado. Gera uma URL assinada temporária (15 min) para envio direto do arquivo ao armazenamento.",
+        "description": "Implementado. Gera uma URL assinada temporária (15 min) para envio direto do arquivo ao armazenamento. 409 se o id já pertence a uma foto confirmada (gere um novo id para outra foto).",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -1571,6 +1793,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         },
         "parameters": [
@@ -1613,7 +1845,7 @@
       ],
       "post": {
         "summary": "Confirmar existência e validade do arquivo enviado",
-        "description": "Implementado. Verifica se o arquivo chegou ao armazenamento e marca a foto como confirmada.",
+        "description": "Implementado. Verifica se o arquivo chegou ao armazenamento e marca a foto como confirmada. Confere o arquivo real no Storage: acima de 8 MB ou tipo diferente do declarado retorna 400 e o arquivo é removido.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -1698,6 +1930,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1870,6 +2112,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       },
@@ -1970,6 +2222,16 @@
             }
           },
           "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -2095,6 +2357,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       }
@@ -2209,6 +2481,16 @@
                 }
               }
             }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       }
@@ -2248,6 +2530,11 @@
             "type": "string",
             "description": "Instante ISO-8601",
             "format": "date-time"
+          },
+          "detalhes": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Opcional, só em alguns 4xx. Ex.: 409 de microchip duplicado traz animalExistenteId e identificadorPublico para o frontend oferecer a transferência."
           }
         },
         "example": {
@@ -2284,7 +2571,7 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados para cadastro de admissão. O identificador público é gerado pelo servidor. Foto de entrada obrigatória e já confirmada (fluxo POST /fotos).",
+        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais.",
         "required": [
           "especieId",
           "unidadeId",
@@ -2296,14 +2583,16 @@
         "properties": {
           "nome": {
             "type": "string",
-            "description": "Nome conhecido",
-            "nullable": true
+            "description": "Nome conhecido. Obrigatório para espécies silvestres (identificação por nome).",
+            "nullable": true,
+            "maxLength": 120
           },
           "microchip": {
             "type": "string",
-            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "description": "Somente dígitos, guardado como texto para preservar zeros. Obrigatório nas frentes CCPA e CED (exceto silvestres). Único entre animais ativos: duplicado retorna 409 com o animal existente em detalhes.",
             "example": "000123456789",
-            "nullable": true
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$"
           },
           "especieId": {
             "type": "string",
@@ -2333,7 +2622,7 @@
           },
           "frente": {
             "type": "string",
-            "description": "Classificação atual; demais nomes aguardam validação",
+            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas.",
             "enum": [
               "CCPA",
               "CASADOTE",
@@ -2348,7 +2637,7 @@
           },
           "sexo": {
             "type": "string",
-            "description": "Sexo informado",
+            "description": "Obrigatório nas frentes CCPA e CED (exceto silvestres).",
             "enum": [
               "MACHO",
               "FEMEA"
@@ -2359,17 +2648,20 @@
             "type": "integer",
             "minimum": 0,
             "nullable": true,
-            "description": "Meses; unidade proposta"
+            "description": "Meses. Obrigatório nas frentes CCPA e CED (exceto silvestres).",
+            "maximum": 600
           },
           "pesoKg": {
             "type": "number",
             "minimum": 0,
             "nullable": true,
-            "description": "Peso atual em kg, duas casas decimais; não há histórico"
+            "description": "Peso atual em kg, até duas casas decimais; sem histórico. Obrigatório nas frentes CCPA e CED (exceto silvestres).",
+            "maximum": 9999.99,
+            "multipleOf": 0.01
           },
           "porte": {
             "type": "string",
-            "description": "Porte",
+            "description": "Obrigatório nas frentes CCPA e CED (exceto silvestres).",
             "enum": [
               "PEQUENO",
               "MEDIO",
@@ -2380,18 +2672,20 @@
           "cor": {
             "type": "string",
             "description": "Cor",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 60
           },
           "observacoes": {
             "type": "string",
             "description": "Ex.: mancha branca na pata dianteira",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 2000
           },
           "fotoEntradaId": {
             "type": "string",
             "format": "uuid",
             "nullable": false,
-            "description": "Foto de entrada já confirmada (ver POST /fotos). Temporariamente opcional até o fluxo de upload estar validado ponta a ponta."
+            "description": "Foto de entrada já confirmada (POST /fotos e POST /fotos/{id}/confirmacao)."
           }
         },
         "example": {
@@ -2417,14 +2711,16 @@
         "properties": {
           "nome": {
             "type": "string",
-            "description": "Nome conhecido",
-            "nullable": true
+            "description": "Nome conhecido. Obrigatório para espécies silvestres (identificação por nome).",
+            "nullable": true,
+            "maxLength": 120
           },
           "microchip": {
             "type": "string",
-            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "description": "Somente dígitos, guardado como texto para preservar zeros. Obrigatório nas frentes CCPA e CED (exceto silvestres). Único entre animais ativos: duplicado retorna 409 com o animal existente em detalhes.",
             "example": "000123456789",
-            "nullable": true
+            "nullable": true,
+            "pattern": "^[0-9]{1,20}$"
           },
           "especieId": {
             "type": "string",
@@ -2454,7 +2750,7 @@
           },
           "frente": {
             "type": "string",
-            "description": "Classificação atual; demais nomes aguardam validação",
+            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas.",
             "enum": [
               "CCPA",
               "CASADOTE",
@@ -2469,7 +2765,7 @@
           },
           "sexo": {
             "type": "string",
-            "description": "Sexo informado",
+            "description": "Obrigatório nas frentes CCPA e CED (exceto silvestres).",
             "enum": [
               "MACHO",
               "FEMEA"
@@ -2480,17 +2776,20 @@
             "type": "integer",
             "minimum": 0,
             "nullable": true,
-            "description": "Meses; unidade proposta"
+            "description": "Meses. Obrigatório nas frentes CCPA e CED (exceto silvestres).",
+            "maximum": 600
           },
           "pesoKg": {
             "type": "number",
             "minimum": 0,
             "nullable": true,
-            "description": "Peso atual em kg, duas casas decimais; não há histórico"
+            "description": "Peso atual em kg, até duas casas decimais; sem histórico. Obrigatório nas frentes CCPA e CED (exceto silvestres).",
+            "maximum": 9999.99,
+            "multipleOf": 0.01
           },
           "porte": {
             "type": "string",
-            "description": "Porte",
+            "description": "Obrigatório nas frentes CCPA e CED (exceto silvestres).",
             "enum": [
               "PEQUENO",
               "MEDIO",
@@ -2501,7 +2800,8 @@
           "cor": {
             "type": "string",
             "description": "Cor",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 60
           },
           "versao": {
             "type": "integer",
@@ -2511,15 +2811,17 @@
           "observacoes": {
             "type": "string",
             "description": "Ex.: mancha branca na pata dianteira",
-            "nullable": true
+            "nullable": true,
+            "maxLength": 2000
           },
           "fotoEntradaId": {
             "type": "string",
             "format": "uuid",
             "nullable": true,
-            "description": "Identificador UUID"
+            "description": "Foto de entrada já confirmada (POST /fotos e POST /fotos/{id}/confirmacao)."
           }
-        }
+        },
+        "description": "Atualização parcial com controle de versão. As regras por frente são avaliadas sobre o estado final (cadastro atual + alterações): uma transferência CED para CASADOTE envia só frente, unidade e localização."
       },
       "Animal": {
         "type": "object",
@@ -2538,7 +2840,7 @@
           },
           "identificadorPublico": {
             "type": "string",
-            "description": "Identificador público; formação pendente"
+            "description": "Identificador público gerado pelo servidor (AM-AAAA-XXXXXXXX)"
           },
           "nome": {
             "type": "string",
@@ -2547,7 +2849,7 @@
           },
           "microchip": {
             "type": "string",
-            "description": "Texto que preserva zeros; sem unicidade confirmada",
+            "description": "Somente dígitos; único entre animais ativos",
             "example": "000123456789",
             "nullable": true
           },
@@ -2658,6 +2960,26 @@
             "format": "uuid",
             "nullable": true,
             "description": "Identificador UUID"
+          },
+          "especieNome": {
+            "type": "string",
+            "description": "Nome da espécie (evita consulta extra no frontend)"
+          },
+          "especieSilvestre": {
+            "type": "boolean",
+            "description": "Espécie silvestre (identificação por nome)"
+          },
+          "unidadeNome": {
+            "type": "string"
+          },
+          "localizacaoNome": {
+            "type": "string"
+          },
+          "fotoEntradaUrl": {
+            "type": "string",
+            "format": "uri",
+            "nullable": true,
+            "description": "URL assinada de leitura da foto de entrada, válida por 1 hora. Null se o armazenamento estiver indisponível."
           }
         },
         "example": {
@@ -2704,6 +3026,10 @@
             "type": "string",
             "description": "Identificador UUID",
             "format": "uuid"
+          },
+          "silvestre": {
+            "type": "boolean",
+            "description": "Presente apenas em espécies"
           }
         },
         "example": {
@@ -3042,6 +3368,95 @@
           "total": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "CriarResponsavel": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "endereco": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true,
+            "example": "(11) 91234-5678"
+          }
+        },
+        "example": {
+          "nome": "Maria Exemplo",
+          "telefone": "(11) 91234-5678"
+        }
+      },
+      "Responsavel": {
+        "type": "object",
+        "required": [
+          "id",
+          "nome"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string"
+          },
+          "endereco": {
+            "type": "string",
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "telefone": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "Prontidao": {
+        "type": "object",
+        "required": [
+          "status",
+          "banco",
+          "timestamp"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "banco": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ]
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }
