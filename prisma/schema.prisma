@@ -32,6 +32,7 @@ enum SituacaoFoto {
 model Species {
   id String @id @default(uuid())
   name String @unique
+  silvestre Boolean @default(false)
   breeds Breed[]
   animals Animal[]
   createdAt DateTime @default(now())
@@ -111,6 +112,7 @@ model Animal {
   healthEvents HealthEvent[]
   @@index([name])
   @@index([speciesId])
+  @@index([microchip])
 }
 model Foto {
   id String @id @default(uuid())
