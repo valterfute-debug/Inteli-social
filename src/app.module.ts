@@ -13,6 +13,7 @@ import { StorageModule } from './storage/storage.module';
 import { FotosModule } from './fotos/fotos.module';
 import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
+import { IdempotenciaModule } from './idempotencia/idempotencia.module';
 @Module({
   imports: [
     PrismaModule,
@@ -51,6 +52,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
       { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 120) },
     ]),
     AuthModule,
+    IdempotenciaModule,
     UsuariosModule,
     HealthModule,
     AnimalsModule,

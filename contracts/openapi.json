@@ -360,6 +360,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Reenvio: o animal criado na primeira vez",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Animal"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Animal cadastrado",
             "content": {
@@ -411,7 +421,7 @@
             }
           },
           "409": {
-            "description": "Erro padronizado",
+            "description": "Microchip já cadastrado, versão/unicidade, ou Idempotency-Key já usada com conteúdo diferente",
             "content": {
               "application/json": {
                 "schema": {
@@ -470,7 +480,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID v4 estável por cadastro (o mesmo em todas as retentativas da fila offline). Mesma chave e mesmo conteúdo: devolve o recurso já criado (200, cabeçalho Idempotent-Replayed: true), sem nova escrita. Mesma chave com conteúdo diferente: 409. Chaves são por usuário e guardadas por 30 dias.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/animals/{id}": {
@@ -1827,7 +1849,7 @@
             }
           },
           "409": {
-            "description": "Erro padronizado",
+            "description": "Foto já confirmada, arquivo ainda não enviado, ou Idempotency-Key já usada com conteúdo diferente",
             "content": {
               "application/json": {
                 "schema": {
@@ -1882,7 +1904,7 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "description": "Filtro ou controle da requisição",
+            "description": "A operação já é idempotente pelo id da foto (gerado no cliente): repetir renova o link de envio ou devolve a confirmação. A chave é registrada e reutilizá-la com outro conteúdo devolve 409.",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -1976,7 +1998,7 @@
             }
           },
           "409": {
-            "description": "Erro padronizado",
+            "description": "Foto já confirmada, arquivo ainda não enviado, ou Idempotency-Key já usada com conteúdo diferente",
             "content": {
               "application/json": {
                 "schema": {
@@ -2031,7 +2053,7 @@
             "name": "Idempotency-Key",
             "in": "header",
             "required": true,
-            "description": "Filtro ou controle da requisição",
+            "description": "A operação já é idempotente pelo id da foto (gerado no cliente): repetir renova o link de envio ou devolve a confirmação. A chave é registrada e reutilizá-la com outro conteúdo devolve 409.",
             "schema": {
               "type": "string",
               "format": "uuid"
@@ -2225,6 +2247,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Reenvio: o evento registrado na primeira vez",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventoSaude"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Resultado esperado quando implementado",
             "content": {
@@ -2276,7 +2308,7 @@
             }
           },
           "409": {
-            "description": "Erro padronizado",
+            "description": "Idempotency-Key já usada com conteúdo diferente",
             "content": {
               "application/json": {
                 "schema": {
@@ -2325,7 +2357,19 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "Opcional; recomendado na sincronização offline. Mesma chave e mesmo conteúdo: devolve o recurso já criado (200, cabeçalho Idempotent-Replayed: true), sem nova escrita. Mesma chave com conteúdo diferente: 409. Chaves são por usuário e guardadas por 30 dias.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/animals/{animalId}/health-events/{id}": {

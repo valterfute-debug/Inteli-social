@@ -1,3 +1,4 @@
+import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
 import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
@@ -31,7 +32,7 @@ describe('FotosService', () => {
       urlEnvio: 'https://exemplo.invalid/envio',
     });
     (prisma.foto.upsert as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
     const resposta = await service.solicitarEnvio(
       {
@@ -40,6 +41,7 @@ describe('FotosService', () => {
         tamanhoBytes: 1000,
       },
       ESCOPO_ADMIN,
+      CHAVE_TESTE,
     );
 
     expect(resposta.urlEnvio).toBe('https://exemplo.invalid/envio');
@@ -50,11 +52,11 @@ describe('FotosService', () => {
     const prisma = criarPrismaFalso();
     const storage = criarStorageFalso();
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    await expect(service.confirmar('id-inexistente', ESCOPO_ADMIN)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.confirmar('id-inexistente', ESCOPO_ADMIN, CHAVE_TESTE),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('rejeita confirmação quando o arquivo ainda não chegou ao armazenamento', async () => {
@@ -67,9 +69,11 @@ describe('FotosService', () => {
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    await expect(service.confirmar('f1', ESCOPO_ADMIN)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('confirma a foto quando o arquivo já está no armazenamento', async () => {
@@ -86,9 +90,9 @@ describe('FotosService', () => {
       tipoMidia: 'image/jpeg',
     });
     (prisma.foto.update as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    const resposta = await service.confirmar('f1', ESCOPO_ADMIN);
+    const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
     expect(resposta.situacao).toBe(SituacaoFoto.CONFIRMADA);
   });
@@ -101,9 +105,9 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.CONFIRMADA,
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    const resposta = await service.confirmar('f1', ESCOPO_ADMIN);
+    const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
     expect(resposta.situacao).toBe(SituacaoFoto.CONFIRMADA);
     expect(storage.obterMetadados).not.toHaveBeenCalled();
@@ -116,7 +120,7 @@ describe('FotosService', () => {
       id: 'f1',
       situacao: SituacaoFoto.CONFIRMADA,
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
     await expect(
       service.solicitarEnvio(
@@ -126,6 +130,7 @@ describe('FotosService', () => {
           tamanhoBytes: 1000,
         },
         ESCOPO_ADMIN,
+        CHAVE_TESTE,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(storage.criarUrlEnvio).not.toHaveBeenCalled();
@@ -145,9 +150,11 @@ describe('FotosService', () => {
       tamanhoBytes: 20 * 1024 * 1024,
       tipoMidia: 'image/jpeg',
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    await expect(service.confirmar('f1', ESCOPO_ADMIN)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
     expect(storage.removerArquivo).toHaveBeenCalledWith('admissao/f1.jpg');
     expect(prisma.foto.update).not.toHaveBeenCalled();
   });
@@ -165,8 +172,10 @@ describe('FotosService', () => {
       tamanhoBytes: 1000,
       tipoMidia: 'application/pdf',
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
 
-    await expect(service.confirmar('f1', ESCOPO_ADMIN)).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
   });
 });

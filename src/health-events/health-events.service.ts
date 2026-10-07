@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
+import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
 import { ListarEventosSaudeQueryDto } from './dto/listar-eventos-saude-query.dto';
@@ -7,7 +8,10 @@ import { mapearEventoSaude } from './health-event.mapper';
 
 @Injectable()
 export class HealthEventsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly idempotencia: IdempotenciaService,
+  ) {}
 
   private async garantirAnimalAcessivel(animalId: string, escopo: EscopoAcesso) {
     const animal = await this.prisma.animal.findFirst({
@@ -18,18 +22,39 @@ export class HealthEventsService {
     garantirUnidade(escopo, animal.unitId);
   }
 
-  async criar(animalId: string, dto: CriarEventoSaudeDto, escopo: EscopoAcesso) {
+  /** Com Idempotency-Key, o reenvio devolve o evento já registrado em vez de duplicá-lo. */
+  async criar(animalId: string, dto: CriarEventoSaudeDto, escopo: EscopoAcesso, chave?: string) {
     await this.garantirAnimalAcessivel(animalId, escopo);
-    const evento = await this.prisma.healthEvent.create({
-      data: {
-        animalId,
-        tipo: dto.tipo,
-        descricao: dto.descricao,
-        data: new Date(dto.data),
-        observacoes: dto.observacoes,
+    const dados = {
+      animalId,
+      tipo: dto.tipo,
+      descricao: dto.descricao,
+      data: new Date(dto.data),
+      observacoes: dto.observacoes,
+    };
+
+    if (!chave) {
+      return {
+        evento: mapearEventoSaude(await this.prisma.healthEvent.create({ data: dados })),
+        reenvio: false,
+      };
+    }
+
+    const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
+      {
+        usuarioId: escopo.usuarioId,
+        chave,
+        operacao: `POST /animals/${animalId}/health-events`,
+        conteudo: dto,
       },
-    });
-    return mapearEventoSaude(evento);
+      async (tx) => {
+        const criado = await tx.healthEvent.create({ data: dados });
+        return { recursoId: criado.id, resultado: criado };
+      },
+    );
+    const evento =
+      resultado ?? (await this.prisma.healthEvent.findUniqueOrThrow({ where: { id: recursoId } }));
+    return { evento: mapearEventoSaude(evento), reenvio };
   }
 
   async listar(animalId: string, query: ListarEventosSaudeQueryDto, escopo: EscopoAcesso) {

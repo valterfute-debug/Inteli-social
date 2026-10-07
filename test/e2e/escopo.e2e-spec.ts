@@ -145,6 +145,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       const fotoAlheia = await fotoConfirmada(opCasAdote);
       const resposta = await http()
         .post('/api/v1/animals')
+        .set('Idempotency-Key', randomUUID())
         .set('Authorization', opCed.autorizacao)
         .send(admissaoCasAdote(fotoAlheia, unidadeCed))
         .expect(403);
@@ -157,6 +158,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       const foto = await fotoConfirmada(opCasAdote);
       const resposta = await http()
         .post('/api/v1/animals')
+        .set('Idempotency-Key', randomUUID())
         .set('Authorization', opCasAdote.autorizacao)
         .send(admissaoCasAdote(foto))
         .expect(201);
@@ -168,6 +170,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       const foto = await fotoConfirmada(opCasAdote);
       await http()
         .post('/api/v1/animals')
+        .set('Idempotency-Key', randomUUID())
         .set('Authorization', opCasAdote.autorizacao)
         .send(admissaoCasAdote(foto, unidadeCed))
         .expect(403);

@@ -3,14 +3,18 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   ParseUUIDPipe,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
+import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
 import { EscopoAtual } from '../auth/decoradores';
 import { EscopoAcesso } from '../auth/escopo';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
@@ -33,14 +37,24 @@ export class HealthEventsController {
   }
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar evento de saúde (vacina, vermífugo ou castração)' })
-  criar(
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: false,
+    description: 'Recomendado na sincronização offline',
+  })
+  async criar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Body() dto: CriarEventoSaudeDto,
     @EscopoAtual() escopo: EscopoAcesso,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Res({ passthrough: true }) resposta: Response,
   ) {
-    return this.healthEventsService.criar(animalId, dto, escopo);
+    const chave = lerChaveIdempotencia(idempotencyKey, false);
+    const { evento, reenvio } = await this.healthEventsService.criar(animalId, dto, escopo, chave);
+    resposta.status(reenvio ? HttpStatus.OK : HttpStatus.CREATED);
+    if (reenvio) resposta.setHeader('Idempotent-Replayed', 'true');
+    return evento;
   }
 
   @Delete(':id')

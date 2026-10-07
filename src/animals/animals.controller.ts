@@ -3,6 +3,7 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
@@ -10,8 +11,11 @@ import {
   Patch,
   Post,
   Query,
+  Res,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import type { Response } from 'express';
+import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
 import { EscopoAtual } from '../auth/decoradores';
 import { EscopoAcesso } from '../auth/escopo';
 import { AnimalsService } from './animals.service';
@@ -31,10 +35,24 @@ export class AnimalsController {
   }
 
   @Post()
-  @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Cadastrar animal (admissão)' })
-  criar(@Body() dto: CriarAnimalDto, @EscopoAtual() escopo: EscopoAcesso) {
-    return this.animalsService.criar(dto, escopo);
+  @ApiHeader({
+    name: 'Idempotency-Key',
+    required: true,
+    description: 'UUID v4 estável por cadastro',
+  })
+  async criar(
+    @Body() dto: CriarAnimalDto,
+    @EscopoAtual() escopo: EscopoAcesso,
+    @Headers('idempotency-key') idempotencyKey: string | undefined,
+    @Res({ passthrough: true }) resposta: Response,
+  ) {
+    const chave = lerChaveIdempotencia(idempotencyKey, true);
+    const { animal, reenvio } = await this.animalsService.criar(dto, escopo, chave);
+    // 201 na primeira vez; 200 quando é o reenvio de um cadastro já feito.
+    resposta.status(reenvio ? HttpStatus.OK : HttpStatus.CREATED);
+    if (reenvio) resposta.setHeader('Idempotent-Replayed', 'true');
+    return animal;
   }
 
   @Get(':id')

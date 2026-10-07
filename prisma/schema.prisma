@@ -143,8 +143,22 @@ model Usuario {
   ativo Boolean @default(true)
   unidades UsuarioUnidade[]
   fotos Foto[]
+  chavesIdempotencia ChaveIdempotencia[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+// Idempotency-Key já processada (issue #3, P0-3). Gravada na mesma transação da escrita:
+// se existe, a operação aconteceu. Chave única por usuário; retenção de 30 dias.
+model ChaveIdempotencia {
+  usuarioId String
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  chave String
+  operacao String
+  hashConteudo String
+  recursoId String
+  createdAt DateTime @default(now())
+  @@id([usuarioId, chave])
+  @@index([createdAt])
 }
 model UsuarioUnidade {
   usuarioId String

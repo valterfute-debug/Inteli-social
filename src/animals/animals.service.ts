@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
 import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
+import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
@@ -27,6 +28,7 @@ export class AnimalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
+    private readonly idempotencia: IdempotenciaService,
   ) {}
 
   async listar(query: ListarAnimaisQueryDto, escopo: EscopoAcesso) {
@@ -80,7 +82,15 @@ export class AnimalsService {
     };
   }
 
-  async criar(dto: CriarAnimalDto, escopo: EscopoAcesso) {
+  /**
+   * Admissão idempotente. A chave é conferida ANTES das validações: um reenvio legítimo não
+   * pode esbarrar no próprio animal criado na primeira vez (ex.: "microchip já cadastrado").
+   */
+  async criar(dto: CriarAnimalDto, escopo: EscopoAcesso, chave: string) {
+    const ctx = { usuarioId: escopo.usuarioId, chave, operacao: 'POST /animals', conteudo: dto };
+    const anterior = await this.idempotencia.verificarReenvio(ctx);
+    if (anterior) return { animal: await this.buscarPorId(anterior, escopo), reenvio: true };
+
     garantirUnidade(escopo, dto.unidadeId);
     const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId);
     this.garantirRegrasAdmissao({
@@ -99,30 +109,40 @@ export class AnimalsService {
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
-        const animal = await this.prisma.animal.create({
-          data: {
-            id: randomUUID(),
-            publicId: identificadorPublico,
-            name: dto.nome,
-            microchip: dto.microchip,
-            speciesId: dto.especieId,
-            breedId: dto.racaId,
-            unitId: dto.unidadeId,
-            locationId: dto.localizacaoId,
-            responsibleId: dto.responsavelId,
-            front: dto.frente,
-            dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
-            sexo: dto.sexo,
-            idadeAproximadaMeses: dto.idadeAproximadaMeses,
-            pesoKg: dto.pesoKg,
-            porte: dto.porte,
-            cor: dto.cor,
-            observacoes: dto.observacoes,
-            fotoEntradaId: dto.fotoEntradaId,
+        const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
+          ctx,
+          async (tx) => {
+            const criado = await tx.animal.create({
+              data: {
+                id: randomUUID(),
+                publicId: identificadorPublico,
+                name: dto.nome,
+                microchip: dto.microchip,
+                speciesId: dto.especieId,
+                breedId: dto.racaId,
+                unitId: dto.unidadeId,
+                locationId: dto.localizacaoId,
+                responsibleId: dto.responsavelId,
+                front: dto.frente,
+                dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
+                sexo: dto.sexo,
+                idadeAproximadaMeses: dto.idadeAproximadaMeses,
+                pesoKg: dto.pesoKg,
+                porte: dto.porte,
+                cor: dto.cor,
+                observacoes: dto.observacoes,
+                fotoEntradaId: dto.fotoEntradaId,
+              },
+              include: INCLUSAO_ANIMAL,
+            });
+            return { recursoId: criado.id, resultado: criado };
           },
-          include: INCLUSAO_ANIMAL,
-        });
-        return this.mapearComFoto(animal);
+        );
+        // Outra requisição com a mesma chave confirmou primeiro: devolve o animal dela.
+        if (reenvio || !resultado) {
+          return { animal: await this.buscarPorId(recursoId, escopo), reenvio: true };
+        }
+        return { animal: await this.mapearComFoto(resultado), reenvio: false };
       } catch (erro) {
         const colisaoDeIdentificador =
           erro instanceof Prisma.PrismaClientKnownRequestError &&
@@ -132,6 +152,7 @@ export class AnimalsService {
         this.tratarErroPrisma(erro);
       }
     }
+    throw new ConflictException('Não foi possível gerar um identificador público único');
   }
 
   async buscarPorId(id: string, escopo: EscopoAcesso) {

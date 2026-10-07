@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
 import { EscopoAcesso, ehAdmin } from '../auth/escopo';
+import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { SolicitarFotoDto, TAMANHO_MAXIMO_BYTES } from './dto/solicitar-foto.dto';
@@ -24,9 +25,17 @@ export class FotosService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
+    private readonly idempotencia: IdempotenciaService,
   ) {}
 
-  async solicitarEnvio(dto: SolicitarFotoDto, escopo: EscopoAcesso) {
+  /**
+   * Idempotente pelo próprio id da foto (gerado no cliente): repetir a solicitação só renova
+   * o link de envio. A Idempotency-Key é registrada para acusar reuso com conteúdo diferente.
+   */
+  async solicitarEnvio(dto: SolicitarFotoDto, escopo: EscopoAcesso, chave: string) {
+    const ctx = { usuarioId: escopo.usuarioId, chave, operacao: 'POST /fotos', conteudo: dto };
+    await this.idempotencia.verificarReenvio(ctx);
+
     const extensao = EXTENSAO_POR_TIPO_MIDIA[dto.tipoMidia];
     const caminhoArmazenamento = `admissao/${dto.id}.${extensao}`;
     const expiraEm = new Date(Date.now() + MINUTOS_VALIDADE_ENVIO * 60 * 1000);
@@ -61,16 +70,27 @@ export class FotosService {
         expiraEm,
       },
     });
+    await this.idempotencia.registrar(ctx, dto.id);
 
     return { id: dto.id, urlEnvio, expiraEm: expiraEm.toISOString() };
   }
 
-  async confirmar(id: string, escopo: EscopoAcesso) {
+  /** Idempotente pelo estado: confirmar de novo uma foto confirmada devolve o mesmo resultado. */
+  async confirmar(id: string, escopo: EscopoAcesso, chave: string) {
+    const ctx = {
+      usuarioId: escopo.usuarioId,
+      chave,
+      operacao: `POST /fotos/${id}/confirmacao`,
+      conteudo: null,
+    };
+    await this.idempotencia.verificarReenvio(ctx);
+
     const foto = await this.prisma.foto.findUnique({ where: { id } });
     if (!foto) throw new NotFoundException('Foto não encontrada');
     this.garantirAutor(foto.criadoPorId, escopo);
 
     if (foto.situacao === SituacaoFoto.CONFIRMADA) {
+      await this.idempotencia.registrar(ctx, foto.id);
       return { id: foto.id, situacao: SituacaoFoto.CONFIRMADA };
     }
 
@@ -92,6 +112,7 @@ export class FotosService {
       where: { id },
       data: { situacao: SituacaoFoto.CONFIRMADA },
     });
+    await this.idempotencia.registrar(ctx, foto.id);
 
     return { id: foto.id, situacao: SituacaoFoto.CONFIRMADA };
   }

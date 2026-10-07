@@ -39,6 +39,7 @@ export function configurarAplicacao(app: INestApplication) {
     origin: origem,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+    exposedHeaders: ['Idempotent-Replayed'],
     maxAge: 600,
   });
   app.enableShutdownHooks();
