@@ -1,3 +1,6 @@
+import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
+import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
+import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
 import { FotosService } from './fotos.service';
@@ -7,10 +10,12 @@ import { SupabaseStorageService } from '../storage/supabase-storage.service';
 function criarPrismaFalso() {
   return {
     foto: {
-      upsert: jest.fn(),
+      create: jest.fn(async ({ data }: { data: unknown }) => data),
       findUnique: jest.fn(),
       update: jest.fn(),
     },
+    remocaoArquivo: { findFirst: jest.fn().mockResolvedValue(null) },
+    $executeRaw: jest.fn().mockResolvedValue(1),
   } as unknown as PrismaService;
 }
 
@@ -29,26 +34,44 @@ describe('FotosService', () => {
     (storage.criarUrlEnvio as jest.Mock).mockResolvedValue({
       urlEnvio: 'https://exemplo.invalid/envio',
     });
-    (prisma.foto.upsert as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    const resposta = await service.solicitarEnvio({
-      id: 'f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1',
-      tipoMidia: 'image/jpeg',
-      tamanhoBytes: 1000,
-    });
+    const resposta = await service.solicitarEnvio(
+      {
+        id: 'f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1',
+        tipoMidia: 'image/jpeg',
+        tamanhoBytes: 1000,
+      },
+      ESCOPO_ADMIN,
+      CHAVE_TESTE,
+    );
 
     expect(resposta.urlEnvio).toBe('https://exemplo.invalid/envio');
-    expect(prisma.foto.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.foto.create).toHaveBeenCalledTimes(1);
+    const prazo = Date.parse(resposta.expiraEm) - Date.now();
+    expect(prazo).toBeGreaterThan(119 * 60 * 1000);
+    expect(prazo).toBeLessThanOrEqual(120 * 60 * 1000);
   });
 
   it('rejeita confirmação de foto inexistente com 404', async () => {
     const prisma = criarPrismaFalso();
     const storage = criarStorageFalso();
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    await expect(service.confirmar('id-inexistente')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(
+      service.confirmar('id-inexistente', ESCOPO_ADMIN, CHAVE_TESTE),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('rejeita confirmação quando o arquivo ainda não chegou ao armazenamento', async () => {
@@ -59,11 +82,19 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.PENDENTE,
       tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date(Date.now() + 120 * 60 * 1000),
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    await expect(service.confirmar('f1')).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      ConflictException,
+    );
   });
 
   it('confirma a foto quando o arquivo já está no armazenamento', async () => {
@@ -74,15 +105,21 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.PENDENTE,
       tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date(Date.now() + 120 * 60 * 1000),
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue({
       tamanhoBytes: 1000,
       tipoMidia: 'image/jpeg',
     });
     (prisma.foto.update as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    const resposta = await service.confirmar('f1');
+    const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
     expect(resposta.situacao).toBe(SituacaoFoto.CONFIRMADA);
   });
@@ -94,10 +131,16 @@ describe('FotosService', () => {
       id: 'f1',
       situacao: SituacaoFoto.CONFIRMADA,
       caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date('2020-01-01'),
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    const resposta = await service.confirmar('f1');
+    const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
     expect(resposta.situacao).toBe(SituacaoFoto.CONFIRMADA);
     expect(storage.obterMetadados).not.toHaveBeenCalled();
@@ -110,20 +153,29 @@ describe('FotosService', () => {
       id: 'f1',
       situacao: SituacaoFoto.CONFIRMADA,
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(
-      service.solicitarEnvio({
-        id: 'f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1',
-        tipoMidia: 'image/png',
-        tamanhoBytes: 1000,
-      }),
+      service.solicitarEnvio(
+        {
+          id: 'f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1',
+          tipoMidia: 'image/png',
+          tamanhoBytes: 1000,
+        },
+        ESCOPO_ADMIN,
+        CHAVE_TESTE,
+      ),
     ).rejects.toBeInstanceOf(ConflictException);
     expect(storage.criarUrlEnvio).not.toHaveBeenCalled();
-    expect(prisma.foto.upsert).not.toHaveBeenCalled();
+    expect(prisma.foto.create).not.toHaveBeenCalled();
   });
 
-  it('rejeita e remove arquivo real maior que o limite, mesmo que o tamanho declarado fosse válido', async () => {
+  it('rejeita arquivo maior que o limite sem excluí-lo fora da manutenção transacional', async () => {
     const prisma = criarPrismaFalso();
     const storage = criarStorageFalso();
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
@@ -131,15 +183,23 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.PENDENTE,
       tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date(Date.now() + 120 * 60 * 1000),
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue({
       tamanhoBytes: 20 * 1024 * 1024,
       tipoMidia: 'image/jpeg',
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    await expect(service.confirmar('f1')).rejects.toBeInstanceOf(BadRequestException);
-    expect(storage.removerArquivo).toHaveBeenCalledWith('admissao/f1.jpg');
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(storage.removerArquivo).not.toHaveBeenCalled();
     expect(prisma.foto.update).not.toHaveBeenCalled();
   });
 
@@ -151,13 +211,44 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.PENDENTE,
       tipoMidia: 'image/jpeg',
       caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date(Date.now() + 120 * 60 * 1000),
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue({
       tamanhoBytes: 1000,
       tipoMidia: 'application/pdf',
     });
-    const service = new FotosService(prisma, storage);
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    await expect(service.confirmar('f1')).rejects.toBeInstanceOf(BadRequestException);
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      BadRequestException,
+    );
+    expect(storage.removerArquivo).not.toHaveBeenCalled();
+    expect(prisma.foto.update).not.toHaveBeenCalled();
+  });
+
+  it('não confirma foto pendente expirada nem consulta ou remove o arquivo', async () => {
+    const prisma = criarPrismaFalso();
+    const storage = criarStorageFalso();
+    (prisma.foto.findUnique as jest.Mock).mockResolvedValue({
+      id: 'f1',
+      situacao: SituacaoFoto.PENDENTE,
+      tipoMidia: 'image/jpeg',
+      caminhoArmazenamento: 'admissao/f1.jpg',
+      expiraEm: new Date('2020-01-01'),
+    });
+    const idempotencia = idempotenciaFalsa(prisma);
+    const service = new FotosService(comTransacao(prisma), storage, idempotencia, auditoriaFalsa());
+    await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toThrow(
+      'Prazo de envio expirado',
+    );
+    expect(storage.obterMetadados).not.toHaveBeenCalled();
+    expect(storage.removerArquivo).not.toHaveBeenCalled();
+    expect(idempotencia.executar).not.toHaveBeenCalled();
+    expect(prisma.foto.update).not.toHaveBeenCalled();
   });
 });

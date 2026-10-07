@@ -1,5 +1,4 @@
 import {
-  BadRequestException,
   Body,
   Controller,
   Headers,
@@ -10,15 +9,11 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { isUUID } from 'class-validator';
+import { EscopoAtual } from '../auth/decoradores';
+import { EscopoAcesso } from '../auth/escopo';
+import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
 import { SolicitarFotoDto } from './dto/solicitar-foto.dto';
 import { FotosService } from './fotos.service';
-
-function validarIdempotencyKey(valor: string | undefined) {
-  if (!valor || !isUUID(valor, '4')) {
-    throw new BadRequestException('Cabeçalho Idempotency-Key ausente ou inválido');
-  }
-}
 
 @ApiTags('Fotos')
 @Controller({ path: 'fotos', version: '1' })
@@ -32,9 +27,10 @@ export class FotosController {
   solicitarEnvio(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: SolicitarFotoDto,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    validarIdempotencyKey(idempotencyKey);
-    return this.fotosService.solicitarEnvio(dto);
+    const chave = lerChaveIdempotencia(idempotencyKey, true);
+    return this.fotosService.solicitarEnvio(dto, escopo, chave);
   }
 
   @Post(':id/confirmacao')
@@ -44,8 +40,9 @@ export class FotosController {
   confirmar(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id', ParseUUIDPipe) id: string,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    validarIdempotencyKey(idempotencyKey);
-    return this.fotosService.confirmar(id);
+    const chave = lerChaveIdempotencia(idempotencyKey, true);
+    return this.fotosService.confirmar(id, escopo, chave);
   }
 }

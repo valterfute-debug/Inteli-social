@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:cov": "jest --coverage --runInBand",
+    "test:e2e": "jest --config jest.e2e.config.cjs --runInBand",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:migrate:dev": "prisma migrate dev",
@@ -20,7 +21,13 @@
     "db:check": "tsx src/database/check-connection.ts",
     "db:seed": "tsx src/database/seed.ts",
     "db:seed:prod": "node dist/database/seed.js",
-    "smoke": "node scripts/smoke-test.cjs"
+    "smoke": "node scripts/smoke-test.cjs",
+    "token": "node scripts/obter-token.cjs",
+    "usuario:liberar": "tsx src/database/liberar-usuario.ts",
+    "manutencao": "nest build && node dist/database/manutencao.js",
+    "manutencao:prod": "node dist/database/manutencao.js",
+    "backup": "tsx src/database/backup.ts",
+    "backup:verificar": "tsx src/database/verificar-restauracao.ts"
   },
   "repository": {
     "type": "git",
@@ -33,7 +40,14 @@
     "node": ">=24"
   },
   "overrides": {
-    "multer": "2.3.0"
+    "multer": "2.4.0",
+    "proxy-addr": "2.0.8",
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.3"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    }
   },
   "type": "commonjs",
   "bugs": {
@@ -54,6 +68,7 @@
     "dotenv": "^17.4.2",
     "helmet": "^8.3.0",
     "joi": "^17.13.8",
+    "jose": "5.10.0",
     "pdf-lib": "^1.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"

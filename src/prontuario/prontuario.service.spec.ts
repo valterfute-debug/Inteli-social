@@ -1,3 +1,4 @@
+import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { NotFoundException } from '@nestjs/common';
 import { Front, Sexo, TipoEventoSaude } from '@prisma/client';
 import { ProntuarioService } from './prontuario.service';
@@ -46,7 +47,9 @@ describe('ProntuarioService', () => {
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
     const service = new ProntuarioService(prisma);
 
-    await expect(service.gerarPdf('id-inexistente')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.gerarPdf('id-inexistente', ESCOPO_ADMIN)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 
   it('gera um PDF válido com os dados do animal e histórico de saúde', async () => {
@@ -67,7 +70,7 @@ describe('ProntuarioService', () => {
     ]);
     const service = new ProntuarioService(prisma);
 
-    const pdf = await service.gerarPdf('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1');
+    const pdf = await service.gerarPdf('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', ESCOPO_ADMIN);
 
     expect(pdf).toBeInstanceOf(Buffer);
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
@@ -79,7 +82,7 @@ describe('ProntuarioService', () => {
     (prisma.healthEvent.findMany as jest.Mock).mockResolvedValue([]);
     const service = new ProntuarioService(prisma);
 
-    const pdf = await service.gerarPdf('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1');
+    const pdf = await service.gerarPdf('a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1', ESCOPO_ADMIN);
 
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });

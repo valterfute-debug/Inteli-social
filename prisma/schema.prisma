@@ -29,6 +29,11 @@ enum SituacaoFoto {
   PENDENTE
   CONFIRMADA
 }
+// Papéis provisórios até a Ampara aprovar os perfis (issue #3, P0-2).
+enum PapelUsuario {
+  ADMIN
+  OPERADOR
+}
 model Species {
   id String @id @default(uuid())
   name String @unique
@@ -55,6 +60,7 @@ model Unit {
   horariosFuncionamento String?
   locations Location[]
   animals Animal[]
+  usuarios UsuarioUnidade[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -121,9 +127,77 @@ model Foto {
   caminhoArmazenamento String
   situacao SituacaoFoto @default(PENDENTE)
   expiraEm DateTime
+  criadoPorId String?
+  criadoPor Usuario? @relation(fields: [criadoPorId], references: [id])
   animal Animal?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+// Tarefa durável de exclusão do Storage. Sem FK: sobrevive à remoção da foto.
+model RemocaoArquivo {
+  id String @id @default(uuid())
+  fotoId String
+  caminhoArmazenamento String @unique
+  tentativas Int @default(0)
+  ultimaTentativaEm DateTime?
+  ultimoErro String?
+  createdAt DateTime @default(now())
+  @@index([fotoId])
+  @@index([createdAt])
+}
+// Conta liberada na API. `id` é o `sub` do token do Supabase Auth: logar no Supabase
+// não basta, a conta precisa existir aqui e estar ativa.
+model Usuario {
+  id String @id
+  email String?
+  nome String?
+  papel PapelUsuario @default(OPERADOR)
+  ativo Boolean @default(true)
+  unidades UsuarioUnidade[]
+  fotos Foto[]
+  chavesIdempotencia ChaveIdempotencia[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+// Trilha de auditoria (issue #3, P0-4). Só recebe INSERT: um gatilho no banco recusa UPDATE
+// e DELETE dentro do prazo de retenção. Sem FK para Usuario/Animal de propósito: o histórico
+// sobrevive à remoção do que ele descreve. Nunca guarda token, chave ou link assinado.
+model EventoAuditoria {
+  id String @id @default(uuid())
+  instante DateTime @default(now())
+  usuarioId String
+  acao String
+  entidade String
+  entidadeId String
+  unidadeId String?
+  frente Front?
+  camposAlterados Json?
+  requisicaoId String?
+  @@index([entidade, entidadeId, instante])
+  @@index([usuarioId, instante])
+  @@index([instante])
+}
+// Idempotency-Key já processada (issue #3, P0-3). Gravada na mesma transação da escrita:
+// se existe, a operação aconteceu. Chave única por usuário; retenção de 30 dias.
+model ChaveIdempotencia {
+  usuarioId String
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  chave String
+  operacao String
+  hashConteudo String
+  recursoId String
+  createdAt DateTime @default(now())
+  @@id([usuarioId, chave])
+  @@index([createdAt])
+}
+model UsuarioUnidade {
+  usuarioId String
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id])
+  createdAt DateTime @default(now())
+  @@id([usuarioId, unitId])
+  @@index([unitId])
 }
 model HealthEvent {
   id String @id @default(uuid())

@@ -11,6 +11,11 @@ import { HealthEventsModule } from './health-events/health-events.module';
 import { ProntuarioModule } from './prontuario/prontuario.module';
 import { StorageModule } from './storage/storage.module';
 import { FotosModule } from './fotos/fotos.module';
+import { AuthModule } from './auth/auth.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
+import { IdempotenciaModule } from './idempotencia/idempotencia.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
+import { ManutencaoModule } from './manutencao/manutencao.module';
 @Module({
   imports: [
     PrismaModule,
@@ -28,7 +33,7 @@ import { FotosModule } from './fotos/fotos.module';
         DIRECT_URL: Joi.string()
           .uri({ scheme: ['postgresql', 'postgres'] })
           .required(),
-        // Sem Storage não há foto e, portanto, não há admissão: obrigatório em produção.
+        // Sem Storage não há foto nem admissão, e sem a URL não há como validar o login.
         SUPABASE_URL: Joi.string()
           .uri()
           .when('NODE_ENV', { is: 'production', then: Joi.required(), otherwise: Joi.optional() }),
@@ -38,15 +43,22 @@ import { FotosModule } from './fotos/fotos.module';
           otherwise: Joi.optional(),
         }),
         SUPABASE_STORAGE_BUCKET: Joi.string().optional(),
+        FOTO_URL_VALIDADE_SEGUNDOS: Joi.number().integer().min(60).max(3600).default(900),
         CORS_ORIGINS: Joi.string().optional(),
         SWAGGER_ENABLED: Joi.boolean().default(false),
-        LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(120),
+        MANUTENCAO_INTERVALO_HORAS: Joi.number().min(0).default(6),
+        LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(600),
       }),
     }),
-    // Limite por IP contra abuso e varredura; folgado para até ~50 usuários simultâneos.
+    // Limite por IP. Folgado (600/min): voluntários no mesmo Wi-Fi dividem o mesmo IP, e cada tela faz várias chamadas.
     ThrottlerModule.forRoot([
-      { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 120) },
+      { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 600) },
     ]),
+    AuthModule,
+    IdempotenciaModule,
+    AuditoriaModule,
+    ManutencaoModule,
+    UsuariosModule,
     HealthModule,
     AnimalsModule,
     CatalogosModule,

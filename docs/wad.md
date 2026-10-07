@@ -19,7 +19,7 @@ O conteúdo descreve o projeto Ampara Animal, com base no TAPI, nas anotações 
 
 A solução pretende centralizar a identificação e o acompanhamento dos animais atendidos pela Ampara, substituindo a dispersão de dados em papel, planilhas e formulários por registros organizados. O Ciclo 1 contempla admissão com foto e localização, seguida de consulta por nome, identificador público ou espécie. O uso operacional será pelo assistente, prioritariamente no computador, com necessidade de continuidade em locais sem internet.
 
-Atualmente o backend NestJS oferece admissão com foto obrigatória e regras por frente, consulta com busca e filtros, catálogos, eventos de saúde e PDF do prontuário (antecipados do Ciclo 2). A interface PWA e a sincronização offline são responsabilidade do frontend. Autenticação ainda não está implementada (decisão pendente com o frontend).
+Atualmente o backend NestJS oferece admissão com foto obrigatória e regras por frente, consulta com busca e filtros, catálogos, eventos de saúde e PDF do prontuário (antecipados do Ciclo 2). A interface PWA e a sincronização offline são responsabilidade do frontend. Toda rota de dados exige login pelo Supabase Auth (ver [3.8](#38-autenticação-autorização-e-resiliência)).
 
 ## Estrutura do repositório
 
@@ -390,7 +390,41 @@ Filtros previstos: name, publicId, speciesId, page e limit. Paginação, limites
 
 ## 3.8. Autenticação, autorização e resiliência
 
-Não há login, sessão, guards de autorização ou integração Supabase Auth. O acesso PostgreSQL usa URLs de banco; publishable key não é utilizada pelo Prisma.
+**Autenticação (issue #3, P0-1):** toda rota exige `Authorization: Bearer <access token>` emitido pelo Supabase Auth do projeto; só `/api/health` e `/api/health/ready` são públicas (`@Publica()`). O `AutenticacaoGuard` (global) valida no servidor a assinatura pelas chaves públicas do projeto (JWKS em `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`), o emissor, a audiência `authenticated` e a validade; aceita só algoritmos assimétricos (ES256/RS256), o que recusa a anon key. Sem token ou com token inválido/vencido: 401. Sem `SUPABASE_URL` ou com o Supabase inacessível: 503 (falha fechada). Não há cadastro aberto: contas são criadas no painel (Authentication > Users).
+
+**Autorização e escopo por unidade (issue #3, P0-2):** logar no Supabase não basta; a conta precisa estar liberada na tabela `Usuario` (id = `sub` do token), senão 403. O guard carrega do banco, a cada requisição, o papel e as unidades vinculadas (`UsuarioUnidade`). Papéis **provisórios**, até a Ampara aprovar os perfis: `ADMIN` acessa todas as unidades; `OPERADOR` só as suas. Regras aplicadas no servidor:
+
+- listagem filtra pelas unidades do usuário (o filtro `unidadeId` do cliente não amplia o acesso);
+- consulta, edição, arquivamento, eventos de saúde e prontuário de animal de outra unidade: 403;
+- cadastro em unidade alheia ou transferência para unidade alheia: 403;
+- catálogos de unidades e localizações mostram só as unidades do usuário;
+- foto ainda sem animal é controlada por autoria (`Foto.criadoPorId`): só quem a enviou (ou ADMIN) confirma, reenvia ou a vincula a uma ficha;
+- `GET /api/v1/me` devolve papel e unidades para o frontend montar as telas.
+
+**Fotos (issue #3, P0-5):** o bucket é privado e a foto só é vista por link assinado (`fotoEntradaUrl`), emitido apenas junto da ficha, ou seja, depois do login e da checagem de unidade; quem não tem acesso recebe 403 e nenhum link. A validade é configurável (`FOTO_URL_VALIDADE_SEGUNDOS`, 60 a 3600 s, padrão 15 min): basta para abrir a ficha, e o PWA guarda a imagem no aparelho, então um link vazado expira logo. Toda resposta da API sai com `Cache-Control: no-store`, para dados e links não ficarem em cache de proxy ou navegador. O readiness (`/api/health/ready`) responde 503 se o bucket virar público por engano. A API não registra em log os links assinados (o log de erro guarda só mensagem e pilha da exceção).
+
+**Idempotência para a fila offline (issue #3, P0-3):** `POST /animals` exige `Idempotency-Key` (UUID v4 estável por cadastro); `POST .../health-events` aceita a chave opcionalmente. A chave, o hash do conteúdo (JSON com campos ordenados) e o id criado são gravados na tabela `ChaveIdempotencia` **na mesma transação** da escrita: se a resposta se perde depois do commit, o reenvio encontra a chave e recebe o mesmo recurso (200, `Idempotent-Replayed: true`) sem nova escrita; se a transação falha, nada fica gravado e o reenvio executa normalmente. Mesma chave com conteúdo diferente: 409. Duas requisições simultâneas com a mesma chave: a segunda espera no índice único e devolve o recurso da primeira (testado com 5 em paralelo). A chave é conferida antes das validações, para o reenvio não esbarrar no próprio animal (ex.: "microchip já cadastrado"). Nas fotos, a idempotência vem do id gerado pelo cliente; a chave é registrada e reuso com outro conteúdo dá 409. Chaves são por usuário e retidas por **30 dias** (maior que o período offline esperado); a remoção das antigas é feita pela rotina de manutenção.
+
+**Auditoria e correlação (issue #3, P0-4):** toda requisição recebe um ID de correlação (`X-Request-Id`; o cliente pode enviar o seu), devolvido na resposta, incluído no corpo dos erros (`requisicaoId`) e registrado no log de acesso (método, caminho sem query string, status, duração, ID e usuário) e no log de erro. Criação, edição e arquivamento de animal, criação e arquivamento de evento de saúde, confirmação de foto e cadastro de responsável gravam um `EventoAuditoria` (ator, ação, alvo, instante, unidade/frente, campos alterados com antes/depois, ID da requisição) **na mesma transação** da escrita: escrita recusada não deixa evento, e reenvio idempotente não duplica. A trilha é append-only no próprio PostgreSQL (gatilho recusa UPDATE e DELETE) e não guarda tokens, chaves de idempotência nem links assinados (testado).
+
+Política (provisória, a aprovar com a Ampara): eventos retidos por **5 anos** (prestação de contas da OSCIP; o gatilho só permite apagar depois disso); consulta em `GET /api/v1/auditoria`, **somente ADMIN**, com filtros por registro, pessoa e ID de requisição; logs de acesso ficam no provedor (Render), com a retenção do plano contratado.
+
+**Microchip e limite de requisições:** o microchip é único entre animais ativos também no banco (índice único parcial `Animal_microchip_ativo_key`), o que fecha a corrida entre dois cadastros simultâneos; o arquivamento libera o número. O limite padrão subiu para 600 requisições/min por IP (`LIMITE_REQUISICOES_POR_MINUTO`), porque voluntários no mesmo Wi-Fi compartilham o IP.
+
+**Limpeza automática (issue #3, P1-1):** a cada `MANUTENCAO_INTERVALO_HORAS` (padrão 6 h; 0 desliga) a API remove fotos pendentes com prazo de envio vencido há mais de 24 h, fotos confirmadas que não viraram ficha em 30 dias (o app pode ter ficado offline entre a foto e o cadastro) e chaves de idempotência com mais de 30 dias. A condição de órfã é conferida de novo no próprio DELETE e o arquivo só sai do Storage se a linha foi apagada, o que evita corrida com a confirmação ou o cadastro. Rodar na hora: `npm run manutencao` (ou `npm run manutencao:prod` após o build). No plano gratuito do Render a API dorme quando ociosa; a limpeza roda quando ela está acordada.
+
+**Backup e restauração (issue #3, P0-6):**
+
+- `npm run backup -- --destino <pasta>` gera `banco.dump` (pg_dump, formato custom, schema public), copia todas as fotos do bucket e grava um `manifesto.json` com o hash SHA-256 de cada arquivo. Só lê da origem. Precisa do `pg_dump` (variável `PG_DUMP` se não estiver no PATH). A pasta `backups/` é ignorada pelo Git: o backup contém dados pessoais e deve ficar em armazenamento com acesso restrito.
+- `npm run backup:verificar -- --backup <pasta> --destino postgresql://...@localhost/<banco descartável>` restaura num banco local e confere contagens e se cada ficha aponta para uma foto existente no backup, com o mesmo hash. Recusa destino fora de localhost.
+- Registro de 2026-10-07: backup do Supabase de desenvolvimento restaurado com sucesso num PostgreSQL 18 local (banco vazio). Em seguida, um backup do banco de testes com uma ficha cujo arquivo não existia: o verificador apontou `AM-2026-CF8EC78F: arquivo ... ausente no backup`, como esperado.
+- Pendente com a Ampara: frequência (proposta: diária, com retenção de 30 dias), RPO (até 24 h de perda) e RTO (até 4 h para voltar), responsável pela execução e local seguro dos backups. O Supabase gratuito tem backup diário do banco, mas **não** das fotos: por isso o script cobre os dois. Repetir o teste de restauração a cada trimestre e antes de toda migration de risco.
+
+**Busca com volume (issue #3, P1-2):** medida com 20 mil animais sintéticos num PostgreSQL local (30 execuções por cenário, página de 20 + contagem total): sem filtro p95 34 ms; busca por nome 26 ms; por identificador 18 ms; por microchip 20 ms; frente + unidade 13 ms; página 500 (offset 9.980) 59 ms. Todos bem abaixo da meta proposta (p95 de 300 ms na API, contando a rede até o Supabase). Ordenação estável (`createdAt desc, id`) evita repetir ou pular itens entre páginas. Decisão: manter `skip/take` e os índices atuais; reavaliar cursor e índice trigram (`pg_trgm`) se o volume passar de ~100 mil animais ou o p95 real passar da meta.
+
+Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
+
+Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.
 
 A imagem fornecida mostra UNRESTRICTED. Isso evidencia a necessidade de conferir configuração de acesso, mas não permite concluir sozinho quem consegue consultar as tabelas. Não houve auditoria de grants, Data API ou políticas de RLS nesta revisão. A tabela de migrations também deve ser incluída nessa análise.
 
@@ -582,7 +616,8 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 
 | Pendência | Situação |
 | --- | --- |
-| Autenticação/autorização | **Risco alto antes de dados reais**: sem login, quem tiver a URL lê e arquiva fichas e vê contatos de responsáveis. Proposta: Supabase Auth com validação do JWT no backend, a combinar com o frontend |
+| Autenticação | Implementada (Supabase Auth, JWT validado no backend). O frontend precisa da tela de login e de enviar o token em toda requisição |
+| Autorização por perfil/unidade | Implementada com papéis **provisórios** (ADMIN/OPERADOR). A Ampara precisa aprovar os perfis e quem vê o quê; ajustar só muda as regras, não a estrutura |
 | Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados |
 | Lista de espécies, unidades e localizações | Seed inicial derivado do TAPI; revisar com a Ampara |
 | Primeiros usuários | Ampara deve indicar o grupo piloto |
@@ -836,7 +871,7 @@ Veja [integridade e campos opcionais](#integridade). O diagrama não representa 
 
 ## Evidência local
 
-Prisma usa conexão PostgreSQL. Não há cliente supabase-js, autenticação ou autorização da API. Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
+Prisma usa conexão PostgreSQL. O supabase-js é usado só para o Storage (service role, no servidor). A API exige login do Supabase Auth e conta liberada com escopo por unidade (seção 3.8). Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
 
 ## Verificações manuais
 

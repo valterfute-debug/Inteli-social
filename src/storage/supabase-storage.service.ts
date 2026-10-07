@@ -2,8 +2,14 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
 
-/** Validade das URLs de leitura: cobre uma sessão de consulta sem ficar pública por muito tempo. */
-const SEGUNDOS_VALIDADE_LEITURA = 60 * 60;
+/**
+ * Validade padrão dos links de leitura (FOTO_URL_VALIDADE_SEGUNDOS). 15 minutos cobrem abrir
+ * a ficha e ver a foto; o PWA guarda a imagem no aparelho e pede a ficha de novo quando
+ * precisa, então um link copiado ou vazado deixa de funcionar logo.
+ */
+export const SEGUNDOS_VALIDADE_LEITURA_PADRAO = 15 * 60;
+
+export type SituacaoBucket = 'nao_configurado' | 'privado' | 'publico';
 
 @Injectable()
 export class SupabaseStorageService {
@@ -28,6 +34,27 @@ export class SupabaseStorageService {
 
   private obterBucket(): string {
     return this.config.get<string>('SUPABASE_STORAGE_BUCKET') ?? 'fotos-animais';
+  }
+
+  validadeLeituraSegundos(): number {
+    return Number(
+      this.config.get<number>('FOTO_URL_VALIDADE_SEGUNDOS') ?? SEGUNDOS_VALIDADE_LEITURA_PADRAO,
+    );
+  }
+
+  /**
+   * Bucket público tornaria os links assinados inúteis: qualquer pessoa com o caminho veria
+   * a foto. Usado pelo readiness para que isso apareça no monitoramento e no smoke test.
+   */
+  async situacaoBucket(): Promise<SituacaoBucket> {
+    if (!this.config.get('SUPABASE_URL') || !this.config.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      return 'nao_configurado';
+    }
+    const { data, error } = await this.obterCliente().storage.getBucket(this.obterBucket());
+    if (error || !data) {
+      throw new InternalServerErrorException('Falha ao consultar o bucket de fotos');
+    }
+    return data.public ? 'publico' : 'privado';
   }
 
   async criarUrlEnvio(caminho: string): Promise<{ urlEnvio: string }> {
@@ -67,7 +94,8 @@ export class SupabaseStorageService {
   }
 
   async removerArquivo(caminho: string): Promise<void> {
-    await this.obterCliente().storage.from(this.obterBucket()).remove([caminho]);
+    const { error } = await this.obterCliente().storage.from(this.obterBucket()).remove([caminho]);
+    if (error) throw new InternalServerErrorException('Falha ao remover arquivo do armazenamento');
   }
 
   /**
@@ -79,7 +107,7 @@ export class SupabaseStorageService {
     if (caminhos.length === 0) return urls;
     const { data, error } = await this.obterCliente()
       .storage.from(this.obterBucket())
-      .createSignedUrls(caminhos, SEGUNDOS_VALIDADE_LEITURA);
+      .createSignedUrls(caminhos, this.validadeLeituraSegundos());
     if (error || !data) {
       throw new InternalServerErrorException('Falha ao gerar URLs de leitura das fotos');
     }

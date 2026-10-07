@@ -1,5 +1,7 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { EscopoAtual } from '../auth/decoradores';
+import { EscopoAcesso } from '../auth/escopo';
 import { CatalogosService } from './catalogos.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
@@ -25,14 +27,17 @@ export class CatalogosController {
 
   @Get('units')
   @ApiOperation({ summary: 'Listar unidades' })
-  listarUnidades(@Query() query: PaginacaoQueryDto) {
-    return this.catalogosService.listarUnidades(query);
+  listarUnidades(@Query() query: PaginacaoQueryDto, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.catalogosService.listarUnidades(query, escopo);
   }
 
   @Get('locations')
   @ApiOperation({ summary: 'Listar localizações' })
-  listarLocalizacoes(@Query() query: ListarLocalizacoesQueryDto) {
-    return this.catalogosService.listarLocalizacoes(query);
+  listarLocalizacoes(
+    @Query() query: ListarLocalizacoesQueryDto,
+    @EscopoAtual() escopo: EscopoAcesso,
+  ) {
+    return this.catalogosService.listarLocalizacoes(query, escopo);
   }
 
   @Get('responsibles')
@@ -44,8 +49,8 @@ export class CatalogosController {
   @Post('responsibles')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Cadastrar responsável (tutor ou quem entregou o animal)' })
-  criarResponsavel(@Body() dto: CriarResponsavelDto) {
-    return this.catalogosService.criarResponsavel(dto);
+  criarResponsavel(@Body() dto: CriarResponsavelDto, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.catalogosService.criarResponsavel(dto, escopo);
   }
 
   @Get('fronts')

@@ -2,11 +2,19 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
+import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
+import {
+  AcaoAuditoria,
+  AuditoriaService,
+  calcularCamposAlterados,
+} from '../auditoria/auditoria.service';
+import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
@@ -25,11 +33,16 @@ export class AnimalsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
+    private readonly idempotencia: IdempotenciaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
-  async listar(query: ListarAnimaisQueryDto) {
+  async listar(query: ListarAnimaisQueryDto, escopo: EscopoAcesso) {
     const { pagina, limite } = query;
-    const where = this.montarFiltroListagem(query);
+    // Filtro do cliente E escopo do servidor: pedir outra unidade só devolve lista vazia.
+    const where: Prisma.AnimalWhereInput = {
+      AND: [this.montarFiltroListagem(query), filtroPorUnidade(escopo)],
+    };
 
     const [itens, total] = await Promise.all([
       this.prisma.animal.findMany({
@@ -75,48 +88,77 @@ export class AnimalsService {
     };
   }
 
-  async criar(dto: CriarAnimalDto) {
-    const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId);
-    this.garantirRegrasAdmissao({
-      frente: dto.frente,
-      especieSilvestre,
-      nome: dto.nome,
-      microchip: dto.microchip,
-      sexo: dto.sexo,
-      idadeAproximadaMeses: dto.idadeAproximadaMeses,
-      pesoKg: dto.pesoKg,
-      porte: dto.porte,
-    });
-    if (dto.microchip) await this.garantirMicrochipDisponivel(dto.microchip);
-    await this.garantirFotoConfirmada(dto.fotoEntradaId);
+  /**
+   * Admissão idempotente. A chave é conferida ANTES das validações: um reenvio legítimo não
+   * pode esbarrar no próprio animal criado na primeira vez (ex.: "microchip já cadastrado").
+   */
+  async criar(dto: CriarAnimalDto, escopo: EscopoAcesso, chave: string) {
+    const ctx = { usuarioId: escopo.usuarioId, chave, operacao: 'POST /animals', conteudo: dto };
+    const anterior = await this.idempotencia.verificarReenvio(ctx);
+    if (anterior) return { animal: await this.buscarPorId(anterior, escopo), reenvio: true };
 
+    garantirUnidade(escopo, dto.unidadeId);
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
-        const animal = await this.prisma.animal.create({
-          data: {
-            id: randomUUID(),
-            publicId: identificadorPublico,
-            name: dto.nome,
-            microchip: dto.microchip,
-            speciesId: dto.especieId,
-            breedId: dto.racaId,
-            unitId: dto.unidadeId,
-            locationId: dto.localizacaoId,
-            responsibleId: dto.responsavelId,
-            front: dto.frente,
-            dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
-            sexo: dto.sexo,
-            idadeAproximadaMeses: dto.idadeAproximadaMeses,
-            pesoKg: dto.pesoKg,
-            porte: dto.porte,
-            cor: dto.cor,
-            observacoes: dto.observacoes,
-            fotoEntradaId: dto.fotoEntradaId,
+        const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
+          ctx,
+          async (tx) => {
+            // A reserva da chave vem antes destas leituras: outra requisição idêntica
+            // aguarda o commit e faz replay, sem rejeitar o microchip que ela mesma criou.
+            const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId, tx);
+            this.garantirRegrasAdmissao({
+              frente: dto.frente,
+              especieSilvestre,
+              nome: dto.nome,
+              microchip: dto.microchip,
+              sexo: dto.sexo,
+              idadeAproximadaMeses: dto.idadeAproximadaMeses,
+              pesoKg: dto.pesoKg,
+              porte: dto.porte,
+            });
+            if (dto.microchip)
+              await this.garantirMicrochipDisponivel(dto.microchip, escopo, undefined, tx);
+            await this.garantirFotoConfirmada(dto.fotoEntradaId, escopo, tx);
+            const criado = await tx.animal.create({
+              data: {
+                id: randomUUID(),
+                publicId: identificadorPublico,
+                name: dto.nome,
+                microchip: dto.microchip,
+                speciesId: dto.especieId,
+                breedId: dto.racaId,
+                unitId: dto.unidadeId,
+                locationId: dto.localizacaoId,
+                responsibleId: dto.responsavelId,
+                front: dto.frente,
+                dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
+                sexo: dto.sexo,
+                idadeAproximadaMeses: dto.idadeAproximadaMeses,
+                pesoKg: dto.pesoKg,
+                porte: dto.porte,
+                cor: dto.cor,
+                observacoes: dto.observacoes,
+                fotoEntradaId: dto.fotoEntradaId,
+              },
+              include: INCLUSAO_ANIMAL,
+            });
+            await this.auditoria.registrar(tx, {
+              usuarioId: escopo.usuarioId,
+              acao: AcaoAuditoria.ANIMAL_CRIADO,
+              entidade: 'Animal',
+              entidadeId: criado.id,
+              unidadeId: criado.unitId,
+              frente: criado.front,
+            });
+            return { recursoId: criado.id, resultado: criado };
           },
-          include: INCLUSAO_ANIMAL,
-        });
-        return this.mapearComFoto(animal);
+        );
+        // Outra requisição com a mesma chave confirmou primeiro: devolve o animal dela.
+        if (reenvio || !resultado) {
+          return { animal: await this.buscarPorId(recursoId, escopo), reenvio: true };
+        }
+        return { animal: await this.mapearComFoto(resultado), reenvio: false };
       } catch (erro) {
         const colisaoDeIdentificador =
           erro instanceof Prisma.PrismaClientKnownRequestError &&
@@ -126,18 +168,20 @@ export class AnimalsService {
         this.tratarErroPrisma(erro);
       }
     }
+    throw new ConflictException('Não foi possível gerar um identificador público único');
   }
 
-  async buscarPorId(id: string) {
+  async buscarPorId(id: string, escopo: EscopoAcesso) {
     const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
       include: INCLUSAO_ANIMAL,
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, animal.unitId);
     return this.mapearComFoto(animal);
   }
 
-  async atualizar(id: string, dto: AtualizarAnimalDto) {
+  async atualizar(id: string, dto: AtualizarAnimalDto, escopo: EscopoAcesso) {
     const { versao, ...dados } = dto;
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
@@ -148,6 +192,9 @@ export class AnimalsService {
       include: { species: true },
     });
     if (!existente) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, existente.unitId);
+    // Transferir para outra unidade exige acesso também à unidade de destino.
+    if (dados.unidadeId !== undefined) garantirUnidade(escopo, dados.unidadeId);
     if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
 
     // As regras valem para o estado final: numa transferência CED → CasAdote, por exemplo,
@@ -168,54 +215,88 @@ export class AnimalsService {
       porte: valorFinal(dados.porte, existente.porte),
     });
     if (dados.microchip && dados.microchip !== existente.microchip) {
-      await this.garantirMicrochipDisponivel(dados.microchip, id);
+      await this.garantirMicrochipDisponivel(dados.microchip, escopo, id);
     }
     if (dados.fotoEntradaId !== undefined) {
-      await this.garantirFotoConfirmada(dados.fotoEntradaId);
+      await this.garantirFotoConfirmada(dados.fotoEntradaId, escopo);
     }
 
+    // Nomes das colunas do banco; undefined = campo não enviado (não muda).
+    const alteracoes = {
+      name: dados.nome,
+      microchip: dados.microchip,
+      speciesId: dados.especieId,
+      breedId: dados.racaId,
+      unitId: dados.unidadeId,
+      locationId: dados.localizacaoId,
+      responsibleId: dados.responsavelId,
+      front: dados.frente,
+      dataEntrada: dados.dataEntrada !== undefined ? new Date(dados.dataEntrada) : undefined,
+      sexo: dados.sexo,
+      idadeAproximadaMeses: dados.idadeAproximadaMeses,
+      pesoKg: dados.pesoKg,
+      porte: dados.porte,
+      cor: dados.cor,
+      observacoes: dados.observacoes,
+      fotoEntradaId: dados.fotoEntradaId,
+    };
+
     try {
-      const resultado = await this.prisma.animal.updateMany({
-        where: { id, deletedAt: null, version: versao },
-        data: {
-          ...(dados.nome !== undefined ? { name: dados.nome } : {}),
-          ...(dados.microchip !== undefined ? { microchip: dados.microchip } : {}),
-          ...(dados.especieId !== undefined ? { speciesId: dados.especieId } : {}),
-          ...(dados.racaId !== undefined ? { breedId: dados.racaId } : {}),
-          ...(dados.unidadeId !== undefined ? { unitId: dados.unidadeId } : {}),
-          ...(dados.localizacaoId !== undefined ? { locationId: dados.localizacaoId } : {}),
-          ...(dados.responsavelId !== undefined ? { responsibleId: dados.responsavelId } : {}),
-          ...(dados.frente !== undefined ? { front: dados.frente } : {}),
-          ...(dados.dataEntrada !== undefined ? { dataEntrada: new Date(dados.dataEntrada) } : {}),
-          ...(dados.sexo !== undefined ? { sexo: dados.sexo } : {}),
-          ...(dados.idadeAproximadaMeses !== undefined
-            ? { idadeAproximadaMeses: dados.idadeAproximadaMeses }
-            : {}),
-          ...(dados.pesoKg !== undefined ? { pesoKg: dados.pesoKg } : {}),
-          ...(dados.porte !== undefined ? { porte: dados.porte } : {}),
-          ...(dados.cor !== undefined ? { cor: dados.cor } : {}),
-          ...(dados.observacoes !== undefined ? { observacoes: dados.observacoes } : {}),
-          ...(dados.fotoEntradaId !== undefined ? { fotoEntradaId: dados.fotoEntradaId } : {}),
-          version: { increment: 1 },
-        },
+      await this.prisma.$transaction(async (tx) => {
+        const resultado = await tx.animal.updateMany({
+          where: { id, deletedAt: null, version: versao },
+          data: { ...alteracoes, version: { increment: 1 } },
+        });
+        // Outra edição venceu entre a leitura acima e esta escrita.
+        if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
+
+        await this.auditoria.registrar(tx, {
+          usuarioId: escopo.usuarioId,
+          acao: AcaoAuditoria.ANIMAL_ATUALIZADO,
+          entidade: 'Animal',
+          entidadeId: id,
+          unidadeId: alteracoes.unitId ?? existente.unitId,
+          frente: alteracoes.front ?? existente.front,
+          camposAlterados: calcularCamposAlterados(existente, alteracoes),
+        });
       });
 
-      // Outra edição venceu entre a leitura acima e esta escrita.
-      if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
-
-      return this.buscarPorId(id);
+      return this.buscarPorId(id, escopo);
     } catch (erro) {
-      if (erro instanceof NotFoundException || erro instanceof ConflictException) throw erro;
+      if (
+        erro instanceof NotFoundException ||
+        erro instanceof ConflictException ||
+        erro instanceof ForbiddenException
+      ) {
+        throw erro;
+      }
       this.tratarErroPrisma(erro);
     }
   }
 
-  async arquivar(id: string) {
-    const resultado = await this.prisma.animal.updateMany({
+  async arquivar(id: string, escopo: EscopoAcesso) {
+    const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
-      data: { deletedAt: new Date() },
+      select: { unitId: true, front: true },
     });
-    if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
+    if (!animal) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, animal.unitId);
+
+    await this.prisma.$transaction(async (tx) => {
+      const resultado = await tx.animal.updateMany({
+        where: { id, deletedAt: null, ...filtroPorUnidade(escopo) },
+        data: { deletedAt: new Date() },
+      });
+      if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
+      await this.auditoria.registrar(tx, {
+        usuarioId: escopo.usuarioId,
+        acao: AcaoAuditoria.ANIMAL_ARQUIVADO,
+        entidade: 'Animal',
+        entidadeId: id,
+        unidadeId: animal.unitId,
+        frente: animal.front,
+      });
+    });
   }
 
   private garantirRegrasAdmissao(estado: EstadoAdmissao) {
@@ -223,8 +304,11 @@ export class AnimalsService {
     if (violacoes.length > 0) throw new BadRequestException(violacoes);
   }
 
-  private async obterEspecieSilvestre(especieId: string) {
-    const especie = await this.prisma.species.findFirst({
+  private async obterEspecieSilvestre(
+    especieId: string,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const especie = await cliente.species.findFirst({
       where: { id: especieId, deletedAt: null },
       select: { silvestre: true },
     });
@@ -237,16 +321,26 @@ export class AnimalsService {
    * então um segundo cadastro com o mesmo número é, na prática, o mesmo animal. O 409 devolve
    * o cadastro existente para o frontend oferecer a transferência em vez de duplicar a ficha.
    */
-  private async garantirMicrochipDisponivel(microchip: string, ignorarId?: string) {
-    const existente = await this.prisma.animal.findFirst({
+  private async garantirMicrochipDisponivel(
+    microchip: string,
+    escopo: EscopoAcesso,
+    ignorarId?: string,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const existente = await cliente.animal.findFirst({
       where: {
         microchip,
         deletedAt: null,
         ...(ignorarId ? { id: { not: ignorarId } } : {}),
       },
-      select: { id: true, publicId: true },
+      select: { id: true, publicId: true, unitId: true },
     });
     if (existente) {
+      // A unicidade é global, mas a ficha existente só pode ser identificada por
+      // quem tem acesso à unidade. Não revelar IDs de outra unidade no erro.
+      if (!ehAdmin(escopo) && !escopo.unidadeIds.includes(existente.unitId)) {
+        throw new ConflictException('Microchip já cadastrado em outro animal ativo');
+      }
       throw new ConflictException({
         message: `Microchip já cadastrado no animal ${existente.publicId}`,
         detalhes: {
@@ -257,9 +351,17 @@ export class AnimalsService {
     }
   }
 
-  private async garantirFotoConfirmada(fotoEntradaId: string) {
-    const foto = await this.prisma.foto.findUnique({ where: { id: fotoEntradaId } });
+  private async garantirFotoConfirmada(
+    fotoEntradaId: string,
+    escopo: EscopoAcesso,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const foto = await cliente.foto.findUnique({ where: { id: fotoEntradaId } });
     if (!foto) throw new BadRequestException('Foto não encontrada');
+    // Só quem enviou a foto (ou um admin) pode vinculá-la a uma ficha.
+    if (foto.criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {
+      throw new ForbiddenException('Foto enviada por outro usuário');
+    }
     if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
       throw new BadRequestException('Foto ainda não confirmada');
     }
@@ -294,7 +396,10 @@ export class AnimalsService {
   private tratarErroPrisma(erro: unknown): never {
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
       if (erro.code === 'P2002') {
-        const alvo = erro.meta?.target as string[] | undefined;
+        const alvo = JSON.stringify(erro.meta ?? {});
+        if (alvo.includes('microchip')) {
+          throw new ConflictException('Microchip já cadastrado em outro animal ativo');
+        }
         throw new ConflictException(
           alvo?.includes('fotoEntradaId')
             ? 'Esta foto já está vinculada a outro animal'

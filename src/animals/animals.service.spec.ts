@@ -1,3 +1,6 @@
+import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
+import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
+import { ESCOPO_ADMIN, escopoOperador } from '../../test/escopos-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Front, Porte, Prisma, SituacaoFoto, Sexo } from '@prisma/client';
 import { AnimalsService } from './animals.service';
@@ -93,9 +96,18 @@ describe('AnimalsService', () => {
     it('cria um animal e devolve a resposta com nomes das relações e URL da foto', async () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.create as jest.Mock).mockResolvedValue(criarAnimalFalso());
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const resposta = await service.criar({ ...BASE_CASADOTE, nome: 'Rex', sexo: Sexo.MACHO });
+      const { animal: resposta } = await service.criar(
+        { ...BASE_CASADOTE, nome: 'Rex', sexo: Sexo.MACHO },
+        ESCOPO_ADMIN,
+        CHAVE_TESTE,
+      );
 
       expect(resposta?.identificadorPublico).toBe('QA-001');
       expect(resposta?.versao).toBe(1);
@@ -106,9 +118,16 @@ describe('AnimalsService', () => {
 
     it('exige microchip, sexo, idade, peso e porte na frente CCPA', async () => {
       const prisma = criarPrismaFalso();
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const erro = await service.criar({ ...BASE_CASADOTE, frente: Front.CCPA }).catch((e) => e);
+      const erro = await service
+        .criar({ ...BASE_CASADOTE, frente: Front.CCPA }, ESCOPO_ADMIN, CHAVE_TESTE)
+        .catch((e) => e);
 
       expect(erro).toBeInstanceOf(BadRequestException);
       expect(erro.getResponse().message).toHaveLength(5);
@@ -121,9 +140,14 @@ describe('AnimalsService', () => {
       (prisma.animal.create as jest.Mock).mockResolvedValue(
         criarAnimalFalso({ front: Front.CCPA, microchip: '000123456789' }),
       );
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const resposta = await service.criar(COMPLETO_CCPA);
+      const { animal: resposta } = await service.criar(COMPLETO_CCPA, ESCOPO_ADMIN, CHAVE_TESTE);
 
       expect(resposta?.microchip).toBe('000123456789');
     });
@@ -131,26 +155,42 @@ describe('AnimalsService', () => {
     it('exige nome para espécie silvestre e dispensa microchip mesmo em CED', async () => {
       const prisma = criarPrismaFalso();
       (prisma.species.findFirst as jest.Mock).mockResolvedValue({ silvestre: true });
-      const service = new AnimalsService(prisma, criarStorageFalso());
-
-      await expect(service.criar({ ...BASE_CASADOTE, frente: Front.CED })).rejects.toBeInstanceOf(
-        BadRequestException,
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
       );
+
+      await expect(
+        service.criar({ ...BASE_CASADOTE, frente: Front.CED }, ESCOPO_ADMIN, CHAVE_TESTE),
+      ).rejects.toBeInstanceOf(BadRequestException);
 
       (prisma.animal.create as jest.Mock).mockResolvedValue(
         criarAnimalFalso({ name: 'Onça Pintada' }),
       );
       await expect(
-        service.criar({ ...BASE_CASADOTE, frente: Front.CED, nome: 'Onça Pintada' }),
+        service.criar(
+          { ...BASE_CASADOTE, frente: Front.CED, nome: 'Onça Pintada' },
+          ESCOPO_ADMIN,
+          CHAVE_TESTE,
+        ),
       ).resolves.toBeDefined();
     });
 
     it('rejeita espécie inexistente com 400', async () => {
       const prisma = criarPrismaFalso();
       (prisma.species.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      await expect(service.criar(BASE_CASADOTE)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.criar(BASE_CASADOTE, ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
     });
 
     it('devolve 409 com o animal existente quando o microchip já está cadastrado', async () => {
@@ -159,9 +199,14 @@ describe('AnimalsService', () => {
         id: ID_ANIMAL,
         publicId: 'AM-2026-AAAA',
       });
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const erro = await service.criar(COMPLETO_CCPA).catch((e) => e);
+      const erro = await service.criar(COMPLETO_CCPA, ESCOPO_ADMIN, CHAVE_TESTE).catch((e) => e);
 
       expect(erro).toBeInstanceOf(ConflictException);
       expect(erro.getResponse().detalhes).toEqual({
@@ -171,6 +216,42 @@ describe('AnimalsService', () => {
       expect(prisma.animal.create).not.toHaveBeenCalled();
     });
 
+    it.each([
+      ['unidade-1', true],
+      ['unidade-alheia', false],
+    ])(
+      'conflito de microchip na %s revela detalhes somente com acesso',
+      async (unitId, permitido) => {
+        const prisma = criarPrismaFalso();
+        (prisma.animal.findFirst as jest.Mock).mockResolvedValue({
+          id: ID_ANIMAL,
+          publicId: 'AM-PRIVADO',
+          unitId,
+        });
+        const service = new AnimalsService(
+          comTransacao(prisma),
+          criarStorageFalso(),
+          idempotenciaFalsa(prisma),
+          auditoriaFalsa(),
+        );
+        const erro = await service
+          .criar(COMPLETO_CCPA, escopoOperador(['unidade-1']), CHAVE_TESTE)
+          .catch((e) => e);
+        expect(erro).toBeInstanceOf(ConflictException);
+        if (permitido) {
+          expect(erro.getResponse().detalhes).toEqual({
+            animalExistenteId: ID_ANIMAL,
+            identificadorPublico: 'AM-PRIVADO',
+          });
+        } else {
+          expect(erro.getResponse().detalhes).toBeUndefined();
+          expect(JSON.stringify(erro.getResponse())).not.toContain(ID_ANIMAL);
+          expect(JSON.stringify(erro.getResponse())).not.toContain('AM-PRIVADO');
+        }
+        expect(prisma.animal.create).not.toHaveBeenCalled();
+      },
+    );
+
     it('converte violação de identificador público duplicado em 409', async () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.create as jest.Mock).mockRejectedValue(
@@ -179,9 +260,16 @@ describe('AnimalsService', () => {
           clientVersion: '6.19.3',
         }),
       );
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      await expect(service.criar(BASE_CASADOTE)).rejects.toBeInstanceOf(ConflictException);
+      await expect(service.criar(BASE_CASADOTE, ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
     });
 
     it('rejeita cadastro quando a foto ainda não foi confirmada', async () => {
@@ -190,26 +278,47 @@ describe('AnimalsService', () => {
         id: 'foto-1',
         situacao: SituacaoFoto.PENDENTE,
       });
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      await expect(service.criar(BASE_CASADOTE)).rejects.toBeInstanceOf(BadRequestException);
+      await expect(service.criar(BASE_CASADOTE, ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
       expect(prisma.animal.create).not.toHaveBeenCalled();
     });
 
     it('rejeita cadastro quando a foto informada não existe', async () => {
       const prisma = criarPrismaFalso();
       (prisma.foto.findUnique as jest.Mock).mockResolvedValue(null);
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
       await expect(
-        service.criar({ ...BASE_CASADOTE, fotoEntradaId: 'foto-inexistente' }),
+        service.criar(
+          { ...BASE_CASADOTE, fotoEntradaId: 'foto-inexistente' },
+          ESCOPO_ADMIN,
+          CHAVE_TESTE,
+        ),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });
 
   describe('listar', () => {
     it('busca livre procura em nome, identificador público e microchip', () => {
-      const service = new AnimalsService(criarPrismaFalso(), criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(criarPrismaFalso()),
+        criarStorageFalso(),
+        idempotenciaFalsa(null),
+        auditoriaFalsa(),
+      );
 
       const where = service.montarFiltroListagem({ pagina: 1, limite: 20, busca: 'rex' });
 
@@ -222,7 +331,12 @@ describe('AnimalsService', () => {
     });
 
     it('combina filtros de espécie, frente, unidade e microchip', () => {
-      const service = new AnimalsService(criarPrismaFalso(), criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(criarPrismaFalso()),
+        criarStorageFalso(),
+        idempotenciaFalsa(null),
+        auditoriaFalsa(),
+      );
 
       const where = service.montarFiltroListagem({
         pagina: 1,
@@ -250,9 +364,14 @@ describe('AnimalsService', () => {
       ]);
       (prisma.animal.count as jest.Mock).mockResolvedValue(2);
       const storage = criarStorageFalso();
-      const service = new AnimalsService(prisma, storage);
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        storage,
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const resposta = await service.listar({ pagina: 1, limite: 20 });
+      const resposta = await service.listar({ pagina: 1, limite: 20 }, ESCOPO_ADMIN);
 
       expect(storage.criarUrlsLeitura).toHaveBeenCalledTimes(1);
       expect(resposta.itens[0].fotoEntradaUrl).toBe('https://exemplo.invalid/foto-1');
@@ -265,9 +384,14 @@ describe('AnimalsService', () => {
       (prisma.animal.count as jest.Mock).mockResolvedValue(1);
       const storage = criarStorageFalso();
       (storage.criarUrlsLeitura as jest.Mock).mockRejectedValue(new Error('Storage fora do ar'));
-      const service = new AnimalsService(prisma, storage);
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        storage,
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const resposta = await service.listar({ pagina: 1, limite: 20 });
+      const resposta = await service.listar({ pagina: 1, limite: 20 }, ESCOPO_ADMIN);
 
       expect(resposta.itens[0].fotoEntradaUrl).toBeNull();
     });
@@ -287,14 +411,23 @@ describe('AnimalsService', () => {
         .mockResolvedValueOnce(completoCed)
         .mockResolvedValueOnce({ ...completoCed, front: Front.CASADOTE, version: 2 });
       (prisma.animal.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
-      const resposta = await service.atualizar(ID_ANIMAL, {
-        versao: 1,
-        frente: Front.CASADOTE,
-        unidadeId: 'unidade-1',
-        localizacaoId: 'local-1',
-      });
+      const resposta = await service.atualizar(
+        ID_ANIMAL,
+        {
+          versao: 1,
+          frente: Front.CASADOTE,
+          unidadeId: 'unidade-1',
+          localizacaoId: 'local-1',
+        },
+        ESCOPO_ADMIN,
+      );
 
       expect(resposta?.frente).toBe(Front.CASADOTE);
     });
@@ -302,10 +435,15 @@ describe('AnimalsService', () => {
     it('aplica as regras sobre o estado final: mover para CCPA sem microchip é rejeitado', async () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalFalso());
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
       await expect(
-        service.atualizar(ID_ANIMAL, { versao: 1, frente: Front.CCPA }),
+        service.atualizar(ID_ANIMAL, { versao: 1, frente: Front.CCPA }, ESCOPO_ADMIN),
       ).rejects.toBeInstanceOf(BadRequestException);
       expect(prisma.animal.updateMany).not.toHaveBeenCalled();
     });
@@ -313,10 +451,15 @@ describe('AnimalsService', () => {
     it('rejeita versão desatualizada com 409 sem tentar gravar', async () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalFalso({ version: 3 }));
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
       await expect(
-        service.atualizar(ID_ANIMAL, { versao: 1, nome: 'Novo nome' }),
+        service.atualizar(ID_ANIMAL, { versao: 1, nome: 'Novo nome' }, ESCOPO_ADMIN),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.animal.updateMany).not.toHaveBeenCalled();
     });
@@ -325,20 +468,30 @@ describe('AnimalsService', () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalFalso());
       (prisma.animal.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
       await expect(
-        service.atualizar(ID_ANIMAL, { versao: 1, nome: 'Novo nome' }),
+        service.atualizar(ID_ANIMAL, { versao: 1, nome: 'Novo nome' }, ESCOPO_ADMIN),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('retorna 404 ao tentar atualizar animal inexistente', async () => {
       const prisma = criarPrismaFalso();
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
-      const service = new AnimalsService(prisma, criarStorageFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
 
       await expect(
-        service.atualizar('id-inexistente', { versao: 1, nome: 'Novo nome' }),
+        service.atualizar('id-inexistente', { versao: 1, nome: 'Novo nome' }, ESCOPO_ADMIN),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
   });
@@ -346,8 +499,15 @@ describe('AnimalsService', () => {
   it('retorna 404 ao arquivar animal inexistente', async () => {
     const prisma = criarPrismaFalso();
     (prisma.animal.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
-    const service = new AnimalsService(prisma, criarStorageFalso());
+    const service = new AnimalsService(
+      comTransacao(prisma),
+      criarStorageFalso(),
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
-    await expect(service.arquivar('id-inexistente')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(service.arquivar('id-inexistente', ESCOPO_ADMIN)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
   });
 });
