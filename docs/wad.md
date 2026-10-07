@@ -411,6 +411,8 @@ Política (provisória, a aprovar com a Ampara): eventos retidos por **5 anos** 
 
 **Microchip e limite de requisições:** o microchip é único entre animais ativos também no banco (índice único parcial `Animal_microchip_ativo_key`), o que fecha a corrida entre dois cadastros simultâneos; o arquivamento libera o número. O limite padrão subiu para 600 requisições/min por IP (`LIMITE_REQUISICOES_POR_MINUTO`), porque voluntários no mesmo Wi-Fi compartilham o IP.
 
+**Limpeza automática (issue #3, P1-1):** a cada `MANUTENCAO_INTERVALO_HORAS` (padrão 6 h; 0 desliga) a API remove fotos pendentes com prazo de envio vencido há mais de 24 h, fotos confirmadas que não viraram ficha em 30 dias (o app pode ter ficado offline entre a foto e o cadastro) e chaves de idempotência com mais de 30 dias. A condição de órfã é conferida de novo no próprio DELETE e o arquivo só sai do Storage se a linha foi apagada, o que evita corrida com a confirmação ou o cadastro. Rodar na hora: `npm run manutencao` (ou `npm run manutencao:prod` após o build). No plano gratuito do Render a API dorme quando ociosa; a limpeza roda quando ela está acordada.
+
 Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
 
 Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.

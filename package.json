@@ -23,7 +23,9 @@
     "db:seed:prod": "node dist/database/seed.js",
     "smoke": "node scripts/smoke-test.cjs",
     "token": "node scripts/obter-token.cjs",
-    "usuario:liberar": "tsx src/database/liberar-usuario.ts"
+    "usuario:liberar": "tsx src/database/liberar-usuario.ts",
+    "manutencao": "nest build && node dist/database/manutencao.js",
+    "manutencao:prod": "node dist/database/manutencao.js"
   },
   "repository": {
     "type": "git",

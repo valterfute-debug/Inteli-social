@@ -15,6 +15,7 @@ import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { IdempotenciaModule } from './idempotencia/idempotencia.module';
 import { AuditoriaModule } from './auditoria/auditoria.module';
+import { ManutencaoModule } from './manutencao/manutencao.module';
 @Module({
   imports: [
     PrismaModule,
@@ -45,6 +46,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
         FOTO_URL_VALIDADE_SEGUNDOS: Joi.number().integer().min(60).max(3600).default(900),
         CORS_ORIGINS: Joi.string().optional(),
         SWAGGER_ENABLED: Joi.boolean().default(false),
+        MANUTENCAO_INTERVALO_HORAS: Joi.number().min(0).default(6),
         LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(600),
       }),
     }),
@@ -55,6 +57,7 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
     AuthModule,
     IdempotenciaModule,
     AuditoriaModule,
+    ManutencaoModule,
     UsuariosModule,
     HealthModule,
     AnimalsModule,
