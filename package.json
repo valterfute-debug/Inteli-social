@@ -25,7 +25,9 @@
     "token": "node scripts/obter-token.cjs",
     "usuario:liberar": "tsx src/database/liberar-usuario.ts",
     "manutencao": "nest build && node dist/database/manutencao.js",
-    "manutencao:prod": "node dist/database/manutencao.js"
+    "manutencao:prod": "node dist/database/manutencao.js",
+    "backup": "tsx src/database/backup.ts",
+    "backup:verificar": "tsx src/database/verificar-restauracao.ts"
   },
   "repository": {
     "type": "git",

@@ -413,6 +413,15 @@ Política (provisória, a aprovar com a Ampara): eventos retidos por **5 anos** 
 
 **Limpeza automática (issue #3, P1-1):** a cada `MANUTENCAO_INTERVALO_HORAS` (padrão 6 h; 0 desliga) a API remove fotos pendentes com prazo de envio vencido há mais de 24 h, fotos confirmadas que não viraram ficha em 30 dias (o app pode ter ficado offline entre a foto e o cadastro) e chaves de idempotência com mais de 30 dias. A condição de órfã é conferida de novo no próprio DELETE e o arquivo só sai do Storage se a linha foi apagada, o que evita corrida com a confirmação ou o cadastro. Rodar na hora: `npm run manutencao` (ou `npm run manutencao:prod` após o build). No plano gratuito do Render a API dorme quando ociosa; a limpeza roda quando ela está acordada.
 
+**Backup e restauração (issue #3, P0-6):**
+
+-  gera  (pg_dump, formato custom, schema public), copia todas as fotos do bucket e grava um  com o hash SHA-256 de cada arquivo. Só lê da origem. Precisa do  (variável  se não estiver no PATH). A pasta  é ignorada pelo Git: o backup contém dados pessoais e deve ficar em armazenamento com acesso restrito.
+-  restaura num banco local e confere contagens e se cada ficha aponta para uma foto existente no backup, com o mesmo hash. Recusa destino fora de localhost.
+- Registro de 2026-10-07: backup do Supabase de desenvolvimento restaurado com sucesso num PostgreSQL 18 local (banco vazio). Em seguida, um backup do banco de testes com uma ficha cujo arquivo não existia: o verificador apontou , como esperado.
+- Pendente com a Ampara: frequência (proposta: diária, com retenção de 30 dias), RPO (até 24 h de perda) e RTO (até 4 h para voltar), responsável pela execução e local seguro dos backups. O Supabase gratuito tem backup diário do banco, mas **não** das fotos: por isso o script cobre os dois. Repetir o teste de restauração a cada trimestre e antes de toda migration de risco.
+
+**Busca com volume (issue #3, P1-2):** medida com 20 mil animais sintéticos num PostgreSQL local (30 execuções por cenário, página de 20 + contagem total): sem filtro p95 34 ms; busca por nome 26 ms; por identificador 18 ms; por microchip 20 ms; frente + unidade 13 ms; página 500 (offset 9.980) 59 ms. Todos bem abaixo da meta proposta (p95 de 300 ms na API, contando a rede até o Supabase). Ordenação estável () evita repetir ou pular itens entre páginas. Decisão: manter  e os índices atuais; reavaliar cursor e índice trigram () se o volume passar de ~100 mil animais ou o p95 real passar da meta.
+
 Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
 
 Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.
