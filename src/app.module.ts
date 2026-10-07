@@ -45,12 +45,12 @@ import { AuditoriaModule } from './auditoria/auditoria.module';
         FOTO_URL_VALIDADE_SEGUNDOS: Joi.number().integer().min(60).max(3600).default(900),
         CORS_ORIGINS: Joi.string().optional(),
         SWAGGER_ENABLED: Joi.boolean().default(false),
-        LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(120),
+        LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(600),
       }),
     }),
-    // Limite por IP contra abuso e varredura; folgado para até ~50 usuários simultâneos.
+    // Limite por IP. Folgado (600/min): voluntários no mesmo Wi-Fi dividem o mesmo IP, e cada tela faz várias chamadas.
     ThrottlerModule.forRoot([
-      { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 120) },
+      { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 600) },
     ]),
     AuthModule,
     IdempotenciaModule,

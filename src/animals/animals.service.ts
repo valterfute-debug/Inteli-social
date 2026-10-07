@@ -377,7 +377,10 @@ export class AnimalsService {
   private tratarErroPrisma(erro: unknown): never {
     if (erro instanceof Prisma.PrismaClientKnownRequestError) {
       if (erro.code === 'P2002') {
-        const alvo = erro.meta?.target as string[] | undefined;
+        const alvo = JSON.stringify(erro.meta ?? {});
+        if (alvo.includes('microchip')) {
+          throw new ConflictException('Microchip já cadastrado em outro animal ativo');
+        }
         throw new ConflictException(
           alvo?.includes('fotoEntradaId')
             ? 'Esta foto já está vinculada a outro animal'

@@ -160,6 +160,27 @@ describe('Idempotência (e2e, banco real)', () => {
     }).expect(409);
   });
 
+  it('cadastros simultâneos com o mesmo microchip (chaves diferentes): só um passa, o banco barra o resto', async () => {
+    const extra = {
+      frente: 'CCPA',
+      ...unidadeCcpa,
+      microchip: '981000999000111',
+      sexo: 'MACHO',
+      idadeAproximadaMeses: 6,
+      pesoKg: 4,
+      porte: 'PEQUENO',
+    };
+    const corpos = await Promise.all(Array.from({ length: 4 }, () => admissao(ana, extra)));
+    const respostas = await Promise.all(corpos.map((corpo) => cadastrar(ana, randomUUID(), corpo)));
+    expect(respostas.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(respostas.filter((r) => r.status === 409)).toHaveLength(3);
+    expect(
+      await ambiente.prisma.animal.count({
+        where: { microchip: '981000999000111', deletedAt: null },
+      }),
+    ).toBe(1);
+  });
+
   it('chaves são por usuário: a mesma chave de outra pessoa é outra operação', async () => {
     const chave = randomUUID();
     const daAna = await cadastrar(ana, chave, await admissao(ana)).expect(201);
