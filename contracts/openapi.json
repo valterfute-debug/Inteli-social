@@ -111,7 +111,7 @@
       "get": {
         "operationId": "consultarProntidao",
         "summary": "Verificar API e banco de dados",
-        "description": "Implementado. Executa SELECT 1 no PostgreSQL; 503 se o banco estiver indisponível. Usado no smoke test pós-deploy.",
+        "description": "Implementado. Confirma o banco e que o bucket de fotos continua privado; bucket público, banco ou storage indisponível: 503.",
         "x-situacao": "implementado",
         "security": [],
         "responses": {
@@ -3115,7 +3115,7 @@
             "type": "string",
             "format": "uri",
             "nullable": true,
-            "description": "URL assinada de leitura da foto de entrada, válida por 1 hora. Null se o armazenamento estiver indisponível."
+            "description": "Link assinado e temporário da foto (padrão 15 min, FOTO_URL_VALIDADE_SEGUNDOS). Só é emitido para quem tem acesso à unidade do animal. Não guardar o link: guardar a imagem e pedir a ficha de novo quando o link vencer."
           }
         },
         "example": {
@@ -3593,6 +3593,14 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          },
+          "armazenamento": {
+            "type": "string",
+            "enum": [
+              "privado",
+              "nao_configurado"
+            ],
+            "description": "Situação do bucket de fotos; público derruba o readiness (503)"
           }
         }
       },

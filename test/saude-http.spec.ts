@@ -177,6 +177,14 @@ describe('Hardening HTTP', () => {
     expect(resposta.headers['x-powered-by']).toBeUndefined();
   });
 
+  it('proíbe cache das respostas (dados pessoais e links assinados de fotos)', async () => {
+    const resposta = await request(app.getHttpServer())
+      .get('/api/v1/fronts')
+      .set('Authorization', autorizacao)
+      .expect(200);
+    expect(resposta.headers['cache-control']).toBe('no-store');
+  });
+
   it('rejeita microchip com letras na busca antes de consultar o banco', async () => {
     const resposta = await request(app.getHttpServer())
       .get('/api/v1/animals?microchip=12AB')

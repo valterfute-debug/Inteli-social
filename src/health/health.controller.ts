@@ -3,13 +3,17 @@ import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import { Publica } from '../auth/decoradores';
 import { PrismaService } from '../prisma/prisma.service';
+import { SituacaoBucket, SupabaseStorageService } from '../storage/supabase-storage.service';
 
 @ApiTags('Health')
 @Publica()
 @SkipThrottle()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
   /** Liveness: só indica que o processo responde. Usado pelo health check do Render. */
   @Get()
@@ -19,11 +23,21 @@ export class HealthController {
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
 
-  /** Readiness: confirma também a conexão com o banco (smoke test pós-deploy e monitoramento). */
+  /**
+   * Readiness: confirma o banco e que o bucket de fotos continua privado
+   * (smoke test pós-deploy e monitoramento).
+   */
   @Get('ready')
-  @ApiOperation({ summary: 'Verifica a API e a conexão com o banco de dados' })
+  @ApiOperation({ summary: 'Verifica a API, o banco de dados e a privacidade do bucket de fotos' })
   @ApiOkResponse({
-    schema: { example: { status: 'ok', banco: 'ok', timestamp: '2026-10-06T00:00:00.000Z' } },
+    schema: {
+      example: {
+        status: 'ok',
+        banco: 'ok',
+        armazenamento: 'privado',
+        timestamp: '2026-10-06T00:00:00.000Z',
+      },
+    },
   })
   async ready() {
     try {
@@ -31,6 +45,19 @@ export class HealthController {
     } catch {
       throw new ServiceUnavailableException('Banco de dados indisponível');
     }
-    return { status: 'ok', banco: 'ok', timestamp: new Date().toISOString() };
+
+    let armazenamento: SituacaoBucket;
+    try {
+      armazenamento = await this.storage.situacaoBucket();
+    } catch {
+      throw new ServiceUnavailableException('Armazenamento de fotos indisponível');
+    }
+    if (armazenamento === 'publico') {
+      throw new ServiceUnavailableException(
+        'Bucket de fotos está público: fotos acessíveis sem login',
+      );
+    }
+
+    return { status: 'ok', banco: 'ok', armazenamento, timestamp: new Date().toISOString() };
   }
 }

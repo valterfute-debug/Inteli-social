@@ -1,5 +1,6 @@
 import { INestApplication, Logger, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { FiltroExcecaoGlobal } from './common/filtros/filtro-excecao-global';
 
@@ -23,6 +24,11 @@ export function configurarAplicacao(app: INestApplication) {
   // Atrás do proxy do Render: o IP real do cliente vem em X-Forwarded-For (usado pelo rate limit).
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
   app.use(helmet());
+  // Respostas trazem dados pessoais e links assinados de fotos: nada de cache em proxy ou navegador.
+  app.use((_requisicao: Request, resposta: Response, proximo: NextFunction) => {
+    resposta.setHeader('Cache-Control', 'no-store');
+    proximo();
+  });
   const origem = resolverOrigensCors(ambiente, config.get<string>('CORS_ORIGINS'));
   if (origem === false) {
     new Logger('CORS').warn(

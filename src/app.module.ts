@@ -40,6 +40,7 @@ import { UsuariosModule } from './usuarios/usuarios.module';
           otherwise: Joi.optional(),
         }),
         SUPABASE_STORAGE_BUCKET: Joi.string().optional(),
+        FOTO_URL_VALIDADE_SEGUNDOS: Joi.number().integer().min(60).max(3600).default(900),
         CORS_ORIGINS: Joi.string().optional(),
         SWAGGER_ENABLED: Joi.boolean().default(false),
         LIMITE_REQUISICOES_POR_MINUTO: Joi.number().integer().min(1).default(120),

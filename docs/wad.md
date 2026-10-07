@@ -401,6 +401,8 @@ Filtros previstos: name, publicId, speciesId, page e limit. Paginação, limites
 - foto ainda sem animal é controlada por autoria (`Foto.criadoPorId`): só quem a enviou (ou ADMIN) confirma, reenvia ou a vincula a uma ficha;
 - `GET /api/v1/me` devolve papel e unidades para o frontend montar as telas.
 
+**Fotos (issue #3, P0-5):** o bucket é privado e a foto só é vista por link assinado (`fotoEntradaUrl`), emitido apenas junto da ficha, ou seja, depois do login e da checagem de unidade; quem não tem acesso recebe 403 e nenhum link. A validade é configurável (`FOTO_URL_VALIDADE_SEGUNDOS`, 60 a 3600 s, padrão 15 min): basta para abrir a ficha, e o PWA guarda a imagem no aparelho, então um link vazado expira logo. Toda resposta da API sai com `Cache-Control: no-store`, para dados e links não ficarem em cache de proxy ou navegador. O readiness (`/api/health/ready`) responde 503 se o bucket virar público por engano. A API não registra em log os links assinados (o log de erro guarda só mensagem e pilha da exceção).
+
 Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
 
 Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.

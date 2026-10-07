@@ -16,6 +16,7 @@ export const storageSimulado = {
   }),
   obterMetadados: async () => ({ tamanhoBytes: 1000, tipoMidia: 'image/jpeg' }),
   removerArquivo: async () => undefined,
+  situacaoBucket: async () => 'privado' as const,
   criarUrlsLeitura: async (caminhos: string[]) =>
     new Map(caminhos.map((caminho) => [caminho, `https://storage.invalid/leitura/${caminho}`])),
 };
