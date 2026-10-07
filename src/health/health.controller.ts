@@ -1,9 +1,11 @@
 import { Controller, Get, ServiceUnavailableException, VERSION_NEUTRAL } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Publica } from '../auth/decoradores';
 import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('Health')
+@Publica()
 @SkipThrottle()
 @Controller({ path: 'health', version: VERSION_NEUTRAL })
 export class HealthController {

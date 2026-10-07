@@ -11,6 +11,7 @@ import { HealthEventsModule } from './health-events/health-events.module';
 import { ProntuarioModule } from './prontuario/prontuario.module';
 import { StorageModule } from './storage/storage.module';
 import { FotosModule } from './fotos/fotos.module';
+import { AuthModule } from './auth/auth.module';
 @Module({
   imports: [
     PrismaModule,
@@ -28,7 +29,7 @@ import { FotosModule } from './fotos/fotos.module';
         DIRECT_URL: Joi.string()
           .uri({ scheme: ['postgresql', 'postgres'] })
           .required(),
-        // Sem Storage não há foto e, portanto, não há admissão: obrigatório em produção.
+        // Sem Storage não há foto nem admissão, e sem a URL não há como validar o login.
         SUPABASE_URL: Joi.string()
           .uri()
           .when('NODE_ENV', { is: 'production', then: Joi.required(), otherwise: Joi.optional() }),
@@ -47,6 +48,7 @@ import { FotosModule } from './fotos/fotos.module';
     ThrottlerModule.forRoot([
       { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 120) },
     ]),
+    AuthModule,
     HealthModule,
     AnimalsModule,
     CatalogosModule,

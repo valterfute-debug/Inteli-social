@@ -3,7 +3,7 @@
   "info": {
     "title": "Ampara Animal — contrato do Ciclo 1",
     "version": "0.3.0",
-    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Autenticação ainda não implementada. IDs e dados dos exemplos são sintéticos."
+    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos."
   },
   "paths": {
     "/api/health": {
@@ -143,7 +143,11 @@
         "summary": "Listar animais ativos",
         "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/unidade/localização e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -166,7 +170,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -215,6 +219,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -226,16 +240,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -350,7 +354,11 @@
         "summary": "Concluir admissão com foto confirmada",
         "description": "Implementado. Exige foto confirmada e aplica as regras por frente (ver CriarAnimal). 409: microchip já cadastrado em animal ativo (detalhes.animalExistenteId) ou foto já vinculada.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "201": {
             "description": "Animal cadastrado",
@@ -373,7 +381,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -422,6 +430,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -433,16 +451,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -483,7 +491,11 @@
         "summary": "Consultar animal",
         "description": "Implementado. Retorna o animal se ele existir e não estiver arquivado.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -506,7 +518,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -555,6 +567,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -566,16 +588,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -591,7 +603,11 @@
         "summary": "Atualizar animal verificando versão",
         "description": "Implementado. Regras avaliadas no estado final; 409 para versão desatualizada ou microchip de outro animal.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -614,7 +630,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -663,6 +679,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -674,16 +700,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -709,7 +725,11 @@
         "summary": "Arquivar animal",
         "description": "Implementado. Arquivamento lógico (soft delete); não remove o registro do banco.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "204": {
             "description": "Operação concluída sem corpo"
@@ -725,7 +745,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -774,6 +794,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -793,16 +823,6 @@
                 }
               }
             }
-          },
-          "429": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
           }
         }
       }
@@ -812,7 +832,11 @@
         "summary": "Listar espécies",
         "description": "Implementado. Lista espécies ativas; o campo silvestre indica identificação por nome.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -835,7 +859,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -884,6 +908,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -895,16 +929,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -947,7 +971,11 @@
         "summary": "Listar raças",
         "description": "Implementado. Lista raças de uma espécie (especieId obrigatório).",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -970,7 +998,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1019,6 +1047,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1030,16 +1068,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1093,7 +1121,11 @@
         "summary": "Listar unidades",
         "description": "Implementado. Lista unidades não arquivadas.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1116,7 +1148,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1165,6 +1197,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1176,16 +1218,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1228,7 +1260,11 @@
         "summary": "Listar localizações",
         "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório).",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1251,7 +1287,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1300,6 +1336,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1311,16 +1357,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1374,7 +1410,11 @@
         "summary": "Listar responsáveis",
         "description": "Implementado. Lista responsáveis ativos e não arquivados.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1397,7 +1437,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1446,6 +1486,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1457,16 +1507,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1507,7 +1547,11 @@
         "summary": "Cadastrar responsável",
         "description": "Implementado. Cadastra o tutor ou quem entregou o animal, para uso em responsavelId.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -1539,8 +1583,8 @@
               }
             }
           },
-          "500": {
-            "description": "Erro padronizado",
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1558,6 +1602,16 @@
                 }
               }
             }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
           }
         }
       }
@@ -1567,7 +1621,11 @@
         "summary": "Listar frentes",
         "description": "Implementado. Lista fixa das três frentes de atuação (CCPA, CasAdote, CED).",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1590,7 +1648,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1639,6 +1697,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1650,16 +1718,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1702,7 +1760,11 @@
         "summary": "Solicitar envio de foto",
         "description": "Implementado. Gera uma URL assinada temporária (15 min) para envio direto do arquivo ao armazenamento. 409 se o id já pertence a uma foto confirmada (gere um novo id para outra foto).",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "201": {
             "description": "Resultado esperado quando implementado",
@@ -1725,7 +1787,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1774,6 +1836,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1785,16 +1857,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1847,7 +1909,11 @@
         "summary": "Confirmar existência e validade do arquivo enviado",
         "description": "Implementado. Verifica se o arquivo chegou ao armazenamento e marca a foto como confirmada. Confere o arquivo real no Storage: acima de 8 MB ou tipo diferente do declarado retorna 400 e o arquivo é removido.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Resultado esperado quando implementado",
@@ -1870,7 +1936,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -1919,6 +1985,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -1930,16 +2006,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -1982,7 +2048,11 @@
         "summary": "Listar eventos de saúde de um animal",
         "description": "Implementado. Lista eventos ativos (não arquivados) de um animal, com paginação e filtro opcional por tipo.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "parameters": [
           {
             "name": "pagina",
@@ -2044,7 +2114,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -2093,6 +2163,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -2112,16 +2192,6 @@
                 }
               }
             }
-          },
-          "429": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
           }
         }
       },
@@ -2129,7 +2199,11 @@
         "summary": "Registrar evento de saúde (vacina, vermífugo ou castração)",
         "description": "Implementado.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -2162,7 +2236,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -2211,6 +2285,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -2222,16 +2306,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -2273,7 +2347,11 @@
         "summary": "Arquivar um evento de saúde cadastrado por engano",
         "description": "Implementado. Arquivamento lógico (soft delete).",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "204": {
             "description": "Operação concluída sem corpo"
@@ -2289,7 +2367,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -2338,6 +2416,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -2349,16 +2437,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -2389,7 +2467,11 @@
         "summary": "Gerar o PDF do prontuário do animal",
         "description": "Implementado. Gera um PDF (application/pdf) com os dados cadastrais do animal e seu histórico de eventos de saúde, pronto para impressão.",
         "x-situacao": "implementado",
-        "security": [],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Documento PDF do prontuário",
@@ -2413,7 +2495,7 @@
             }
           },
           "401": {
-            "description": "Erro padronizado",
+            "description": "Sem token, token inválido ou vencido",
             "content": {
               "application/json": {
                 "schema": {
@@ -2462,6 +2544,16 @@
               }
             }
           },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Erro padronizado",
             "content": {
@@ -2473,16 +2565,6 @@
             }
           },
           "503": {
-            "description": "Erro padronizado",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Erro"
-                }
-              }
-            }
-          },
-          "429": {
             "description": "Erro padronizado",
             "content": {
               "application/json": {
@@ -3462,10 +3544,11 @@
       }
     },
     "securitySchemes": {
-      "acessoPlanejado": {
+      "bearerSupabase": {
         "type": "http",
         "scheme": "bearer",
-        "description": "Autenticação futura; mecanismo/provedor a confirmar. Nenhuma segurança funcional declarada."
+        "bearerFormat": "JWT",
+        "description": "Access token emitido pelo Supabase Auth do projeto (o mesmo login do frontend). Validado no servidor pela assinatura (JWKS), emissor e audiência \"authenticated\". Sem token ou com token inválido/vencido: 401."
       }
     }
   }

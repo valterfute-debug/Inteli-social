@@ -20,7 +20,8 @@
     "db:check": "tsx src/database/check-connection.ts",
     "db:seed": "tsx src/database/seed.ts",
     "db:seed:prod": "node dist/database/seed.js",
-    "smoke": "node scripts/smoke-test.cjs"
+    "smoke": "node scripts/smoke-test.cjs",
+    "token": "node scripts/obter-token.cjs"
   },
   "repository": {
     "type": "git",
@@ -54,6 +55,7 @@
     "dotenv": "^17.4.2",
     "helmet": "^8.3.0",
     "joi": "^17.13.8",
+    "jose": "5.10.0",
     "pdf-lib": "^1.17.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2"

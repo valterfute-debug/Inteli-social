@@ -10,7 +10,12 @@ async function bootstrap() {
 
   // Swagger expõe o mapa da API; em produção só com liberação explícita.
   if (process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true') {
-    const swagger = new DocumentBuilder().setTitle('Ampara Animal API').setVersion('1.0').build();
+    const swagger = new DocumentBuilder()
+      .setTitle('Ampara Animal API')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .addSecurityRequirements('bearer')
+      .build();
     SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swagger));
   }
   await app.listen(process.env.PORT ?? 3000);

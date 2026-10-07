@@ -19,7 +19,7 @@ O conteúdo descreve o projeto Ampara Animal, com base no TAPI, nas anotações 
 
 A solução pretende centralizar a identificação e o acompanhamento dos animais atendidos pela Ampara, substituindo a dispersão de dados em papel, planilhas e formulários por registros organizados. O Ciclo 1 contempla admissão com foto e localização, seguida de consulta por nome, identificador público ou espécie. O uso operacional será pelo assistente, prioritariamente no computador, com necessidade de continuidade em locais sem internet.
 
-Atualmente o backend NestJS oferece admissão com foto obrigatória e regras por frente, consulta com busca e filtros, catálogos, eventos de saúde e PDF do prontuário (antecipados do Ciclo 2). A interface PWA e a sincronização offline são responsabilidade do frontend. Autenticação ainda não está implementada (decisão pendente com o frontend).
+Atualmente o backend NestJS oferece admissão com foto obrigatória e regras por frente, consulta com busca e filtros, catálogos, eventos de saúde e PDF do prontuário (antecipados do Ciclo 2). A interface PWA e a sincronização offline são responsabilidade do frontend. Toda rota de dados exige login pelo Supabase Auth (ver [3.8](#38-autenticação-autorização-e-resiliência)).
 
 ## Estrutura do repositório
 
@@ -390,7 +390,9 @@ Filtros previstos: name, publicId, speciesId, page e limit. Paginação, limites
 
 ## 3.8. Autenticação, autorização e resiliência
 
-Não há login, sessão, guards de autorização ou integração Supabase Auth. O acesso PostgreSQL usa URLs de banco; publishable key não é utilizada pelo Prisma.
+**Autenticação (issue #3, P0-1):** toda rota exige `Authorization: Bearer <access token>` emitido pelo Supabase Auth do projeto; só `/api/health` e `/api/health/ready` são públicas (`@Publica()`). O `AutenticacaoGuard` (global) valida no servidor a assinatura pelas chaves públicas do projeto (JWKS em `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`), o emissor, a audiência `authenticated` e a validade; aceita só algoritmos assimétricos (ES256/RS256), o que recusa a anon key. Sem token ou com token inválido/vencido: 401. Sem `SUPABASE_URL` ou com o Supabase inacessível: 503 (falha fechada). Não há cadastro aberto: contas são criadas no painel (Authentication > Users). Autorização por perfil e unidade: ver P0-2. O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
+
+Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.
 
 A imagem fornecida mostra UNRESTRICTED. Isso evidencia a necessidade de conferir configuração de acesso, mas não permite concluir sozinho quem consegue consultar as tabelas. Não houve auditoria de grants, Data API ou políticas de RLS nesta revisão. A tabela de migrations também deve ser incluída nessa análise.
 
@@ -582,7 +584,8 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 
 | Pendência | Situação |
 | --- | --- |
-| Autenticação/autorização | **Risco alto antes de dados reais**: sem login, quem tiver a URL lê e arquiva fichas e vê contatos de responsáveis. Proposta: Supabase Auth com validação do JWT no backend, a combinar com o frontend |
+| Autenticação | Implementada (Supabase Auth, JWT validado no backend). O frontend precisa da tela de login e de enviar o token em toda requisição |
+| Autorização por perfil/unidade | **Risco alto antes de dados reais** (issue #3, P0-2) |
 | Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados |
 | Lista de espécies, unidades e localizações | Seed inicial derivado do TAPI; revisar com a Ampara |
 | Primeiros usuários | Ampara deve indicar o grupo piloto |
@@ -836,7 +839,7 @@ Veja [integridade e campos opcionais](#integridade). O diagrama não representa 
 
 ## Evidência local
 
-Prisma usa conexão PostgreSQL. Não há cliente supabase-js, autenticação ou autorização da API. Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
+Prisma usa conexão PostgreSQL. O supabase-js é usado só para o Storage (service role, no servidor). A API exige login do Supabase Auth (seção 3.8); a autorização por perfil/unidade ainda está pendente. Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
 
 ## Verificações manuais
 
