@@ -40,7 +40,14 @@
     "node": ">=24"
   },
   "overrides": {
-    "multer": "2.3.0"
+    "multer": "2.4.0",
+    "proxy-addr": "2.0.8",
+    "@nestjs/swagger": {
+      "js-yaml": "5.4.3"
+    },
+    "@prisma/config": {
+      "deepmerge-ts": "8.0.0"
+    }
   },
   "type": "commonjs",
   "bugs": {

@@ -133,6 +133,18 @@ model Foto {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+// Tarefa durável de exclusão do Storage. Sem FK: sobrevive à remoção da foto.
+model RemocaoArquivo {
+  id String @id @default(uuid())
+  fotoId String
+  caminhoArmazenamento String @unique
+  tentativas Int @default(0)
+  ultimaTentativaEm DateTime?
+  ultimoErro String?
+  createdAt DateTime @default(now())
+  @@index([fotoId])
+  @@index([createdAt])
+}
 // Conta liberada na API. `id` é o `sub` do token do Supabase Auth: logar no Supabase
 // não basta, a conta precisa existir aqui e estar ativa.
 model Usuario {

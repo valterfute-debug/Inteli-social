@@ -51,7 +51,8 @@ export class ManutencaoService implements OnApplicationBootstrap, OnApplicationS
 
   /**
    * Idempotente e segura contra corrida com a confirmação/cadastro: a condição de "órfã" é
-   * conferida de novo no próprio DELETE, e o arquivo só é removido se a linha foi apagada.
+   * conferida de novo no próprio DELETE. A tarefa de Storage é gravada na mesma transação:
+   * uma falha de rede não perde a referência e a próxima execução tenta novamente.
    */
   async executar(agora = new Date()): Promise<ResultadoManutencao> {
     const limitePendente = new Date(agora.getTime() - HORAS_TOLERANCIA_PENDENTE * HORA);
@@ -85,14 +86,42 @@ export class ManutencaoService implements OnApplicationBootstrap, OnApplicationS
         take: 500,
       });
       for (const foto of candidatas) {
-        const { count } = await this.prisma.foto.deleteMany({ where: { id: foto.id, ...where } });
+        const count = await this.prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${foto.id}, 0))`;
+          const { count } = await tx.foto.deleteMany({ where: { id: foto.id, ...where } });
+          if (count > 0) {
+            await tx.remocaoArquivo.upsert({
+              where: { caminhoArmazenamento: foto.caminhoArmazenamento },
+              create: { fotoId: foto.id, caminhoArmazenamento: foto.caminhoArmazenamento },
+              update: {},
+            });
+          }
+          return count;
+        });
         if (count === 0) continue; // virou ficha (ou foi confirmada) no meio do caminho
         resultado[campo]++;
-        try {
-          await this.storage.removerArquivo(foto.caminhoArmazenamento);
-        } catch {
-          resultado.falhasNoStorage++;
-        }
+      }
+    }
+
+    const tarefas = await this.prisma.remocaoArquivo.findMany({
+      orderBy: { createdAt: 'asc' },
+      take: 500,
+    });
+    for (const tarefa of tarefas) {
+      try {
+        await this.storage.removerArquivo(tarefa.caminhoArmazenamento);
+        await this.prisma.remocaoArquivo.deleteMany({ where: { id: tarefa.id } });
+      } catch {
+        resultado.falhasNoStorage++;
+        // Mensagem fixa, sem resposta do fornecedor que possa conter segredo/link.
+        await this.prisma.remocaoArquivo.updateMany({
+          where: { id: tarefa.id },
+          data: {
+            tentativas: { increment: 1 },
+            ultimaTentativaEm: agora,
+            ultimoErro: 'Falha ao remover arquivo do armazenamento',
+          },
+        });
       }
     }
 

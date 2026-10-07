@@ -1,6 +1,6 @@
 import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
-import { ESCOPO_ADMIN } from '../../test/escopos-teste';
+import { ESCOPO_ADMIN, escopoOperador } from '../../test/escopos-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Front, Porte, Prisma, SituacaoFoto, Sexo } from '@prisma/client';
 import { AnimalsService } from './animals.service';
@@ -215,6 +215,42 @@ describe('AnimalsService', () => {
       });
       expect(prisma.animal.create).not.toHaveBeenCalled();
     });
+
+    it.each([
+      ['unidade-1', true],
+      ['unidade-alheia', false],
+    ])(
+      'conflito de microchip na %s revela detalhes somente com acesso',
+      async (unitId, permitido) => {
+        const prisma = criarPrismaFalso();
+        (prisma.animal.findFirst as jest.Mock).mockResolvedValue({
+          id: ID_ANIMAL,
+          publicId: 'AM-PRIVADO',
+          unitId,
+        });
+        const service = new AnimalsService(
+          comTransacao(prisma),
+          criarStorageFalso(),
+          idempotenciaFalsa(prisma),
+          auditoriaFalsa(),
+        );
+        const erro = await service
+          .criar(COMPLETO_CCPA, escopoOperador(['unidade-1']), CHAVE_TESTE)
+          .catch((e) => e);
+        expect(erro).toBeInstanceOf(ConflictException);
+        if (permitido) {
+          expect(erro.getResponse().detalhes).toEqual({
+            animalExistenteId: ID_ANIMAL,
+            identificadorPublico: 'AM-PRIVADO',
+          });
+        } else {
+          expect(erro.getResponse().detalhes).toBeUndefined();
+          expect(JSON.stringify(erro.getResponse())).not.toContain(ID_ANIMAL);
+          expect(JSON.stringify(erro.getResponse())).not.toContain('AM-PRIVADO');
+        }
+        expect(prisma.animal.create).not.toHaveBeenCalled();
+      },
+    );
 
     it('converte violação de identificador público duplicado em 409', async () => {
       const prisma = criarPrismaFalso();

@@ -98,26 +98,28 @@ export class AnimalsService {
     if (anterior) return { animal: await this.buscarPorId(anterior, escopo), reenvio: true };
 
     garantirUnidade(escopo, dto.unidadeId);
-    const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId);
-    this.garantirRegrasAdmissao({
-      frente: dto.frente,
-      especieSilvestre,
-      nome: dto.nome,
-      microchip: dto.microchip,
-      sexo: dto.sexo,
-      idadeAproximadaMeses: dto.idadeAproximadaMeses,
-      pesoKg: dto.pesoKg,
-      porte: dto.porte,
-    });
-    if (dto.microchip) await this.garantirMicrochipDisponivel(dto.microchip);
-    await this.garantirFotoConfirmada(dto.fotoEntradaId, escopo);
-
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
         const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
           ctx,
           async (tx) => {
+            // A reserva da chave vem antes destas leituras: outra requisição idêntica
+            // aguarda o commit e faz replay, sem rejeitar o microchip que ela mesma criou.
+            const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId, tx);
+            this.garantirRegrasAdmissao({
+              frente: dto.frente,
+              especieSilvestre,
+              nome: dto.nome,
+              microchip: dto.microchip,
+              sexo: dto.sexo,
+              idadeAproximadaMeses: dto.idadeAproximadaMeses,
+              pesoKg: dto.pesoKg,
+              porte: dto.porte,
+            });
+            if (dto.microchip)
+              await this.garantirMicrochipDisponivel(dto.microchip, escopo, undefined, tx);
+            await this.garantirFotoConfirmada(dto.fotoEntradaId, escopo, tx);
             const criado = await tx.animal.create({
               data: {
                 id: randomUUID(),
@@ -213,7 +215,7 @@ export class AnimalsService {
       porte: valorFinal(dados.porte, existente.porte),
     });
     if (dados.microchip && dados.microchip !== existente.microchip) {
-      await this.garantirMicrochipDisponivel(dados.microchip, id);
+      await this.garantirMicrochipDisponivel(dados.microchip, escopo, id);
     }
     if (dados.fotoEntradaId !== undefined) {
       await this.garantirFotoConfirmada(dados.fotoEntradaId, escopo);
@@ -302,8 +304,11 @@ export class AnimalsService {
     if (violacoes.length > 0) throw new BadRequestException(violacoes);
   }
 
-  private async obterEspecieSilvestre(especieId: string) {
-    const especie = await this.prisma.species.findFirst({
+  private async obterEspecieSilvestre(
+    especieId: string,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const especie = await cliente.species.findFirst({
       where: { id: especieId, deletedAt: null },
       select: { silvestre: true },
     });
@@ -316,16 +321,26 @@ export class AnimalsService {
    * então um segundo cadastro com o mesmo número é, na prática, o mesmo animal. O 409 devolve
    * o cadastro existente para o frontend oferecer a transferência em vez de duplicar a ficha.
    */
-  private async garantirMicrochipDisponivel(microchip: string, ignorarId?: string) {
-    const existente = await this.prisma.animal.findFirst({
+  private async garantirMicrochipDisponivel(
+    microchip: string,
+    escopo: EscopoAcesso,
+    ignorarId?: string,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const existente = await cliente.animal.findFirst({
       where: {
         microchip,
         deletedAt: null,
         ...(ignorarId ? { id: { not: ignorarId } } : {}),
       },
-      select: { id: true, publicId: true },
+      select: { id: true, publicId: true, unitId: true },
     });
     if (existente) {
+      // A unicidade é global, mas a ficha existente só pode ser identificada por
+      // quem tem acesso à unidade. Não revelar IDs de outra unidade no erro.
+      if (!ehAdmin(escopo) && !escopo.unidadeIds.includes(existente.unitId)) {
+        throw new ConflictException('Microchip já cadastrado em outro animal ativo');
+      }
       throw new ConflictException({
         message: `Microchip já cadastrado no animal ${existente.publicId}`,
         detalhes: {
@@ -336,8 +351,12 @@ export class AnimalsService {
     }
   }
 
-  private async garantirFotoConfirmada(fotoEntradaId: string, escopo: EscopoAcesso) {
-    const foto = await this.prisma.foto.findUnique({ where: { id: fotoEntradaId } });
+  private async garantirFotoConfirmada(
+    fotoEntradaId: string,
+    escopo: EscopoAcesso,
+    cliente: Prisma.TransactionClient = this.prisma,
+  ) {
+    const foto = await cliente.foto.findUnique({ where: { id: fotoEntradaId } });
     if (!foto) throw new BadRequestException('Foto não encontrada');
     // Só quem enviou a foto (ou um admin) pode vinculá-la a uma ficha.
     if (foto.criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {

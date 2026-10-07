@@ -50,7 +50,9 @@ export async function criarAmbienteE2E() {
     .compile();
   const app: INestApplication = modulo.createNestApplication();
   configurarAplicacao(app);
-  await app.init();
+  // Uma porta por suíte, estável em requisições simultâneas. Supertest não deve
+  // abrir/fechar automaticamente o mesmo server para cada request concorrente.
+  await app.listen(0, '127.0.0.1');
 
   /** Cria a conta no "Supabase" (token) e, se `papel` vier, libera na API. */
   async function usuario(

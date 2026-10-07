@@ -107,4 +107,37 @@ describe('Manutenção (e2e, banco real)', () => {
       storageSimulado.removerArquivo = original;
     }
   });
+
+  it('falha do Storage mantém tarefa durável e a próxima execução repete a remoção', async () => {
+    const id = await foto(SituacaoFoto.PENDENTE, horasAtras(48));
+    const caminhoArmazenamento = `admissao/${id}.jpg`;
+    const original = storageSimulado.removerArquivo;
+    const remover = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('Storage indisponível'))
+      .mockResolvedValue(undefined);
+    storageSimulado.removerArquivo = remover;
+    try {
+      const service = ambiente.app.get(ManutencaoService);
+      const primeira = await service.executar(agora);
+      expect(primeira.fotosPendentesRemovidas).toBe(1);
+      expect(primeira.falhasNoStorage).toBe(1);
+      expect(await ambiente.prisma.foto.findUnique({ where: { id } })).toBeNull();
+      const tarefa = await ambiente.prisma.remocaoArquivo.findUniqueOrThrow({
+        where: { caminhoArmazenamento },
+      });
+      expect(tarefa.fotoId).toBe(id);
+      expect(tarefa.tentativas).toBe(1);
+      const segunda = await service.executar(agora);
+      expect(segunda.fotosPendentesRemovidas).toBe(0);
+      expect(segunda.falhasNoStorage).toBe(0);
+      expect(remover).toHaveBeenCalledTimes(2);
+      expect(remover).toHaveBeenLastCalledWith(caminhoArmazenamento);
+      expect(
+        await ambiente.prisma.remocaoArquivo.findUnique({ where: { caminhoArmazenamento } }),
+      ).toBeNull();
+    } finally {
+      storageSimulado.removerArquivo = original;
+    }
+  });
 });

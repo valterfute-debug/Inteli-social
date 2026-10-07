@@ -185,6 +185,28 @@ describe('Hardening HTTP', () => {
     expect(resposta.headers['cache-control']).toBe('no-store');
   });
 
+  it('aceita preflight com ID de correlação e expõe o ID na resposta', async () => {
+    const resposta = await request(app.getHttpServer())
+      .options('/api/v1/animals')
+      .set('Origin', 'https://frontend.teste.invalid')
+      .set('Access-Control-Request-Method', 'POST')
+      .set('Access-Control-Request-Headers', 'authorization,idempotency-key,x-request-id')
+      .expect(204);
+    expect(resposta.headers['access-control-allow-headers'].toLowerCase()).toContain(
+      'x-request-id',
+    );
+    const consulta = await request(app.getHttpServer())
+      .get('/api/v1/fronts')
+      .set('Origin', 'https://frontend.teste.invalid')
+      .set('Authorization', autorizacao)
+      .set('X-Request-Id', 'regressao-cors-001')
+      .expect(200);
+    expect(consulta.headers['x-request-id']).toBe('regressao-cors-001');
+    expect(consulta.headers['access-control-expose-headers'].toLowerCase()).toContain(
+      'x-request-id',
+    );
+  });
+
   it('rejeita microchip com letras na busca antes de consultar o banco', async () => {
     const resposta = await request(app.getHttpServer())
       .get('/api/v1/animals?microchip=12AB')
