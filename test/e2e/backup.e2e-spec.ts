@@ -45,6 +45,8 @@ describe('Backup/restauração PostgreSQL real com Auth e foto sintéticos', () 
   }
   beforeAll(async () => {
     temporary = mkdtempSync(join(tmpdir(), 'ampara-backup-e2e-'));
+    const socketDirectory = join(temporary, 'socket');
+    mkdirSync(socketDirectory, { mode: 0o700 });
     port = await availablePort();
     exec(join(bindir, 'initdb'), [
       '-D',
@@ -53,16 +55,31 @@ describe('Backup/restauração PostgreSQL real com Auth e foto sintéticos', () 
       '--username=postgres',
       '--no-instructions',
     ]);
-    exec(join(bindir, 'pg_ctl'), [
-      '-D',
-      join(temporary, 'pg'),
-      '-l',
-      join(temporary, 'postgres.log'),
-      '-o',
-      `-h 127.0.0.1 -p ${port}`,
-      '-w',
-      'start',
-    ]);
+    try {
+      exec(join(bindir, 'pg_ctl'), [
+        '-D',
+        join(temporary, 'pg'),
+        '-l',
+        join(temporary, 'postgres.log'),
+        '-o',
+        `-h 127.0.0.1 -p ${port} -k "${socketDirectory}"`,
+        '-w',
+        'start',
+      ]);
+    } catch (cause) {
+      let diagnostic = 'Log de inicialização indisponível';
+      try {
+        // This server has not received any fixture rows or production data.
+        diagnostic = readFileSync(join(temporary, 'postgres.log'), 'utf8')
+          .split('\n')
+          .slice(-12)
+          .join('\n')
+          .slice(-3000);
+      } catch {
+        // Keep the original failure visible even when the log was not created.
+      }
+      throw new Error(`PostgreSQL sintético local não iniciou: ${diagnostic}`, { cause });
+    }
     started = true;
   });
   afterAll(async () => {
