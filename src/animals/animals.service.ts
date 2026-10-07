@@ -1,42 +1,93 @@
 import { randomUUID } from 'node:crypto';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
 import { ListarAnimaisQueryDto } from './dto/listar-animais-query.dto';
-import { mapearAnimal } from './animal.mapper';
+import { AnimalComRelacoes, INCLUSAO_ANIMAL, mapearAnimal } from './animal.mapper';
 import { gerarIdentificadorPublico } from './identificador-publico.util';
+import { EstadoAdmissao, validarRegrasAdmissao } from './regras-admissao';
 
 const TENTATIVAS_MAXIMAS_IDENTIFICADOR = 3;
 
 @Injectable()
 export class AnimalsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AnimalsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
   async listar(query: ListarAnimaisQueryDto) {
-    const { pagina, limite, nome, identificadorPublico, especieId } = query;
-    const where: Prisma.AnimalWhereInput = {
-      deletedAt: null,
-      ...(nome ? { name: { contains: nome, mode: 'insensitive' } } : {}),
-      ...(identificadorPublico ? { publicId: identificadorPublico } : {}),
-      ...(especieId ? { speciesId: especieId } : {}),
-    };
+    const { pagina, limite } = query;
+    const where = this.montarFiltroListagem(query);
 
     const [itens, total] = await Promise.all([
       this.prisma.animal.findMany({
         where,
+        include: INCLUSAO_ANIMAL,
         skip: (pagina - 1) * limite,
         take: limite,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
       }),
       this.prisma.animal.count({ where }),
     ]);
 
-    return { itens: itens.map(mapearAnimal), pagina, limite, total };
+    const urls = await this.gerarUrlsFotos(itens);
+    return {
+      itens: itens.map((animal) => mapearAnimal(animal, this.urlDaFoto(animal, urls))),
+      pagina,
+      limite,
+      total,
+    };
+  }
+
+  montarFiltroListagem(query: ListarAnimaisQueryDto): Prisma.AnimalWhereInput {
+    const { busca, nome, identificadorPublico, microchip, especieId, frente, unidadeId } = query;
+    return {
+      deletedAt: null,
+      ...(busca
+        ? {
+            OR: [
+              { name: { contains: busca, mode: 'insensitive' } },
+              { publicId: { contains: busca, mode: 'insensitive' } },
+              { microchip: { startsWith: busca } },
+            ],
+          }
+        : {}),
+      ...(nome ? { name: { contains: nome, mode: 'insensitive' } } : {}),
+      ...(identificadorPublico
+        ? { publicId: { equals: identificadorPublico, mode: 'insensitive' } }
+        : {}),
+      ...(microchip ? { microchip } : {}),
+      ...(especieId ? { speciesId: especieId } : {}),
+      ...(frente ? { front: frente } : {}),
+      ...(unidadeId ? { unitId: unidadeId } : {}),
+    };
   }
 
   async criar(dto: CriarAnimalDto) {
+    const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId);
+    this.garantirRegrasAdmissao({
+      frente: dto.frente,
+      especieSilvestre,
+      nome: dto.nome,
+      microchip: dto.microchip,
+      sexo: dto.sexo,
+      idadeAproximadaMeses: dto.idadeAproximadaMeses,
+      pesoKg: dto.pesoKg,
+      porte: dto.porte,
+    });
+    if (dto.microchip) await this.garantirMicrochipDisponivel(dto.microchip);
     await this.garantirFotoConfirmada(dto.fotoEntradaId);
 
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
@@ -63,8 +114,9 @@ export class AnimalsService {
             observacoes: dto.observacoes,
             fotoEntradaId: dto.fotoEntradaId,
           },
+          include: INCLUSAO_ANIMAL,
         });
-        return mapearAnimal(animal);
+        return this.mapearComFoto(animal);
       } catch (erro) {
         const colisaoDeIdentificador =
           erro instanceof Prisma.PrismaClientKnownRequestError &&
@@ -77,15 +129,46 @@ export class AnimalsService {
   }
 
   async buscarPorId(id: string) {
-    const animal = await this.prisma.animal.findFirst({ where: { id, deletedAt: null } });
+    const animal = await this.prisma.animal.findFirst({
+      where: { id, deletedAt: null },
+      include: INCLUSAO_ANIMAL,
+    });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    return mapearAnimal(animal);
+    return this.mapearComFoto(animal);
   }
 
   async atualizar(id: string, dto: AtualizarAnimalDto) {
     const { versao, ...dados } = dto;
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
+    }
+
+    const existente = await this.prisma.animal.findFirst({
+      where: { id, deletedAt: null },
+      include: { species: true },
+    });
+    if (!existente) throw new NotFoundException('Animal não encontrado');
+    if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
+
+    // As regras valem para o estado final: numa transferência CED → CasAdote, por exemplo,
+    // basta enviar frente/unidade/localização e o restante vem do cadastro atual.
+    const valorFinal = <T>(novo: T | undefined, atual: T) => (novo !== undefined ? novo : atual);
+    const especieSilvestre =
+      dados.especieId !== undefined && dados.especieId !== existente.speciesId
+        ? await this.obterEspecieSilvestre(dados.especieId)
+        : existente.species.silvestre;
+    this.garantirRegrasAdmissao({
+      frente: valorFinal(dados.frente, existente.front),
+      especieSilvestre,
+      nome: valorFinal(dados.nome, existente.name),
+      microchip: valorFinal(dados.microchip, existente.microchip),
+      sexo: valorFinal(dados.sexo, existente.sexo),
+      idadeAproximadaMeses: valorFinal(dados.idadeAproximadaMeses, existente.idadeAproximadaMeses),
+      pesoKg: valorFinal(dados.pesoKg, existente.pesoKg === null ? null : Number(existente.pesoKg)),
+      porte: valorFinal(dados.porte, existente.porte),
+    });
+    if (dados.microchip && dados.microchip !== existente.microchip) {
+      await this.garantirMicrochipDisponivel(dados.microchip, id);
     }
     if (dados.fotoEntradaId !== undefined) {
       await this.garantirFotoConfirmada(dados.fotoEntradaId);
@@ -117,11 +200,8 @@ export class AnimalsService {
         },
       });
 
-      if (resultado.count === 0) {
-        const existente = await this.prisma.animal.findFirst({ where: { id, deletedAt: null } });
-        if (!existente) throw new NotFoundException('Animal não encontrado');
-        throw new ConflictException('Versão desatualizada');
-      }
+      // Outra edição venceu entre a leitura acima e esta escrita.
+      if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
 
       return this.buscarPorId(id);
     } catch (erro) {
@@ -138,11 +218,76 @@ export class AnimalsService {
     if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
   }
 
+  private garantirRegrasAdmissao(estado: EstadoAdmissao) {
+    const violacoes = validarRegrasAdmissao(estado);
+    if (violacoes.length > 0) throw new BadRequestException(violacoes);
+  }
+
+  private async obterEspecieSilvestre(especieId: string) {
+    const especie = await this.prisma.species.findFirst({
+      where: { id: especieId, deletedAt: null },
+      select: { silvestre: true },
+    });
+    if (!especie) throw new BadRequestException('Espécie não encontrada');
+    return especie.silvestre;
+  }
+
+  /**
+   * O microchip acompanha o animal entre frentes (ex.: chega pelo CED e vai para o CasAdote),
+   * então um segundo cadastro com o mesmo número é, na prática, o mesmo animal. O 409 devolve
+   * o cadastro existente para o frontend oferecer a transferência em vez de duplicar a ficha.
+   */
+  private async garantirMicrochipDisponivel(microchip: string, ignorarId?: string) {
+    const existente = await this.prisma.animal.findFirst({
+      where: {
+        microchip,
+        deletedAt: null,
+        ...(ignorarId ? { id: { not: ignorarId } } : {}),
+      },
+      select: { id: true, publicId: true },
+    });
+    if (existente) {
+      throw new ConflictException({
+        message: `Microchip já cadastrado no animal ${existente.publicId}`,
+        detalhes: {
+          animalExistenteId: existente.id,
+          identificadorPublico: existente.publicId,
+        },
+      });
+    }
+  }
+
   private async garantirFotoConfirmada(fotoEntradaId: string) {
     const foto = await this.prisma.foto.findUnique({ where: { id: fotoEntradaId } });
     if (!foto) throw new BadRequestException('Foto não encontrada');
     if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
       throw new BadRequestException('Foto ainda não confirmada');
+    }
+  }
+
+  private async mapearComFoto(animal: AnimalComRelacoes) {
+    const urls = await this.gerarUrlsFotos([animal]);
+    return mapearAnimal(animal, this.urlDaFoto(animal, urls));
+  }
+
+  private urlDaFoto(animal: AnimalComRelacoes, urls: Map<string, string>) {
+    const foto = animal.fotoEntrada;
+    if (!foto || foto.situacao !== SituacaoFoto.CONFIRMADA) return null;
+    return urls.get(foto.caminhoArmazenamento) ?? null;
+  }
+
+  /** Falha no Storage não derruba a consulta: a ficha é exibida sem a imagem. */
+  private async gerarUrlsFotos(animais: AnimalComRelacoes[]) {
+    const caminhos = animais
+      .map((animal) => animal.fotoEntrada)
+      .filter((foto) => foto?.situacao === SituacaoFoto.CONFIRMADA)
+      .map((foto) => foto!.caminhoArmazenamento);
+    if (caminhos.length === 0) return new Map<string, string>();
+    try {
+      return await this.storage.criarUrlsLeitura(caminhos);
+    } catch (erro) {
+      this.logger.warn(`Fotos exibidas sem URL: ${(erro as Error).message}`);
+      return new Map<string, string>();
     }
   }
 

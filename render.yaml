@@ -1,10 +1,13 @@
+# Blueprint do Render. Para homologação e produção separadas, crie um serviço por ambiente
+# (ex.: duplicando este bloco com outro name), cada um apontando para seu próprio projeto Supabase.
 services:
   - type: web
     name: inteli-social-api
     runtime: node
     plan: free
     region: oregon
-    buildCommand: npm ci && npm run prisma:generate && npm run prisma:migrate:deploy && npm run build
+    # Migrations e seed são idempotentes: só aplicam o que falta.
+    buildCommand: npm ci && npm run prisma:generate && npm run prisma:migrate:deploy && npm run build && npm run db:seed:prod
     startCommand: npm run start
     healthCheckPath: /api/health
     envVars:
@@ -16,3 +19,15 @@ services:
         sync: false
       - key: DIRECT_URL
         sync: false
+      # Obrigatórias em produção (a API não sobe sem elas): sem Storage não há foto nem admissão.
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_STORAGE_BUCKET
+        value: fotos-animais
+      # URL(s) do frontend publicado, separadas por vírgula. Sem ela, navegadores são bloqueados.
+      - key: CORS_ORIGINS
+        sync: false
+      - key: SWAGGER_ENABLED
+        value: false

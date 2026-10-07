@@ -17,7 +17,10 @@
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
     "openapi:validate": "node scripts/validar-openapi.cjs",
-    "db:check": "tsx src/database/check-connection.ts"
+    "db:check": "tsx src/database/check-connection.ts",
+    "db:seed": "tsx src/database/seed.ts",
+    "db:seed:prod": "node dist/database/seed.js",
+    "smoke": "node scripts/smoke-test.cjs"
   },
   "repository": {
     "type": "git",
@@ -43,11 +46,13 @@
     "@nestjs/core": "^11.2.3",
     "@nestjs/platform-express": "^11.2.3",
     "@nestjs/swagger": "^11.4.7",
+    "@nestjs/throttler": "^6.7.1",
     "@prisma/client": "^6.19.3",
     "@supabase/supabase-js": "^2.117.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.4",
     "dotenv": "^17.4.2",
+    "helmet": "^8.3.0",
     "joi": "^17.13.8",
     "pdf-lib": "^1.17.1",
     "reflect-metadata": "^0.2.2",

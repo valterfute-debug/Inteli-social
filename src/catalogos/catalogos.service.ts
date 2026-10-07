@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
 import { ListarLocalizacoesQueryDto } from './dto/listar-localizacoes-query.dto';
+import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
 
 const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
@@ -27,7 +28,7 @@ export class CatalogosService {
       this.prisma.species.count({ where }),
     ]);
     return {
-      itens: itens.map((item) => ({ id: item.id, nome: item.name })),
+      itens: itens.map((item) => ({ id: item.id, nome: item.name, silvestre: item.silvestre })),
       pagina,
       limite,
       total,
@@ -107,6 +108,24 @@ export class CatalogosService {
       pagina,
       limite,
       total,
+    };
+  }
+
+  async criarResponsavel(dto: CriarResponsavelDto) {
+    const responsavel = await this.prisma.responsible.create({
+      data: {
+        name: dto.nome.trim(),
+        endereco: dto.endereco,
+        email: dto.email,
+        telefone: dto.telefone,
+      },
+    });
+    return {
+      id: responsavel.id,
+      nome: responsavel.name,
+      endereco: responsavel.endereco,
+      email: responsavel.email,
+      telefone: responsavel.telefone,
     };
   }
 

@@ -6,6 +6,7 @@ const fs = require('node:fs');
 // alguém declare um endpoint pronto sem o código existir de fato.
 const ENDPOINTS_IMPLEMENTADOS = new Set([
   'GET /api/health',
+  'GET /api/health/ready',
   'GET /api/v1/animals',
   'POST /api/v1/animals',
   'GET /api/v1/animals/{id}',
@@ -16,6 +17,7 @@ const ENDPOINTS_IMPLEMENTADOS = new Set([
   'GET /api/v1/units',
   'GET /api/v1/locations',
   'GET /api/v1/responsibles',
+  'POST /api/v1/responsibles',
   'GET /api/v1/fronts',
   'GET /api/v1/animals/{animalId}/health-events',
   'POST /api/v1/animals/{animalId}/health-events',

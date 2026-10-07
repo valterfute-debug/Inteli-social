@@ -5,7 +5,7 @@ import { Test } from '@nestjs/testing';
 import request = require('supertest');
 import { AppModule } from '../src/app.module';
 import { FiltroExcecaoGlobal } from '../src/common/filtros/filtro-excecao-global';
-import { configurarAplicacao } from '../src/configurar-aplicacao';
+import { configurarAplicacao, resolverOrigensCors } from '../src/configurar-aplicacao';
 
 describe('Aplicação NestJS via HTTP', () => {
   let app: INestApplication;
@@ -71,5 +71,61 @@ describe('Filtro global de exceções', () => {
       }),
     );
     expect(JSON.stringify(resposta.json.mock.calls)).not.toContain('segredo');
+  });
+});
+
+describe('Hardening HTTP', () => {
+  let app: INestApplication;
+
+  beforeAll(async () => {
+    const modulo = await Test.createTestingModule({ imports: [AppModule] }).compile();
+    app = modulo.createNestApplication();
+    configurarAplicacao(app);
+    await app.init();
+  });
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('envia cabeçalhos de segurança e não revela o framework', async () => {
+    const resposta = await request(app.getHttpServer()).get('/api/health').expect(200);
+    expect(resposta.headers['x-content-type-options']).toBe('nosniff');
+    expect(resposta.headers['x-powered-by']).toBeUndefined();
+  });
+
+  it('rejeita microchip com letras na busca antes de consultar o banco', async () => {
+    const resposta = await request(app.getHttpServer())
+      .get('/api/v1/animals?microchip=12AB')
+      .expect(400);
+    expect(JSON.stringify(resposta.body.mensagem)).toContain('microchip');
+  });
+
+  it('rejeita parâmetros de consulta desconhecidos', async () => {
+    await request(app.getHttpServer()).get('/api/v1/animals?admin=true').expect(400);
+  });
+
+  it('rejeita peso acima do suportado pelo banco com 400, não 500', async () => {
+    const resposta = await request(app.getHttpServer())
+      .post('/api/v1/animals')
+      .send({ pesoKg: 100000 })
+      .expect(400);
+    expect(JSON.stringify(resposta.body.mensagem)).toContain('pesoKg');
+  });
+});
+
+describe('Origens CORS', () => {
+  it('usa a lista configurada, ignorando espaços', () => {
+    expect(resolverOrigensCors('production', 'https://a.app, https://b.app')).toEqual([
+      'https://a.app',
+      'https://b.app',
+    ]);
+  });
+
+  it('em produção sem configuração bloqueia navegadores (falha fechada)', () => {
+    expect(resolverOrigensCors('production', undefined)).toBe(false);
+  });
+
+  it('em desenvolvimento sem configuração libera qualquer origem', () => {
+    expect(resolverOrigensCors('development', '')).toBe(true);
   });
 });
