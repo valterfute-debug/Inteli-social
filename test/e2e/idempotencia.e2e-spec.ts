@@ -181,6 +181,27 @@ describe('Idempotência (e2e, banco real)', () => {
     ).toBe(1);
   });
 
+  it('replay concorrente com microchip e a mesma chave não esbarra no próprio cadastro', async () => {
+    const corpo = await admissao(ana, {
+      frente: 'CCPA',
+      ...unidadeCcpa,
+      microchip: '981000777000111',
+      sexo: 'MACHO',
+      idadeAproximadaMeses: 6,
+      pesoKg: 4,
+      porte: 'PEQUENO',
+    });
+    const chave = randomUUID();
+    const antes = await contarAnimais();
+    const respostas = await Promise.all(
+      Array.from({ length: 5 }, () => cadastrar(ana, chave, corpo)),
+    );
+    expect(respostas.filter((r) => r.status === 201)).toHaveLength(1);
+    expect(respostas.every((r) => r.status === 200 || r.status === 201)).toBe(true);
+    expect(new Set(respostas.map((r) => r.body.id)).size).toBe(1);
+    expect(await contarAnimais()).toBe(antes + 1);
+  });
+
   it('chaves são por usuário: a mesma chave de outra pessoa é outra operação', async () => {
     const chave = randomUUID();
     const daAna = await cadastrar(ana, chave, await admissao(ana)).expect(201);
@@ -227,5 +248,135 @@ describe('Idempotência (e2e, banco real)', () => {
       .set('Idempotency-Key', chave)
       .send({ id: randomUUID(), tipoMidia: 'image/jpeg', tamanhoBytes: 1000 })
       .expect(409);
+  });
+
+  it('foto: conteúdo conflitante simultâneo não grava a segunda foto', async () => {
+    const chave = randomUUID();
+    const antes = await ambiente.prisma.foto.count();
+    const ids = [randomUUID(), randomUUID()];
+    const respostas = await Promise.all(
+      ids.map((id) =>
+        http()
+          .post('/api/v1/fotos')
+          .set('Authorization', ana.autorizacao)
+          .set('Idempotency-Key', chave)
+          .send({ id, tipoMidia: 'image/jpeg', tamanhoBytes: 1000 }),
+      ),
+    );
+    expect(respostas.map((r) => r.status).sort()).toEqual([201, 409]);
+    expect(await ambiente.prisma.foto.count()).toBe(antes + 1);
+    expect(
+      await ambiente.prisma.chaveIdempotencia.count({ where: { usuarioId: ana.id, chave } }),
+    ).toBe(1);
+  });
+
+  it('foto: replay pendente renova URL e prazo, sem duplicar registro', async () => {
+    const id = randomUUID();
+    const chave = randomUUID();
+    const corpo = { id, tipoMidia: 'image/jpeg', tamanhoBytes: 1000 };
+    const solicitar = () =>
+      http()
+        .post('/api/v1/fotos')
+        .set('Authorization', ana.autorizacao)
+        .set('Idempotency-Key', chave)
+        .send(corpo);
+    await solicitar().expect(201);
+    const prazoAntigo = new Date('2020-01-01');
+    await ambiente.prisma.foto.update({ where: { id }, data: { expiraEm: prazoAntigo } });
+    const reenvio = await solicitar().expect(201);
+    expect(reenvio.body.urlEnvio).toContain(id);
+    expect(
+      (await ambiente.prisma.foto.findUniqueOrThrow({ where: { id } })).expiraEm.getTime(),
+    ).toBeGreaterThan(Date.now());
+    expect(await ambiente.prisma.foto.count({ where: { id } })).toBe(1);
+  });
+
+  it('foto pendente expirada exige renovação; replay confirmado continua válido após o prazo', async () => {
+    const id = randomUUID();
+    const chaveSolicitacao = randomUUID();
+    const chaveConfirmacao = randomUUID();
+    const solicitar = () =>
+      http()
+        .post('/api/v1/fotos')
+        .set('Authorization', ana.autorizacao)
+        .set('Idempotency-Key', chaveSolicitacao)
+        .send({ id, tipoMidia: 'image/jpeg', tamanhoBytes: 1000 });
+    const confirmar = () =>
+      http()
+        .post(`/api/v1/fotos/${id}/confirmacao`)
+        .set('Authorization', ana.autorizacao)
+        .set('Idempotency-Key', chaveConfirmacao);
+    await solicitar().expect(201);
+    await ambiente.prisma.foto.update({
+      where: { id },
+      data: { expiraEm: new Date('2020-01-01') },
+    });
+    await confirmar().expect(409);
+    expect((await ambiente.prisma.foto.findUniqueOrThrow({ where: { id } })).situacao).toBe(
+      'PENDENTE',
+    );
+    expect(
+      await ambiente.prisma.chaveIdempotencia.findUnique({
+        where: { usuarioId_chave: { usuarioId: ana.id, chave: chaveConfirmacao } },
+      }),
+    ).toBeNull();
+    await solicitar().expect(201);
+    await confirmar().expect(200);
+    await ambiente.prisma.foto.update({
+      where: { id },
+      data: { expiraEm: new Date('2020-01-01') },
+    });
+    await confirmar().expect(200);
+    expect(
+      await ambiente.prisma.eventoAuditoria.count({
+        where: { entidadeId: id, acao: 'FOTO_CONFIRMADA' },
+      }),
+    ).toBe(1);
+  });
+
+  it('confirmação simultânea com chave igual gera uma única auditoria', async () => {
+    const id = randomUUID();
+    await http()
+      .post('/api/v1/fotos')
+      .set('Authorization', ana.autorizacao)
+      .set('Idempotency-Key', randomUUID())
+      .send({ id, tipoMidia: 'image/jpeg', tamanhoBytes: 1000 })
+      .expect(201);
+    const chave = randomUUID();
+    const respostas = await Promise.all(
+      Array.from({ length: 5 }, () =>
+        http()
+          .post(`/api/v1/fotos/${id}/confirmacao`)
+          .set('Authorization', ana.autorizacao)
+          .set('Idempotency-Key', chave),
+      ),
+    );
+    expect(respostas.every((r) => r.status === 200)).toBe(true);
+    expect(
+      await ambiente.prisma.eventoAuditoria.count({
+        where: { entidadeId: id, acao: 'FOTO_CONFIRMADA' },
+      }),
+    ).toBe(1);
+  });
+
+  it('dois operadores concorrentes não conseguem assumir o mesmo ID de foto', async () => {
+    const operadorA = await ambiente.usuario('foto-op-a', PapelUsuario.OPERADOR, ['CasAdote']);
+    const operadorB = await ambiente.usuario('foto-op-b', PapelUsuario.OPERADOR, ['CasAdote']);
+    const id = randomUUID();
+    const operadores = [operadorA, operadorB];
+    const respostas = await Promise.all(
+      operadores.map((quem) =>
+        http()
+          .post('/api/v1/fotos')
+          .set('Authorization', quem.autorizacao)
+          .set('Idempotency-Key', randomUUID())
+          .send({ id, tipoMidia: 'image/jpeg', tamanhoBytes: 1000 }),
+      ),
+    );
+    expect(respostas.map((r) => r.status).sort()).toEqual([201, 403]);
+    const vencedor = operadores[respostas.findIndex((r) => r.status === 201)];
+    expect((await ambiente.prisma.foto.findUniqueOrThrow({ where: { id } })).criadoPorId).toBe(
+      vencedor.id,
+    );
   });
 });

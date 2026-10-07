@@ -94,7 +94,8 @@ export class SupabaseStorageService {
   }
 
   async removerArquivo(caminho: string): Promise<void> {
-    await this.obterCliente().storage.from(this.obterBucket()).remove([caminho]);
+    const { error } = await this.obterCliente().storage.from(this.obterBucket()).remove([caminho]);
+    if (error) throw new InternalServerErrorException('Falha ao remover arquivo do armazenamento');
   }
 
   /**

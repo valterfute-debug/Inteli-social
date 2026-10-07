@@ -6,8 +6,9 @@ import {
 
 const getBucket = jest.fn();
 const createSignedUrls = jest.fn();
+const remove = jest.fn();
 jest.mock('@supabase/supabase-js', () => ({
-  createClient: () => ({ storage: { getBucket, from: () => ({ createSignedUrls }) } }),
+  createClient: () => ({ storage: { getBucket, from: () => ({ createSignedUrls, remove }) } }),
 }));
 
 function configCom(valores: Record<string, unknown>) {
@@ -56,5 +57,20 @@ describe('SupabaseStorageService', () => {
     await expect(
       new SupabaseStorageService(configCom(CONFIGURADO)).situacaoBucket(),
     ).rejects.toThrow('Falha ao consultar o bucket de fotos');
+  });
+
+  it('erro retornado pelo Storage na remoção vira exceção para permitir retry durável', async () => {
+    remove.mockResolvedValue({ data: null, error: { message: 'Storage unavailable' } });
+    await expect(
+      new SupabaseStorageService(configCom(CONFIGURADO)).removerArquivo('admissao/a.jpg'),
+    ).rejects.toThrow('Falha ao remover arquivo do armazenamento');
+  });
+
+  it('remoção bem-sucedida, inclusive arquivo ausente, é idempotente', async () => {
+    remove.mockResolvedValue({ data: [], error: null });
+    await expect(
+      new SupabaseStorageService(configCom(CONFIGURADO)).removerArquivo('admissao/a.jpg'),
+    ).resolves.toBeUndefined();
+    expect(remove).toHaveBeenCalledWith(['admissao/a.jpg']);
   });
 });

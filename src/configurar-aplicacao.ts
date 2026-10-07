@@ -41,7 +41,7 @@ export function configurarAplicacao(app: INestApplication) {
   app.enableCors({
     origin: origem,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key', 'X-Request-Id'],
     exposedHeaders: ['Idempotent-Replayed', 'X-Request-Id'],
     maxAge: 600,
   });
