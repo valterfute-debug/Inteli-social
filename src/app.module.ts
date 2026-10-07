@@ -12,6 +12,7 @@ import { ProntuarioModule } from './prontuario/prontuario.module';
 import { StorageModule } from './storage/storage.module';
 import { FotosModule } from './fotos/fotos.module';
 import { AuthModule } from './auth/auth.module';
+import { UsuariosModule } from './usuarios/usuarios.module';
 @Module({
   imports: [
     PrismaModule,
@@ -49,6 +50,7 @@ import { AuthModule } from './auth/auth.module';
       { ttl: 60_000, limit: Number(process.env.LIMITE_REQUISICOES_POR_MINUTO ?? 120) },
     ]),
     AuthModule,
+    UsuariosModule,
     HealthModule,
     AnimalsModule,
     CatalogosModule,

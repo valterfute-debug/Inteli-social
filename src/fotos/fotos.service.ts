@@ -1,10 +1,12 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
+import { EscopoAcesso, ehAdmin } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { SolicitarFotoDto, TAMANHO_MAXIMO_BYTES } from './dto/solicitar-foto.dto';
@@ -24,14 +26,17 @@ export class FotosService {
     private readonly storage: SupabaseStorageService,
   ) {}
 
-  async solicitarEnvio(dto: SolicitarFotoDto) {
+  async solicitarEnvio(dto: SolicitarFotoDto, escopo: EscopoAcesso) {
     const extensao = EXTENSAO_POR_TIPO_MIDIA[dto.tipoMidia];
     const caminhoArmazenamento = `admissao/${dto.id}.${extensao}`;
     const expiraEm = new Date(Date.now() + MINUTOS_VALIDADE_ENVIO * 60 * 1000);
 
+    const existente = await this.prisma.foto.findUnique({ where: { id: dto.id } });
+    // O id vem do cliente: sem isto, quem soubesse o id de uma foto pendente alheia
+    // poderia trocar o arquivo dela.
+    if (existente) this.garantirAutor(existente.criadoPorId, escopo);
     // Uma foto confirmada pode já estar vinculada a um animal: reescrever caminho/tipo
     // faria a ficha apontar para um arquivo que não existe. Nova foto = novo id.
-    const existente = await this.prisma.foto.findUnique({ where: { id: dto.id } });
     if (existente?.situacao === SituacaoFoto.CONFIRMADA) {
       throw new ConflictException('Foto já confirmada; gere um novo id para enviar outra foto');
     }
@@ -47,6 +52,7 @@ export class FotosService {
         caminhoArmazenamento,
         situacao: SituacaoFoto.PENDENTE,
         expiraEm,
+        criadoPorId: escopo.usuarioId,
       },
       update: {
         tipoMidia: dto.tipoMidia,
@@ -59,9 +65,10 @@ export class FotosService {
     return { id: dto.id, urlEnvio, expiraEm: expiraEm.toISOString() };
   }
 
-  async confirmar(id: string) {
+  async confirmar(id: string, escopo: EscopoAcesso) {
     const foto = await this.prisma.foto.findUnique({ where: { id } });
     if (!foto) throw new NotFoundException('Foto não encontrada');
+    this.garantirAutor(foto.criadoPorId, escopo);
 
     if (foto.situacao === SituacaoFoto.CONFIRMADA) {
       return { id: foto.id, situacao: SituacaoFoto.CONFIRMADA };
@@ -87,5 +94,12 @@ export class FotosService {
     });
 
     return { id: foto.id, situacao: SituacaoFoto.CONFIRMADA };
+  }
+
+  /** Foto ainda sem animal não tem unidade: o controle é por autoria (ou admin). */
+  private garantirAutor(criadoPorId: string | null, escopo: EscopoAcesso) {
+    if (criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {
+      throw new ForbiddenException('Foto enviada por outro usuário');
+    }
   }
 }

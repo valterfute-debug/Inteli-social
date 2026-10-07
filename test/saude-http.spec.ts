@@ -3,18 +3,40 @@ import { Test } from '@nestjs/testing';
 // supertest exporta uma função CommonJS; esta sintaxe evita dependência de esModuleInterop no editor.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
+import { PapelUsuario } from '@prisma/client';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { CHAVES_JWT } from '../src/auth/verificador-token.service';
 import { FiltroExcecaoGlobal } from '../src/common/filtros/filtro-excecao-global';
 import { configurarAplicacao, resolverOrigensCors } from '../src/configurar-aplicacao';
 import { criarEmissorDeTokens } from './tokens-teste';
 
-/** Sobe a aplicação inteira com as chaves do Supabase Auth trocadas por chaves locais. */
+/**
+ * Sobe a aplicação inteira com as chaves do Supabase Auth trocadas por chaves locais e um
+ * banco simulado que só sabe responder "este usuário é admin". Os testes com banco de
+ * verdade (escopo por unidade) ficam em test/e2e.
+ */
 async function criarAppComAutenticacao() {
   const emissor = await criarEmissorDeTokens();
+  const bancoSimulado = {
+    usuario: {
+      findUnique: async () => ({
+        id: 'admin',
+        ativo: true,
+        papel: PapelUsuario.ADMIN,
+        unidades: [],
+      }),
+    },
+    $queryRaw: async () => {
+      throw new Error('sem banco nos testes HTTP');
+    },
+    $disconnect: async () => undefined,
+  };
   const modulo = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(CHAVES_JWT)
     .useValue(emissor.chaves)
+    .overrideProvider(PrismaService)
+    .useValue(bancoSimulado)
     .compile();
   const app = modulo.createNestApplication();
   configurarAplicacao(app);
@@ -100,10 +122,13 @@ describe('Autenticação via HTTP', () => {
     await app.close();
   });
 
-  it.each(['/api/health', '/api/health/ready'])('mantém %s público (health check do Render)', async (rota) => {
-    const resposta = await request(app.getHttpServer()).get(rota);
-    expect(resposta.status).not.toBe(401);
-  });
+  it.each(['/api/health', '/api/health/ready'])(
+    'mantém %s público (health check do Render)',
+    async (rota) => {
+      const resposta = await request(app.getHttpServer()).get(rota);
+      expect(resposta.status).not.toBe(401);
+    },
+  );
 
   it.each([
     ['get', '/api/v1/animals'],

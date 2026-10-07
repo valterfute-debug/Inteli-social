@@ -1,3 +1,4 @@
+import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { NotFoundException } from '@nestjs/common';
 import { TipoEventoSaude } from '@prisma/client';
 import { HealthEventsService } from './health-events.service';
@@ -39,10 +40,14 @@ describe('HealthEventsService', () => {
     const service = new HealthEventsService(prisma);
 
     await expect(
-      service.criar('animal-inexistente', {
-        tipo: TipoEventoSaude.VACINA,
-        data: '2026-01-10',
-      }),
+      service.criar(
+        'animal-inexistente',
+        {
+          tipo: TipoEventoSaude.VACINA,
+          data: '2026-01-10',
+        },
+        ESCOPO_ADMIN,
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
@@ -52,11 +57,15 @@ describe('HealthEventsService', () => {
     (prisma.healthEvent.create as jest.Mock).mockResolvedValue(criarEventoFalso());
     const service = new HealthEventsService(prisma);
 
-    const resposta = await service.criar('animal-1', {
-      tipo: TipoEventoSaude.VACINA,
-      descricao: 'V10',
-      data: '2026-01-10',
-    });
+    const resposta = await service.criar(
+      'animal-1',
+      {
+        tipo: TipoEventoSaude.VACINA,
+        descricao: 'V10',
+        data: '2026-01-10',
+      },
+      ESCOPO_ADMIN,
+    );
 
     expect(resposta.tipo).toBe(TipoEventoSaude.VACINA);
     expect(resposta.descricao).toBe('V10');
@@ -69,11 +78,15 @@ describe('HealthEventsService', () => {
     (prisma.healthEvent.count as jest.Mock).mockResolvedValue(1);
     const service = new HealthEventsService(prisma);
 
-    const resposta = await service.listar('animal-1', {
-      pagina: 1,
-      limite: 20,
-      tipo: TipoEventoSaude.VACINA,
-    });
+    const resposta = await service.listar(
+      'animal-1',
+      {
+        pagina: 1,
+        limite: 20,
+        tipo: TipoEventoSaude.VACINA,
+      },
+      ESCOPO_ADMIN,
+    );
 
     expect(resposta.total).toBe(1);
     expect(resposta.itens[0].tipo).toBe(TipoEventoSaude.VACINA);
@@ -84,8 +97,8 @@ describe('HealthEventsService', () => {
     (prisma.healthEvent.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
     const service = new HealthEventsService(prisma);
 
-    await expect(service.arquivar('animal-1', 'evento-inexistente')).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
+    await expect(
+      service.arquivar('animal-1', 'evento-inexistente', ESCOPO_ADMIN),
+    ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

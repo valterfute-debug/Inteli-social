@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
 import { ListarEventosSaudeQueryDto } from './dto/listar-eventos-saude-query.dto';
@@ -8,16 +9,17 @@ import { mapearEventoSaude } from './health-event.mapper';
 export class HealthEventsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async garantirAnimalAtivo(animalId: string) {
+  private async garantirAnimalAcessivel(animalId: string, escopo: EscopoAcesso) {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
-      select: { id: true },
+      select: { unitId: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, animal.unitId);
   }
 
-  async criar(animalId: string, dto: CriarEventoSaudeDto) {
-    await this.garantirAnimalAtivo(animalId);
+  async criar(animalId: string, dto: CriarEventoSaudeDto, escopo: EscopoAcesso) {
+    await this.garantirAnimalAcessivel(animalId, escopo);
     const evento = await this.prisma.healthEvent.create({
       data: {
         animalId,
@@ -30,8 +32,8 @@ export class HealthEventsService {
     return mapearEventoSaude(evento);
   }
 
-  async listar(animalId: string, query: ListarEventosSaudeQueryDto) {
-    await this.garantirAnimalAtivo(animalId);
+  async listar(animalId: string, query: ListarEventosSaudeQueryDto, escopo: EscopoAcesso) {
+    await this.garantirAnimalAcessivel(animalId, escopo);
     const { pagina, limite, tipo } = query;
     const where = {
       animalId,
@@ -52,7 +54,8 @@ export class HealthEventsService {
     return { itens: itens.map(mapearEventoSaude), pagina, limite, total };
   }
 
-  async arquivar(animalId: string, id: string) {
+  async arquivar(animalId: string, id: string, escopo: EscopoAcesso) {
+    await this.garantirAnimalAcessivel(animalId, escopo);
     const resultado = await this.prisma.healthEvent.updateMany({
       where: { id, animalId, deletedAt: null },
       data: { deletedAt: new Date() },

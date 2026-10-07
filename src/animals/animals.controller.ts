@@ -12,6 +12,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { EscopoAtual } from '../auth/decoradores';
+import { EscopoAcesso } from '../auth/escopo';
 import { AnimalsService } from './animals.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
@@ -24,33 +26,37 @@ export class AnimalsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar animais ativos' })
-  listar(@Query() query: ListarAnimaisQueryDto) {
-    return this.animalsService.listar(query);
+  listar(@Query() query: ListarAnimaisQueryDto, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.animalsService.listar(query, escopo);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Cadastrar animal (admissão)' })
-  criar(@Body() dto: CriarAnimalDto) {
-    return this.animalsService.criar(dto);
+  criar(@Body() dto: CriarAnimalDto, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.animalsService.criar(dto, escopo);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Consultar animal' })
-  buscarPorId(@Param('id', ParseUUIDPipe) id: string) {
-    return this.animalsService.buscarPorId(id);
+  buscarPorId(@Param('id', ParseUUIDPipe) id: string, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.animalsService.buscarPorId(id, escopo);
   }
 
   @Patch(':id')
   @ApiOperation({ summary: 'Atualizar animal verificando versão' })
-  atualizar(@Param('id', ParseUUIDPipe) id: string, @Body() dto: AtualizarAnimalDto) {
-    return this.animalsService.atualizar(id, dto);
+  atualizar(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AtualizarAnimalDto,
+    @EscopoAtual() escopo: EscopoAcesso,
+  ) {
+    return this.animalsService.atualizar(id, dto, escopo);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Arquivar animal' })
-  arquivar(@Param('id', ParseUUIDPipe) id: string) {
-    return this.animalsService.arquivar(id);
+  arquivar(@Param('id', ParseUUIDPipe) id: string, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.animalsService.arquivar(id, escopo);
   }
 }

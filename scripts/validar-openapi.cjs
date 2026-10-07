@@ -7,6 +7,7 @@ const fs = require('node:fs');
 const ENDPOINTS_IMPLEMENTADOS = new Set([
   'GET /api/health',
   'GET /api/health/ready',
+  'GET /api/v1/me',
   'GET /api/v1/animals',
   'POST /api/v1/animals',
   'GET /api/v1/animals/{id}',

@@ -3,7 +3,7 @@
   "info": {
     "title": "Ampara Animal — contrato do Ciclo 1",
     "version": "0.3.0",
-    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos."
+    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos. Autorização: além do login, a conta precisa estar liberada na API (tabela Usuario); conta não liberada ou desativada recebe 403. ADMIN acessa todas as unidades; OPERADOR só as vinculadas (papéis provisórios até aprovação da Ampara). O escopo é decidido no servidor: filtros enviados pelo cliente nunca ampliam o acesso."
   },
   "paths": {
     "/api/health": {
@@ -141,7 +141,7 @@
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/unidade/localização e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado.",
+        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/unidade/localização e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. Restrito às unidades do usuário: o filtro unidadeId não amplia o acesso.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -180,7 +180,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -391,7 +391,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -528,7 +528,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -640,7 +640,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -755,7 +755,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -869,7 +869,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1008,7 +1008,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1119,7 +1119,7 @@
     "/api/v1/units": {
       "get": {
         "summary": "Listar unidades",
-        "description": "Implementado. Lista unidades não arquivadas.",
+        "description": "Implementado. Lista só as unidades em que o usuário pode trabalhar (todas, para ADMIN).",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1158,7 +1158,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1258,7 +1258,7 @@
     "/api/v1/locations": {
       "get": {
         "summary": "Listar localizações",
-        "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório).",
+        "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório); unidade fora do escopo do usuário: 403.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1297,7 +1297,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1447,7 +1447,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1593,6 +1593,16 @@
               }
             }
           },
+          "403": {
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
           "429": {
             "description": "Erro padronizado",
             "content": {
@@ -1658,7 +1668,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1797,7 +1807,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou foto enviada por outro usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -1946,7 +1956,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou foto enviada por outro usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -2124,7 +2134,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -2246,7 +2256,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -2377,7 +2387,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -2505,7 +2515,7 @@
             }
           },
           "403": {
-            "description": "Erro padronizado",
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -2566,6 +2576,50 @@
           },
           "503": {
             "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/me": {
+      "get": {
+        "summary": "Dados, papel e unidades do usuário logado",
+        "description": "Implementado. Use para montar a tela conforme o acesso (ex.: unidades do formulário de admissão).",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Perfil do usuário",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Perfil"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
             "content": {
               "application/json": {
                 "schema": {
@@ -3539,6 +3593,60 @@
           "timestamp": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "Perfil": {
+        "type": "object",
+        "required": [
+          "id",
+          "papel",
+          "todasUnidades",
+          "unidades"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "id do usuário no Supabase Auth (sub do token)"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "nome": {
+            "type": "string",
+            "nullable": true
+          },
+          "papel": {
+            "type": "string",
+            "enum": [
+              "ADMIN",
+              "OPERADOR"
+            ],
+            "description": "Provisório até aprovação da Ampara"
+          },
+          "todasUnidades": {
+            "type": "boolean"
+          },
+          "unidades": {
+            "type": "array",
+            "description": "Unidades em que o usuário pode trabalhar (todas, para ADMIN)",
+            "items": {
+              "type": "object",
+              "required": [
+                "id",
+                "nome"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "nome": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

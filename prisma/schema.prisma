@@ -29,6 +29,11 @@ enum SituacaoFoto {
   PENDENTE
   CONFIRMADA
 }
+// Papéis provisórios até a Ampara aprovar os perfis (issue #3, P0-2).
+enum PapelUsuario {
+  ADMIN
+  OPERADOR
+}
 model Species {
   id String @id @default(uuid())
   name String @unique
@@ -55,6 +60,7 @@ model Unit {
   horariosFuncionamento String?
   locations Location[]
   animals Animal[]
+  usuarios UsuarioUnidade[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -121,9 +127,33 @@ model Foto {
   caminhoArmazenamento String
   situacao SituacaoFoto @default(PENDENTE)
   expiraEm DateTime
+  criadoPorId String?
+  criadoPor Usuario? @relation(fields: [criadoPorId], references: [id])
   animal Animal?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+// Conta liberada na API. `id` é o `sub` do token do Supabase Auth: logar no Supabase
+// não basta, a conta precisa existir aqui e estar ativa.
+model Usuario {
+  id String @id
+  email String?
+  nome String?
+  papel PapelUsuario @default(OPERADOR)
+  ativo Boolean @default(true)
+  unidades UsuarioUnidade[]
+  fotos Foto[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model UsuarioUnidade {
+  usuarioId String
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  unitId String
+  unit Unit @relation(fields: [unitId], references: [id])
+  createdAt DateTime @default(now())
+  @@id([usuarioId, unitId])
+  @@index([unitId])
 }
 model HealthEvent {
   id String @id @default(uuid())

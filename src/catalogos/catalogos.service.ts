@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Front } from '@prisma/client';
+import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
@@ -9,7 +10,7 @@ import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
 const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
   CASADOTE: 'CasAdote',
-  CED: 'Centro de Educação e Divulgação',
+  CED: 'Captura, Esterilização e Devolução',
 };
 
 @Injectable()
@@ -54,8 +55,12 @@ export class CatalogosService {
     };
   }
 
-  async listarUnidades({ pagina, limite }: PaginacaoQueryDto) {
-    const where = { deletedAt: null };
+  /** Só as unidades em que o usuário pode trabalhar: é delas que sai o formulário de admissão. */
+  async listarUnidades({ pagina, limite }: PaginacaoQueryDto, escopo: EscopoAcesso) {
+    const where = {
+      deletedAt: null,
+      ...(escopo.todasUnidades ? {} : { id: { in: escopo.unidadeIds } }),
+    };
     const [itens, total] = await Promise.all([
       this.prisma.unit.findMany({
         where,
@@ -73,7 +78,11 @@ export class CatalogosService {
     };
   }
 
-  async listarLocalizacoes({ pagina, limite, unidadeId }: ListarLocalizacoesQueryDto) {
+  async listarLocalizacoes(
+    { pagina, limite, unidadeId }: ListarLocalizacoesQueryDto,
+    escopo: EscopoAcesso,
+  ) {
+    garantirUnidade(escopo, unidadeId);
     const where = { unitId: unidadeId };
     const [itens, total] = await Promise.all([
       this.prisma.location.findMany({

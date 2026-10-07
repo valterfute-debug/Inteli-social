@@ -10,6 +10,8 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { EscopoAtual } from '../auth/decoradores';
+import { EscopoAcesso } from '../auth/escopo';
 import { isUUID } from 'class-validator';
 import { SolicitarFotoDto } from './dto/solicitar-foto.dto';
 import { FotosService } from './fotos.service';
@@ -32,9 +34,10 @@ export class FotosController {
   solicitarEnvio(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: SolicitarFotoDto,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
     validarIdempotencyKey(idempotencyKey);
-    return this.fotosService.solicitarEnvio(dto);
+    return this.fotosService.solicitarEnvio(dto, escopo);
   }
 
   @Post(':id/confirmacao')
@@ -44,8 +47,9 @@ export class FotosController {
   confirmar(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id', ParseUUIDPipe) id: string,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
     validarIdempotencyKey(idempotencyKey);
-    return this.fotosService.confirmar(id);
+    return this.fotosService.confirmar(id, escopo);
   }
 }

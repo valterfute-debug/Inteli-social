@@ -1,11 +1,14 @@
 import {
   ExecutionContext,
+  ForbiddenException,
   ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
+import { PapelUsuario } from '@prisma/client';
 import { JWTVerifyGetKey } from 'jose';
+import { PrismaService } from '../prisma/prisma.service';
 import { SUPABASE_URL_TESTE, criarEmissorDeTokens } from '../../test/tokens-teste';
 import { AutenticacaoGuard, extrairToken } from './autenticacao.guard';
 import { Publica } from './decoradores';
@@ -21,7 +24,10 @@ class ControllerPublico {
   rota() {}
 }
 
-function contexto(requisicao: Partial<RequisicaoAutenticada>, classe: object = ControllerProtegido) {
+function contexto(
+  requisicao: Partial<RequisicaoAutenticada>,
+  classe: object = ControllerProtegido,
+) {
   const instancia = classe as { prototype: { rota: () => void } };
   return {
     getHandler: () => instancia.prototype.rota,
@@ -34,9 +40,21 @@ function configCom(supabaseUrl: string | undefined) {
   return { get: () => supabaseUrl } as unknown as ConfigService;
 }
 
-function criarGuard(chaves: JWTVerifyGetKey | null, supabaseUrl: string | undefined = SUPABASE_URL_TESTE) {
+const USUARIO_ADMIN = { id: 'usuario-1', ativo: true, papel: PapelUsuario.ADMIN, unidades: [] };
+
+function prismaCom(usuario: unknown) {
+  return {
+    usuario: { findUnique: jest.fn().mockResolvedValue(usuario) },
+  } as unknown as PrismaService;
+}
+
+function criarGuard(
+  chaves: JWTVerifyGetKey | null,
+  supabaseUrl: string | undefined = SUPABASE_URL_TESTE,
+  prisma: PrismaService = prismaCom(USUARIO_ADMIN),
+) {
   const verificador = new VerificadorTokenService(chaves, configCom(supabaseUrl));
-  return new AutenticacaoGuard(new Reflector(), verificador);
+  return new AutenticacaoGuard(new Reflector(), verificador, prisma);
 }
 
 describe('AutenticacaoGuard', () => {
@@ -48,7 +66,9 @@ describe('AutenticacaoGuard', () => {
 
   it('libera rota marcada com @Publica() sem token', async () => {
     const guard = criarGuard(emissor.chaves);
-    await expect(guard.canActivate(contexto({ headers: {} }, ControllerPublico))).resolves.toBe(true);
+    await expect(guard.canActivate(contexto({ headers: {} }, ControllerPublico))).resolves.toBe(
+      true,
+    );
   });
 
   it('recusa requisição anônima com 401', async () => {
@@ -67,6 +87,41 @@ describe('AutenticacaoGuard', () => {
 
     await expect(guard.canActivate(contexto(requisicao))).resolves.toBe(true);
     expect(requisicao.usuario).toEqual({ id: 'usuario-1', email: 'ana@teste.invalid' });
+    expect(requisicao.escopo).toMatchObject({ usuarioId: 'usuario-1', todasUnidades: true });
+  });
+
+  it('carrega o escopo do operador a partir dos vínculos no banco', async () => {
+    const prisma = prismaCom({
+      id: 'usuario-2',
+      ativo: true,
+      papel: PapelUsuario.OPERADOR,
+      unidades: [{ unitId: 'unidade-a' }, { unitId: 'unidade-b' }],
+    });
+    const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prisma);
+    const token = await emissor.assinar({ sub: 'usuario-2' });
+    const requisicao: Partial<RequisicaoAutenticada> = {
+      headers: { authorization: `Bearer ${token}` },
+    };
+
+    await guard.canActivate(contexto(requisicao));
+
+    expect(requisicao.escopo).toEqual({
+      usuarioId: 'usuario-2',
+      papel: PapelUsuario.OPERADOR,
+      todasUnidades: false,
+      unidadeIds: ['unidade-a', 'unidade-b'],
+    });
+  });
+
+  it.each([
+    ['sem cadastro na API', null],
+    ['desativado', { ...USUARIO_ADMIN, ativo: false }],
+  ])('recusa com 403 login válido de usuário %s', async (_caso, usuario) => {
+    const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prismaCom(usuario));
+    const token = await emissor.assinar();
+    await expect(
+      guard.canActivate(contexto({ headers: { authorization: `Bearer ${token}` } })),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it.each([

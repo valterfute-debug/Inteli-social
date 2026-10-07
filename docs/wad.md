@@ -390,7 +390,18 @@ Filtros previstos: name, publicId, speciesId, page e limit. Paginação, limites
 
 ## 3.8. Autenticação, autorização e resiliência
 
-**Autenticação (issue #3, P0-1):** toda rota exige `Authorization: Bearer <access token>` emitido pelo Supabase Auth do projeto; só `/api/health` e `/api/health/ready` são públicas (`@Publica()`). O `AutenticacaoGuard` (global) valida no servidor a assinatura pelas chaves públicas do projeto (JWKS em `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`), o emissor, a audiência `authenticated` e a validade; aceita só algoritmos assimétricos (ES256/RS256), o que recusa a anon key. Sem token ou com token inválido/vencido: 401. Sem `SUPABASE_URL` ou com o Supabase inacessível: 503 (falha fechada). Não há cadastro aberto: contas são criadas no painel (Authentication > Users). Autorização por perfil e unidade: ver P0-2. O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
+**Autenticação (issue #3, P0-1):** toda rota exige `Authorization: Bearer <access token>` emitido pelo Supabase Auth do projeto; só `/api/health` e `/api/health/ready` são públicas (`@Publica()`). O `AutenticacaoGuard` (global) valida no servidor a assinatura pelas chaves públicas do projeto (JWKS em `${SUPABASE_URL}/auth/v1/.well-known/jwks.json`), o emissor, a audiência `authenticated` e a validade; aceita só algoritmos assimétricos (ES256/RS256), o que recusa a anon key. Sem token ou com token inválido/vencido: 401. Sem `SUPABASE_URL` ou com o Supabase inacessível: 503 (falha fechada). Não há cadastro aberto: contas são criadas no painel (Authentication > Users).
+
+**Autorização e escopo por unidade (issue #3, P0-2):** logar no Supabase não basta; a conta precisa estar liberada na tabela `Usuario` (id = `sub` do token), senão 403. O guard carrega do banco, a cada requisição, o papel e as unidades vinculadas (`UsuarioUnidade`). Papéis **provisórios**, até a Ampara aprovar os perfis: `ADMIN` acessa todas as unidades; `OPERADOR` só as suas. Regras aplicadas no servidor:
+
+- listagem filtra pelas unidades do usuário (o filtro `unidadeId` do cliente não amplia o acesso);
+- consulta, edição, arquivamento, eventos de saúde e prontuário de animal de outra unidade: 403;
+- cadastro em unidade alheia ou transferência para unidade alheia: 403;
+- catálogos de unidades e localizações mostram só as unidades do usuário;
+- foto ainda sem animal é controlada por autoria (`Foto.criadoPorId`): só quem a enviou (ou ADMIN) confirma, reenvia ou a vincula a uma ficha;
+- `GET /api/v1/me` devolve papel e unidades para o frontend montar as telas.
+
+Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
 
 Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.
 
@@ -585,7 +596,7 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 | Pendência | Situação |
 | --- | --- |
 | Autenticação | Implementada (Supabase Auth, JWT validado no backend). O frontend precisa da tela de login e de enviar o token em toda requisição |
-| Autorização por perfil/unidade | **Risco alto antes de dados reais** (issue #3, P0-2) |
+| Autorização por perfil/unidade | Implementada com papéis **provisórios** (ADMIN/OPERADOR). A Ampara precisa aprovar os perfis e quem vê o quê; ajustar só muda as regras, não a estrutura |
 | Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados |
 | Lista de espécies, unidades e localizações | Seed inicial derivado do TAPI; revisar com a Ampara |
 | Primeiros usuários | Ampara deve indicar o grupo piloto |
@@ -839,7 +850,7 @@ Veja [integridade e campos opcionais](#integridade). O diagrama não representa 
 
 ## Evidência local
 
-Prisma usa conexão PostgreSQL. O supabase-js é usado só para o Storage (service role, no servidor). A API exige login do Supabase Auth (seção 3.8); a autorização por perfil/unidade ainda está pendente. Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
+Prisma usa conexão PostgreSQL. O supabase-js é usado só para o Storage (service role, no servidor). A API exige login do Supabase Auth e conta liberada com escopo por unidade (seção 3.8). Não há políticas RLS ou grants documentados nas migrations. UNRESTRICTED indica ausência de RLS no objeto mostrado; não demonstra, sozinho, acesso público. O repositório não prova configurações do painel, grants atuais ou quais schemas são expostos.
 
 ## Verificações manuais
 

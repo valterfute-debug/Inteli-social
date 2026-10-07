@@ -2,11 +2,13 @@ import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
+import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
@@ -27,9 +29,12 @@ export class AnimalsService {
     private readonly storage: SupabaseStorageService,
   ) {}
 
-  async listar(query: ListarAnimaisQueryDto) {
+  async listar(query: ListarAnimaisQueryDto, escopo: EscopoAcesso) {
     const { pagina, limite } = query;
-    const where = this.montarFiltroListagem(query);
+    // Filtro do cliente E escopo do servidor: pedir outra unidade só devolve lista vazia.
+    const where: Prisma.AnimalWhereInput = {
+      AND: [this.montarFiltroListagem(query), filtroPorUnidade(escopo)],
+    };
 
     const [itens, total] = await Promise.all([
       this.prisma.animal.findMany({
@@ -75,7 +80,8 @@ export class AnimalsService {
     };
   }
 
-  async criar(dto: CriarAnimalDto) {
+  async criar(dto: CriarAnimalDto, escopo: EscopoAcesso) {
+    garantirUnidade(escopo, dto.unidadeId);
     const especieSilvestre = await this.obterEspecieSilvestre(dto.especieId);
     this.garantirRegrasAdmissao({
       frente: dto.frente,
@@ -88,7 +94,7 @@ export class AnimalsService {
       porte: dto.porte,
     });
     if (dto.microchip) await this.garantirMicrochipDisponivel(dto.microchip);
-    await this.garantirFotoConfirmada(dto.fotoEntradaId);
+    await this.garantirFotoConfirmada(dto.fotoEntradaId, escopo);
 
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
@@ -128,16 +134,17 @@ export class AnimalsService {
     }
   }
 
-  async buscarPorId(id: string) {
+  async buscarPorId(id: string, escopo: EscopoAcesso) {
     const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
       include: INCLUSAO_ANIMAL,
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, animal.unitId);
     return this.mapearComFoto(animal);
   }
 
-  async atualizar(id: string, dto: AtualizarAnimalDto) {
+  async atualizar(id: string, dto: AtualizarAnimalDto, escopo: EscopoAcesso) {
     const { versao, ...dados } = dto;
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
@@ -148,6 +155,9 @@ export class AnimalsService {
       include: { species: true },
     });
     if (!existente) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, existente.unitId);
+    // Transferir para outra unidade exige acesso também à unidade de destino.
+    if (dados.unidadeId !== undefined) garantirUnidade(escopo, dados.unidadeId);
     if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
 
     // As regras valem para o estado final: numa transferência CED → CasAdote, por exemplo,
@@ -171,7 +181,7 @@ export class AnimalsService {
       await this.garantirMicrochipDisponivel(dados.microchip, id);
     }
     if (dados.fotoEntradaId !== undefined) {
-      await this.garantirFotoConfirmada(dados.fotoEntradaId);
+      await this.garantirFotoConfirmada(dados.fotoEntradaId, escopo);
     }
 
     try {
@@ -203,16 +213,29 @@ export class AnimalsService {
       // Outra edição venceu entre a leitura acima e esta escrita.
       if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
 
-      return this.buscarPorId(id);
+      return this.buscarPorId(id, escopo);
     } catch (erro) {
-      if (erro instanceof NotFoundException || erro instanceof ConflictException) throw erro;
+      if (
+        erro instanceof NotFoundException ||
+        erro instanceof ConflictException ||
+        erro instanceof ForbiddenException
+      ) {
+        throw erro;
+      }
       this.tratarErroPrisma(erro);
     }
   }
 
-  async arquivar(id: string) {
-    const resultado = await this.prisma.animal.updateMany({
+  async arquivar(id: string, escopo: EscopoAcesso) {
+    const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
+      select: { unitId: true },
+    });
+    if (!animal) throw new NotFoundException('Animal não encontrado');
+    garantirUnidade(escopo, animal.unitId);
+
+    const resultado = await this.prisma.animal.updateMany({
+      where: { id, deletedAt: null, ...filtroPorUnidade(escopo) },
       data: { deletedAt: new Date() },
     });
     if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
@@ -257,9 +280,13 @@ export class AnimalsService {
     }
   }
 
-  private async garantirFotoConfirmada(fotoEntradaId: string) {
+  private async garantirFotoConfirmada(fotoEntradaId: string, escopo: EscopoAcesso) {
     const foto = await this.prisma.foto.findUnique({ where: { id: fotoEntradaId } });
     if (!foto) throw new BadRequestException('Foto não encontrada');
+    // Só quem enviou a foto (ou um admin) pode vinculá-la a uma ficha.
+    if (foto.criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {
+      throw new ForbiddenException('Foto enviada por outro usuário');
+    }
     if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
       throw new BadRequestException('Foto ainda não confirmada');
     }

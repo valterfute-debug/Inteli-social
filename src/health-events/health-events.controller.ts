@@ -11,6 +11,8 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { EscopoAtual } from '../auth/decoradores';
+import { EscopoAcesso } from '../auth/escopo';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
 import { ListarEventosSaudeQueryDto } from './dto/listar-eventos-saude-query.dto';
 import { HealthEventsService } from './health-events.service';
@@ -25,15 +27,20 @@ export class HealthEventsController {
   listar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Query() query: ListarEventosSaudeQueryDto,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    return this.healthEventsService.listar(animalId, query);
+    return this.healthEventsService.listar(animalId, query, escopo);
   }
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Registrar evento de saúde (vacina, vermífugo ou castração)' })
-  criar(@Param('animalId', ParseUUIDPipe) animalId: string, @Body() dto: CriarEventoSaudeDto) {
-    return this.healthEventsService.criar(animalId, dto);
+  criar(
+    @Param('animalId', ParseUUIDPipe) animalId: string,
+    @Body() dto: CriarEventoSaudeDto,
+    @EscopoAtual() escopo: EscopoAcesso,
+  ) {
+    return this.healthEventsService.criar(animalId, dto, escopo);
   }
 
   @Delete(':id')
@@ -42,7 +49,8 @@ export class HealthEventsController {
   arquivar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Param('id', ParseUUIDPipe) id: string,
+    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    return this.healthEventsService.arquivar(animalId, id);
+    return this.healthEventsService.arquivar(animalId, id, escopo);
   }
 }
