@@ -7,9 +7,9 @@ services:
     plan: free
     region: oregon
     # Migrations e seed são idempotentes: só aplicam o que falta.
-    buildCommand: npm ci && npm run prisma:generate && npm run prisma:migrate:deploy && npm run build && npm run db:seed:prod
+    buildCommand: npm ci --include=dev && npm run prisma:generate && npm run prisma:migrate:deploy && npm run build && npm run db:seed:prod
     startCommand: npm run start
-    healthCheckPath: /api/health
+    healthCheckPath: /api/health/ready
     envVars:
       - key: NODE_ENV
         value: production
