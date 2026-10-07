@@ -28,7 +28,7 @@ jobs:
   # Ponta a ponta com PostgreSQL descartável: aplica as migrations do zero e testa
   # login, escopo por unidade e demais regras com requisições HTTP reais.
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
@@ -54,4 +54,6 @@ jobs:
       - name: Simular roles de acesso direto do Supabase
         run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE ROLE anon NOLOGIN; CREATE ROLE authenticated NOLOGIN;'
       - run: npm run prisma:migrate:deploy
+      - name: Preparar PostgreSQL nativo para restore isolado de backup
+        run: sudo apt-get update -qq && sudo apt-get install -y postgresql-16
       - run: npm run test:e2e

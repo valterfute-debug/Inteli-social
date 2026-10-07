@@ -1,6 +1,6 @@
 # WAD — Web Application Document
 
-> Este documento registra o estado real do backend ao fim da Sprint 3 (encerramento do Ciclo 1). Admissão com foto e regras por frente, busca/listagem, catálogos com seed, hardening e configuração de produção estão implementados e testados. A publicação em produção, a autenticação e a revisão do painel Supabase dependem de decisões e evidências externas (ver [seção 7.5](#75-sprint-3--busca-hardening-e-publicação)). As seções históricas abaixo descrevem a fundação da Sprint 1; em caso de divergência, prevalece a seção 7.5.
+> Atualização de 7 de outubro de 2026: a API foi publicada na conta institucional do Render e integrada ao frontend na Vercel, com login Supabase e autorização por unidade. A admissão com foto, busca e logout foram verificados com dados sintéticos nos serviços reais. Isso não representa aceite da Ampara nem comprova operação offline em aparelhos físicos ou recuperação completa do Supabase. As seções de sprints preservam o histórico; o estado mais recente está na seção 7.6.
 
 ## Instituto Ampara Animal — Inteli Social
 
@@ -8,7 +8,7 @@
 **Parceiro:** Instituto Ampara Animal  
 **Iniciativa:** Inteli Social  
 **Estágio documentado:** backend ao fim da Sprint 3 do Ciclo 1  
-**Data da revisão:** 6 de outubro de 2026  
+**Data da revisão:** 7 de outubro de 2026<br>
 **Equipe e orientação:** identificação dos integrantes e do orientador a completar pela equipe.
 
 O conteúdo descreve o projeto Ampara Animal, com base no TAPI, nas anotações de reunião e nos arquivos do repositório. Não transfere integrantes, imagens, resultados de testes ou funcionalidades do projeto de referência.
@@ -166,24 +166,24 @@ A autorização de assistentes para atualizar saúde foi mencionada na reunião.
 
 ## 3.1. Requisitos, regras e rastreabilidade
 
-| ID   | Requisito/regra                                | Estado real                                                | Evidência ou pendência                                                     |
-| ---- | ---------------------------------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- |
-| RF01 | Cadastro animal                                | Implementado (Sprint 2)                                    | POST /api/v1/animals; AnimalsService                                       |
-| RF02 | Foto obrigatória na entrada                    | Implementado (Sprints 2 e 3)                               | Upload por URL assinada; confirmação confere o arquivo real; URL de leitura na ficha |
-| RF03 | Consulta com filtros                           | Implementado (Sprint 3)                                    | GET /api/v1/animals: busca livre, nome, identificador, microchip, espécie, frente, unidade |
-| RF04 | Microchip                                      | Implementado (Sprint 3)                                    | Só dígitos; obrigatório em CCPA/CED; único entre animais ativos (409)      |
-| RF05 | Atualização e arquivamento                     | Implementado (Sprint 2)                                    | PATCH com versão (409) e DELETE lógico                                     |
-| RF06 | Catálogos operacionais                         | Implementado (Sprint 3)                                    | GET de catálogos, POST /responsibles e seed idempotente                    |
-| RF07 | Offline                                        | Planejado                                                  | Não existe armazenamento local, fila ou sincronização                      |
-| RF08 | Disponibilidade da API                         | Implementado                                               | GET /api/health                                                            |
-| RN01 | Raça deve corresponder à espécie               | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(breedId, speciesId)` referencia `Breed(id, speciesId)` |
-| RN02 | Localização deve pertencer à unidade do animal | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(locationId, unitId)` referencia `Location(id, unitId)` |
-| RN03 | Repetições não podem duplicar cadastro         | Parcial                                                    | Microchip único entre ativos; foto vinculada a um só animal               |
-| RN04 | Conflitos devem ser detectados                 | Implementado                                               | version checada e incrementada; 409 em versão desatualizada               |
-| RN05 | Ficha concluída exige foto                     | Implementado                                               | fotoEntradaId obrigatório e foto CONFIRMADA                                |
-| RN06 | CCPA e CED exigem microchip, sexo, idade, peso e porte | Implementado (Sprint 3)                            | src/animals/regras-admissao.ts, avaliado no estado final (também no PATCH) |
-| RN07 | CasAdote não repete exigências                 | Implementado (Sprint 3)                                    | Animal chega de CCPA/CED com o mesmo microchip: transferência via PATCH   |
-| RN08 | Silvestre é identificado por nome              | Implementado (Sprint 3)                                    | Species.silvestre; nome obrigatório, demais campos dispensados            |
+| ID   | Requisito/regra                                        | Estado real                                                | Evidência ou pendência                                                                     |
+| ---- | ------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| RF01 | Cadastro animal                                        | Implementado (Sprint 2)                                    | POST /api/v1/animals; AnimalsService                                                       |
+| RF02 | Foto obrigatória na entrada                            | Implementado (Sprints 2 e 3)                               | Upload por URL assinada; confirmação confere o arquivo real; URL de leitura na ficha       |
+| RF03 | Consulta com filtros                                   | Implementado (Sprint 3)                                    | GET /api/v1/animals: busca livre, nome, identificador, microchip, espécie, frente, unidade |
+| RF04 | Microchip                                              | Implementado (Sprint 3)                                    | Só dígitos; obrigatório em CCPA/CED; único entre animais ativos (409)                      |
+| RF05 | Atualização e arquivamento                             | Implementado (Sprint 2)                                    | PATCH com versão (409) e DELETE lógico                                                     |
+| RF06 | Catálogos operacionais                                 | Implementado (Sprint 3)                                    | GET de catálogos, POST /responsibles e seed idempotente                                    |
+| RF07 | Offline                                                | Planejado                                                  | Não existe armazenamento local, fila ou sincronização                                      |
+| RF08 | Disponibilidade da API                                 | Implementado                                               | GET /api/health                                                                            |
+| RN01 | Raça deve corresponder à espécie                       | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(breedId, speciesId)` referencia `Breed(id, speciesId)`                 |
+| RN02 | Localização deve pertencer à unidade do animal         | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(locationId, unitId)` referencia `Location(id, unitId)`                 |
+| RN03 | Repetições não podem duplicar cadastro                 | Parcial                                                    | Microchip único entre ativos; foto vinculada a um só animal                                |
+| RN04 | Conflitos devem ser detectados                         | Implementado                                               | version checada e incrementada; 409 em versão desatualizada                                |
+| RN05 | Ficha concluída exige foto                             | Implementado                                               | fotoEntradaId obrigatório e foto CONFIRMADA                                                |
+| RN06 | CCPA e CED exigem microchip, sexo, idade, peso e porte | Implementado (Sprint 3)                                    | src/animals/regras-admissao.ts, avaliado no estado final (também no PATCH)                 |
+| RN07 | CasAdote não repete exigências                         | Implementado (Sprint 3)                                    | Animal chega de CCPA/CED com o mesmo microchip: transferência via PATCH                    |
+| RN08 | Silvestre é identificado por nome                      | Implementado (Sprint 3)                                    | Species.silvestre; nome obrigatório, demais campos dispensados                             |
 
 ### 3.1.1. Obrigatoriedade e incertezas
 
@@ -415,10 +415,12 @@ Política (provisória, a aprovar com a Ampara): eventos retidos por **5 anos** 
 
 **Backup e restauração (issue #3, P0-6):**
 
-- `npm run backup -- --destino <pasta>` gera `banco.dump` (pg_dump, formato custom, schema public), copia todas as fotos do bucket e grava um `manifesto.json` com o hash SHA-256 de cada arquivo. Só lê da origem. Precisa do `pg_dump` (variável `PG_DUMP` se não estiver no PATH). A pasta `backups/` é ignorada pelo Git: o backup contém dados pessoais e deve ficar em armazenamento com acesso restrito.
-- `npm run backup:verificar -- --backup <pasta> --destino postgresql://...@localhost/<banco descartável>` restaura num banco local e confere contagens e se cada ficha aponta para uma foto existente no backup, com o mesmo hash. Recusa destino fora de localhost.
-- Registro de 2026-10-07: backup do Supabase de desenvolvimento restaurado com sucesso num PostgreSQL 18 local (banco vazio). Em seguida, um backup do banco de testes com uma ficha cujo arquivo não existia: o verificador apontou `AM-2026-CF8EC78F: arquivo ... ausente no backup`, como esperado.
-- Pendente com a Ampara: frequência (proposta: diária, com retenção de 30 dias), RPO (até 24 h de perda) e RTO (até 4 h para voltar), responsável pela execução e local seguro dos backups. O Supabase gratuito tem backup diário do banco, mas **não** das fotos: por isso o script cobre os dois. Repetir o teste de restauração a cada trimestre e antes de toda migration de risco.
+- `npm run backup -- --destino <pasta vazia>` gera `banco.dump` custom com `public` e `auth` no mesmo snapshot PostgreSQL. Inclui identidades e hashes de senha do Auth, catálogos, vínculos UUID dos usuários, fichas, auditoria e tarefas duráveis de remoção; copia os objetos do bucket. O manifesto v2 registra contagens por tabela, hash dos usuários Auth, tamanho/SHA-256 do dump e de cada arquivo, metadados do bucket, roles sem senhas e extensões. A origem é somente leitura. `--anterior <pasta>` reaproveita cópias verificadas de objetos inalterados e reduz downloads do Storage; mudança concorrente detectada faz o backup falhar, sem publicar pacote incompleto.
+- Use `DIRECT_URL` (ou `DATABASE_URL` em session pooler), `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` apenas no ambiente protegido. As ferramentas PostgreSQL recebem credenciais por variáveis `PG*`, não por argumentos; erros/logs exibem somente mensagens fixas e totais. Os caminhos das fotos e dados pessoais ficam dentro do pacote. A pasta `backups/` é ignorada pelo Git; nunca envie dump, manifesto ou fotos sem criptografia e nunca grave a chave no mesmo destino do backup.
+- Para verificar: crie banco local novo `ampara_restore_<16 caracteres hexadecimais>`, defina `RESTORE_DATABASE_URL` no ambiente e execute `npm run backup:verificar -- --backup <pasta>`. O verificador recusa host remoto, nome fora do padrão e qualquer banco com objetos existentes; não usa `--clean`. Confere hashes antes de restaurar, usa `pg_restore --exit-on-error --single-transaction` e valida contagens, FKs, identidade/Auth e fotos referenciadas. Roles necessárias a políticas são criadas como `NOLOGIN`, sem privilégios originais; extensões locais suportadas são `pgcrypto`, `uuid-ossp` e `citext`. Dependências gerenciadas incompatíveis causam falha explícita, não aprovação parcial.
+- O teste local PostgreSQL não comprova login no Supabase, reenvio dos arquivos ao Storage, configuração do Auth (SMTP, OAuth, URL de redirecionamento), chaves JWT, políticas/grants de produção, Edge Functions ou recuperação completa do projeto. Esse aceite exige ambiente Supabase separado, guia oficial e validação operacional por responsável autorizado. Backups antigos de schema `public` não contêm Auth e não são aceitos como pacote completo v2.
+- Registro legado de 2026-10-07: a versão anterior de backup, limitada ao schema `public`, foi restaurada em PostgreSQL 18 local e rejeitou uma ficha sem seu arquivo de foto. Essa evidência não valida Auth nem o novo pacote v2 e não comprova recuperação completa Supabase.
+- No plano Free, não há garantia de backup diário acessível para recuperação pelo cliente. A orientação oficial é exportar e manter cópia externa; backups do banco não incluem os bytes das fotos ([Supabase Backups](https://supabase.com/docs/guides/platform/backups)). O workflow preparado no repositório **privado** do frontend propõe backup diário AES-256-GCM, retenção de 7 dias, teto de 60 MiB por pacote e restore PostgreSQL semanal. É preparado, não ativado ou homologado. Sete pacotes de tamanho máximo podem ocupar 420 MiB antes de overhead, concorrendo com demais artefatos/quotas da conta; sem confirmação de saldo, a rotina recusa publicação. Frequência, custódia da chave, destino permanente, RPO/RTO e orçamento dependem de aprovação da Ampara. Ao ultrapassar o teto, revisar destino/retenção, sem habilitar cobrança automática.
 
 **Busca com volume (issue #3, P1-2):** medida com 20 mil animais sintéticos num PostgreSQL local (30 execuções por cenário, página de 20 + contagem total): sem filtro p95 34 ms; busca por nome 26 ms; por identificador 18 ms; por microchip 20 ms; frente + unidade 13 ms; página 500 (offset 9.980) 59 ms. Todos bem abaixo da meta proposta (p95 de 300 ms na API, contando a rede até o Supabase). Ordenação estável (`createdAt desc, id`) evita repetir ou pular itens entre páginas. Decisão: manter `skip/take` e os índices atuais; reavaliar cursor e índice trigram (`pg_trgm`) se o volume passar de ~100 mil animais ou o p95 real passar da meta.
 
@@ -487,18 +489,18 @@ db:check requer conexão real; start requer build prévio e ambiente configurado
 
 Existe uma suíte com um teste unitário de HealthController, que confere status igual a ok. Esse teste não abre uma conexão HTTP nem valida banco, autenticação ou regras de domínio.
 
-| Verificação               | Evidência disponível                                                      |
-| ------------------------- | ------------------------------------------------------------------------- |
-| Lint, tipos e build       | Aprovação registrada na sessão anterior                                   |
-| Prisma validate           | Schema aprovado na sessão anterior                                        |
-| Testes automatizados      | Uma suíte e um teste aprovados anteriormente                              |
-| db:check                  | Consulta PostgreSQL bem-sucedida anteriormente                            |
-| Migrations                | Três aplicadas em ambiente remoto (confirmado em 2026-09-23)              |
-| Contrato OpenAPI completo | Implementado e validado localmente                                        |
-| HTTP automatizado         | Implementado e validado localmente                                        |
-| Integridade cruzada       | Migration aplicada e validada funcionalmente em 2026-09-23                |
-| Cobertura percentual      | Sem medição apresentada neste documento                                   |
-| Carga e offline           | Não implementados/testados                                                |
+| Verificação               | Evidência disponível                                         |
+| ------------------------- | ------------------------------------------------------------ |
+| Lint, tipos e build       | Aprovação registrada na sessão anterior                      |
+| Prisma validate           | Schema aprovado na sessão anterior                           |
+| Testes automatizados      | Uma suíte e um teste aprovados anteriormente                 |
+| db:check                  | Consulta PostgreSQL bem-sucedida anteriormente               |
+| Migrations                | Três aplicadas em ambiente remoto (confirmado em 2026-09-23) |
+| Contrato OpenAPI completo | Implementado e validado localmente                           |
+| HTTP automatizado         | Implementado e validado localmente                           |
+| Integridade cruzada       | Migration aplicada e validada funcionalmente em 2026-09-23   |
+| Cobertura percentual      | Sem medição apresentada neste documento                      |
+| Carga e offline           | Não implementados/testados                                   |
 
 As verificações locais são repetidas na revisão de cada alteração; operações remotas permanecem fora deste repositório.
 
@@ -553,22 +555,22 @@ O projeto estabeleceu a base do backend e persistência no Supabase, com modelo 
 
 ## 7.2. Checklist da Sprint 1
 
-| Entrega                                      | Situação                                                                     |
-| -------------------------------------------- | ---------------------------------------------------------------------------- |
-| Base NestJS e configuração                   | Implementada                                                                 |
+| Entrega                                      | Situação                                                                                           |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Base NestJS e configuração                   | Implementada                                                                                       |
 | Modelo e migrations                          | Implementados; as três migrations, incluindo a de integridade cruzada, estão aplicadas em produção |
-| Conexão Supabase de desenvolvimento          | Verificada anteriormente                                                     |
-| Health e Swagger básico                      | Implementados                                                                |
-| Filtro global de erros                       | Implementado e coberto pelos testes HTTP da base                             |
-| Contrato OpenAPI                             | Implementado e validado; aprovação com Ampara/frontend pendente              |
-| CI                                           | Implementado com variáveis fictícias; execução remota pendente               |
-| .env.example                                 | Implementado                                                                 |
-| Teste HTTP automatizado                      | Implementado                                                                 |
-| Integridade cruzada de relações              | Aplicada em produção e validada funcionalmente (2026-09-23)                  |
-| Revisão de segurança Supabase                | Pendente                                                                     |
-| Documentação e coerência dos artefatos       | Atualizada nesta revisão                                                     |
-| Ambientes de homologação e publicação da API | Provedor (Render) e `render.yaml` prontos; falta criar a conta e publicar    |
-| Identificação da equipe e orientação         | Pendente de confirmação institucional                                        |
+| Conexão Supabase de desenvolvimento          | Verificada anteriormente                                                                           |
+| Health e Swagger básico                      | Implementados                                                                                      |
+| Filtro global de erros                       | Implementado e coberto pelos testes HTTP da base                                                   |
+| Contrato OpenAPI                             | Implementado e validado; aprovação com Ampara/frontend pendente                                    |
+| CI                                           | Implementado com variáveis fictícias; execução remota pendente                                     |
+| .env.example                                 | Implementado                                                                                       |
+| Teste HTTP automatizado                      | Implementado                                                                                       |
+| Integridade cruzada de relações              | Aplicada em produção e validada funcionalmente (2026-09-23)                                        |
+| Revisão de segurança Supabase                | Pendente                                                                                           |
+| Documentação e coerência dos artefatos       | Atualizada nesta revisão                                                                           |
+| Ambientes de homologação e publicação da API | Provedor (Render) e `render.yaml` prontos; falta criar a conta e publicar                          |
+| Identificação da equipe e orientação         | Pendente de confirmação institucional                                                              |
 
 ## 7.3. Próximos passos priorizados
 
@@ -593,19 +595,19 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 
 ### Entregas do backend
 
-| Entrega | Implementação | Evidência |
-| --- | --- | --- |
-| Busca e listagem | `busca` (nome contém, identificador contém, microchip começa com) e filtros por nome, identificador, microchip, espécie, frente e unidade; ordenação estável; texto vazio ignorado | Testes unitários e cenário ponta a ponta |
-| Ficha pronta para exibição | Respostas trazem `especieNome`, `especieSilvestre`, `unidadeNome`, `localizacaoNome` e `fotoEntradaUrl` (URL assinada, 1 h, gerada em lote por página) | `animal.mapper.ts`, `SupabaseStorageService.criarUrlsLeitura` |
-| Regras por frente (pendência da Sprint 2) | `validarRegrasAdmissao` aplicada no POST e no estado final do PATCH | `regras-admissao.spec.ts` |
-| Microchip único | 409 com `detalhes.animalExistenteId` para o frontend oferecer a transferência; animal arquivado libera o número (readmissão) | `animals.service.spec.ts` |
-| Responsáveis | `POST /api/v1/responsibles` (antes não havia como cadastrar tutor) | `catalogos.service.spec.ts` |
-| Seed de catálogos | `npm run db:seed` / `db:seed:prod`; idempotente, roda no build do Render | `seed.spec.ts`; executado 3 vezes sem duplicar |
-| Migration | `20261006120000_especie_silvestre_e_indice_microchip` (aditiva) | Aplicada do zero com as anteriores; diff schema × banco vazio |
-| Hardening: fotos | Foto confirmada não pode ser reescrita (409); confirmação confere tamanho e tipo reais e remove arquivo inválido | `fotos.service.spec.ts` |
-| Hardening: HTTP | Helmet, CORS restrito a `CORS_ORIGINS` (fechado em produção se ausente), rate limit por IP (120/min, `trust proxy`), Swagger desligado em produção, limites nos campos (ex.: `pesoKg` ≤ 9999,99 evita erro 500 do `Decimal(6,2)`) | `test/saude-http.spec.ts` |
-| Hardening: operação | Erros 5xx registrados em log (antes eram silenciados), `GET /api/health/ready` testa o banco, encerramento gracioso, variáveis Supabase obrigatórias em produção | Inicialização em produção sem Supabase recusada |
-| Publicação | `render.yaml` com todas as variáveis; `npm run smoke -- <url>` valida a API publicada | Smoke test aprovado localmente |
+| Entrega                                   | Implementação                                                                                                                                                                                                                     | Evidência                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| Busca e listagem                          | `busca` (nome contém, identificador contém, microchip começa com) e filtros por nome, identificador, microchip, espécie, frente e unidade; ordenação estável; texto vazio ignorado                                                | Testes unitários e cenário ponta a ponta                      |
+| Ficha pronta para exibição                | Respostas trazem `especieNome`, `especieSilvestre`, `unidadeNome`, `localizacaoNome` e `fotoEntradaUrl` (URL assinada, 1 h, gerada em lote por página)                                                                            | `animal.mapper.ts`, `SupabaseStorageService.criarUrlsLeitura` |
+| Regras por frente (pendência da Sprint 2) | `validarRegrasAdmissao` aplicada no POST e no estado final do PATCH                                                                                                                                                               | `regras-admissao.spec.ts`                                     |
+| Microchip único                           | 409 com `detalhes.animalExistenteId` para o frontend oferecer a transferência; animal arquivado libera o número (readmissão)                                                                                                      | `animals.service.spec.ts`                                     |
+| Responsáveis                              | `POST /api/v1/responsibles` (antes não havia como cadastrar tutor)                                                                                                                                                                | `catalogos.service.spec.ts`                                   |
+| Seed de catálogos                         | `npm run db:seed` / `db:seed:prod`; idempotente, roda no build do Render                                                                                                                                                          | `seed.spec.ts`; executado 3 vezes sem duplicar                |
+| Migration                                 | `20261006120000_especie_silvestre_e_indice_microchip` (aditiva)                                                                                                                                                                   | Aplicada do zero com as anteriores; diff schema × banco vazio |
+| Hardening: fotos                          | Foto confirmada não pode ser reescrita (409); confirmação confere tamanho e tipo reais e remove arquivo inválido                                                                                                                  | `fotos.service.spec.ts`                                       |
+| Hardening: HTTP                           | Helmet, CORS restrito a `CORS_ORIGINS` (fechado em produção se ausente), rate limit por IP (120/min, `trust proxy`), Swagger desligado em produção, limites nos campos (ex.: `pesoKg` ≤ 9999,99 evita erro 500 do `Decimal(6,2)`) | `test/saude-http.spec.ts`                                     |
+| Hardening: operação                       | Erros 5xx registrados em log (antes eram silenciados), `GET /api/health/ready` testa o banco, encerramento gracioso, variáveis Supabase obrigatórias em produção                                                                  | Inicialização em produção sem Supabase recusada               |
+| Publicação                                | `render.yaml` com todas as variáveis; `npm run smoke -- <url>` valida a API publicada                                                                                                                                             | Smoke test aprovado localmente                                |
 
 ### Verificação
 
@@ -614,14 +616,14 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 
 ### Pendências que dependem da equipe ou da Ampara
 
-| Pendência | Situação |
-| --- | --- |
-| Autenticação | Implementada (Supabase Auth, JWT validado no backend). O frontend precisa da tela de login e de enviar o token em toda requisição |
-| Autorização por perfil/unidade | Implementada com papéis **provisórios** (ADMIN/OPERADOR). A Ampara precisa aprovar os perfis e quem vê o quê; ajustar só muda as regras, não a estrutura |
-| Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados |
-| Lista de espécies, unidades e localizações | Seed inicial derivado do TAPI; revisar com a Ampara |
-| Primeiros usuários | Ampara deve indicar o grupo piloto |
-| Revisão RLS/Data API no Supabase | Pendente (ver [segurança](#seguranca)) |
+| Pendência                                   | Situação                                                                                                                                                 |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Autenticação                                | Implementada (Supabase Auth, JWT validado no backend). O frontend precisa da tela de login e de enviar o token em toda requisição                        |
+| Autorização por perfil/unidade              | Implementada com papéis **provisórios** (ADMIN/OPERADOR). A Ampara precisa aprovar os perfis e quem vê o quê; ajustar só muda as regras, não a estrutura |
+| Conta Render e projeto Supabase de produção | A confirmar; homologação e produção devem usar projetos separados                                                                                        |
+| Lista de espécies, unidades e localizações  | Seed inicial derivado do TAPI; revisar com a Ampara                                                                                                      |
+| Primeiros usuários                          | Ampara deve indicar o grupo piloto                                                                                                                       |
+| Revisão RLS/Data API no Supabase            | Pendente (ver [segurança](#seguranca))                                                                                                                   |
 
 ### Publicação em produção (passo a passo)
 
@@ -629,6 +631,19 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 2. No Render, **New → Blueprint** com este repositório; preencher `DATABASE_URL`, `DIRECT_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` e `CORS_ORIGINS` (URL do frontend publicado).
 3. O build aplica migrations e seed automaticamente.
 4. Validar com `npm run smoke -- https://<servico>.onrender.com`.
+
+## 7.6. Integração publicada e limites verificados (7 de outubro de 2026)
+
+Estado técnico atual, separado do histórico de sprints e do aceite institucional:
+
+- Backend `e7967aa113fe56187a2fdbcc6190a2d9bae21819`, após merge dos PRs 2, 4 e 5. [CI main 37633970569](https://github.com/valterfute-debug/Inteli-social/actions/runs/37633970569) aprovado: 130 testes unitários e 46 E2E com PostgreSQL. Render institucional, plano Free, deploy `dep-db35a74s728c73bd57ug` live. `/api/health/ready` retornou 200 com banco disponível e bucket privado; `/api/v1/me` e `/api/v1/animals` sem token retornaram 401.
+- [Frontend institucional](https://ampara-animal-frontend-intelisocial-8691.vercel.app/) integrado por BFF same-origin, login com e-mail e senha e cookie HttpOnly/Secure/SameSite=Strict. O token Supabase é encaminhado somente pelo servidor. ADMIN institucional provisionado com autorização explícita. O frontend trata a fila por identidade, sem atribuir dados legados anônimos a outra conta automaticamente.
+- Teste sintético nos serviços reais: 19 verificações de login sem liberação (403), usuário OPERADOR restrito a uma unidade, catálogos, solicitação/upload/confirmação de foto com replay, admissão com replay sem duplicar, leitura assinada com bytes conferidos, busca/ficha, reabertura HTTP e logout. Frontend testado `e98b4b6239dfffbb9f7ed3867f5aebe24f738af6`, deploy `dpl_HSvwLmFfZjhKJR3NtX2vhxxAbKRY`. Conta, ficha e arquivo sintéticos removidos após o teste; registros imutáveis de auditoria preservados.
+- Limites atuais do contrato: link de upload de 2 horas, link de leitura de 15 minutos, confirmação pendente expirada rejeitada antes de alterações. Replay de foto já confirmada continua válido. Readiness verifica banco e privacidade do bucket, além do liveness separado.
+- Migration aditiva de RLS/revogação do acesso direto aplicada às tabelas de domínio e migrations, com revisão da role existente da API. Isso não equivale a aprovação institucional das permissões ADMIN/OPERADOR nem a auditoria integral do projeto Supabase.
+- Não verificados nesta evidência: IndexedDB e sincronização no navegador com conectividade interrompida, aparelhos iOS/Android físicos, usabilidade com assistentes, aceite de catálogo/perfis, recuperação completa do projeto Supabase e adequação permanente dos planos gratuitos. Render Free pode suspender por inatividade. Backup automático permanece preparado e desativado; não deve ser anunciado como operação diária ativa.
+
+As correções adicionais de backup v2 exigem CI PostgreSQL do seu próprio SHA antes de merge. Uma restauração local de dump não comprova login no Auth gerenciado nem recuperação do Storage; esses critérios continuam separados.
 
 # 8. Referências e fontes
 

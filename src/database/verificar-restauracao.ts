@@ -1,92 +1,104 @@
-import { execFileSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync, readFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { PrismaClient } from '@prisma/client';
+import {
+  executarPg,
+  filtrarTocRestore,
+  identificadorSQL,
+  validarDestinoRestore,
+  validarManifesto,
+  verificarArquivos,
+  verificarBancoRestaurado,
+  verificarDestinoVazio,
+} from './backup-core';
 
-/**
- * Restaura um backup num banco ISOLADO (só localhost) e confere a integridade:
- * contagens, FKs, e se cada ficha aponta para uma foto cujo arquivo existe no backup
- * com o mesmo hash do manifesto.
- *
- *   npm run backup:verificar -- --backup ./backups/<pasta> --destino postgresql://postgres@localhost:5432/restauracao
- */
+/** RESTORE_DATABASE_URL must name a newly created localhost ampara_restore_<16 hex> database. Never clean an existing database. */
 async function executar() {
-  const { values } = parseArgs({
-    options: { backup: { type: 'string' }, destino: { type: 'string' } },
-  });
-  if (!values.backup || !values.destino) throw new Error('Informe --backup e --destino');
-  if (!['localhost', '127.0.0.1'].includes(new URL(values.destino).hostname)) {
-    throw new Error('--destino precisa ser um banco local e descartável (localhost)');
-  }
-
-  execFileSync(
-    process.env.PG_RESTORE ?? 'pg_restore',
-    [
-      '--clean',
-      '--if-exists',
-      '--no-owner',
-      '--no-privileges',
-      `--dbname=${values.destino}`,
-      join(values.backup, 'banco.dump'),
-    ],
-    { stdio: 'inherit' },
+  const { values } = parseArgs({ options: { backup: { type: 'string' } } });
+  const conexao = process.env.RESTORE_DATABASE_URL;
+  if (!values.backup || !conexao) throw new Error('Informe --backup e RESTORE_DATABASE_URL local');
+  const nomeBanco = validarDestinoRestore(conexao);
+  const manifesto = validarManifesto(
+    JSON.parse(readFileSync(join(values.backup, 'manifesto.json'), 'utf8')),
   );
-
-  const manifesto = JSON.parse(readFileSync(join(values.backup, 'manifesto.json'), 'utf8')) as {
-    fotos: Record<string, string>;
-  };
-  const prisma = new PrismaClient({ datasources: { db: { url: values.destino } } });
+  verificarArquivos(values.backup, manifesto);
+  const prisma = new PrismaClient({ datasources: { db: { url: conexao } }, log: [] });
   try {
-    const [animais, fotos, eventos, auditoria] = await Promise.all([
-      prisma.animal.count(),
-      prisma.foto.count(),
-      prisma.healthEvent.count(),
-      prisma.eventoAuditoria.count().catch(() => 0),
-    ]);
-    const fichas = await prisma.animal.findMany({
-      where: { fotoEntradaId: { not: null } },
-      select: { publicId: true, fotoEntrada: { select: { caminhoArmazenamento: true } } },
-    });
-    const problemas: string[] = [];
-    for (const ficha of fichas) {
-      const caminho = ficha.fotoEntrada?.caminhoArmazenamento;
-      if (!caminho) {
-        problemas.push(`${ficha.publicId}: foto referenciada não existe no banco restaurado`);
-        continue;
-      }
-      const arquivo = join(values.backup, 'storage', caminho);
-      if (!existsSync(arquivo)) {
-        problemas.push(`${ficha.publicId}: arquivo ${caminho} ausente no backup`);
-      } else if (
-        createHash('sha256').update(readFileSync(arquivo)).digest('hex') !==
-        manifesto.fotos[caminho]
-      ) {
-        problemas.push(`${ficha.publicId}: arquivo ${caminho} diferente do manifesto`);
-      }
+    await verificarDestinoVazio(prisma);
+    for (const role of manifesto.rolesPoliticas) {
+      if (
+        typeof role !== 'string' ||
+        role.length > 63 ||
+        [...role].some((c) => c.charCodeAt(0) < 32)
+      )
+        throw new Error('Role de política inválido');
+      const existentes = await prisma.$queryRaw<
+        Array<{ existe: boolean }>
+      >`SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=${role}) AS existe`;
+      if (!existentes[0].existe)
+        await prisma.$executeRawUnsafe(
+          `CREATE ROLE ${identificadorSQL(role)} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS`,
+        );
     }
+    for (const extensao of manifesto.extensoes.filter((e) =>
+      ['pgcrypto', 'uuid-ossp', 'citext'].includes(e.nome),
+    )) {
+      if (!['public', 'extensions'].includes(extensao.esquema))
+        throw new Error('Schema de extensão não suportado no teste local');
+      await prisma.$executeRawUnsafe(
+        `CREATE SCHEMA IF NOT EXISTS ${identificadorSQL(extensao.esquema)}`,
+      );
+      await prisma.$executeRawUnsafe(
+        `CREATE EXTENSION IF NOT EXISTS ${identificadorSQL(extensao.nome)} WITH SCHEMA ${identificadorSQL(extensao.esquema)}`,
+      );
+    }
+    const lista = executarPg(
+      process.env.PG_RESTORE ?? 'pg_restore',
+      ['--list', join(values.backup, 'banco.dump')],
+      conexao,
+    ).toString('utf8');
+    const temporaria = mkdtempSync(join(tmpdir(), 'ampara-restore-toc-'));
+    const selecao = join(temporaria, 'selecao.list');
+    writeFileSync(selecao, filtrarTocRestore(lista), { mode: 0o600 });
+    try {
+      executarPg(
+        process.env.PG_RESTORE ?? 'pg_restore',
+        [
+          '--exit-on-error',
+          '--single-transaction',
+          '--no-owner',
+          '--no-privileges',
+          `--use-list=${selecao}`,
+          `--dbname=${nomeBanco}`,
+          join(values.backup, 'banco.dump'),
+        ],
+        conexao,
+      );
+    } finally {
+      // Remove only the exact temporary TOC file and its now-empty directory.
+      unlinkSync(selecao);
+      rmdirSync(temporaria);
+    }
+    await verificarBancoRestaurado(prisma, manifesto);
     console.log(
-      JSON.stringify(
-        {
-          animais,
-          fotos,
-          eventosSaude: eventos,
-          eventosAuditoria: auditoria,
-          fichasComFoto: fichas.length,
-          problemas,
-        },
-        null,
-        2,
-      ),
+      JSON.stringify({
+        restorePostgres: 'verificado',
+        tabelas: manifesto.tabelas.length,
+        arquivos: manifesto.objetos.length,
+        authUsuarios: 'hash-e-UUID-conferidos',
+        loginSupabase: 'NAO_TESTADO',
+        storageSupabase: 'ARQUIVOS_VERIFICADOS_NAO_REENVIADOS',
+      }),
     );
-    if (problemas.length > 0) process.exitCode = 1;
   } finally {
     await prisma.$disconnect();
   }
 }
-
-executar().catch((erro: unknown) => {
-  console.error((erro as Error).message);
+executar().catch(() => {
+  console.error(
+    'Restore falhou; destino deve ser novo, vazio e local. Não há comprovação de recuperação completa Supabase.',
+  );
   process.exitCode = 1;
 });
