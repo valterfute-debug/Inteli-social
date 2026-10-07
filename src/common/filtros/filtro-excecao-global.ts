@@ -7,6 +7,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { requisicaoAtualId } from '../../requisicao/contexto-requisicao';
 
 @Catch()
 export class FiltroExcecaoGlobal implements ExceptionFilter {
@@ -41,10 +42,12 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
       status < 500 && typeof detalhe === 'object' && detalhe && 'detalhes' in detalhe
         ? (detalhe as { detalhes: unknown }).detalhes
         : undefined;
+    // O mesmo ID vai na resposta e no log: quem relata o erro informa o código e achamos o log.
+    const requisicaoId = requisicaoAtualId();
     if (status >= 500) {
       // O cliente recebe mensagem genérica; o detalhe fica só no log do servidor.
       this.logger.error(
-        `${request.method} ${request.path} → ${status}`,
+        `${request.method} ${request.path} → ${status} req=${requisicaoId ?? '-'}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -53,6 +56,7 @@ export class FiltroExcecaoGlobal implements ExceptionFilter {
       mensagem,
       ...(detalhes !== undefined ? { detalhes } : {}),
       caminho: request.path,
+      ...(requisicaoId ? { requisicaoId } : {}),
       timestamp: new Date().toISOString(),
     });
   }

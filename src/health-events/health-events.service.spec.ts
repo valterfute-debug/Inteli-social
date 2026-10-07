@@ -1,3 +1,4 @@
+import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { idempotenciaFalsa } from '../../test/idempotencia-teste';
 import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { NotFoundException } from '@nestjs/common';
@@ -38,7 +39,11 @@ describe('HealthEventsService', () => {
   it('rejeita criação de evento para animal inexistente com 404', async () => {
     const prisma = criarPrismaFalso();
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
-    const service = new HealthEventsService(prisma, idempotenciaFalsa(prisma));
+    const service = new HealthEventsService(
+      comTransacao(prisma),
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(
       service.criar(
@@ -56,7 +61,11 @@ describe('HealthEventsService', () => {
     const prisma = criarPrismaFalso();
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue({ id: 'animal-1' });
     (prisma.healthEvent.create as jest.Mock).mockResolvedValue(criarEventoFalso());
-    const service = new HealthEventsService(prisma, idempotenciaFalsa(prisma));
+    const service = new HealthEventsService(
+      comTransacao(prisma),
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     const { evento: resposta } = await service.criar(
       'animal-1',
@@ -77,7 +86,11 @@ describe('HealthEventsService', () => {
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue({ id: 'animal-1' });
     (prisma.healthEvent.findMany as jest.Mock).mockResolvedValue([criarEventoFalso()]);
     (prisma.healthEvent.count as jest.Mock).mockResolvedValue(1);
-    const service = new HealthEventsService(prisma, idempotenciaFalsa(prisma));
+    const service = new HealthEventsService(
+      comTransacao(prisma),
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     const resposta = await service.listar(
       'animal-1',
@@ -96,7 +109,11 @@ describe('HealthEventsService', () => {
   it('retorna 404 ao arquivar evento inexistente', async () => {
     const prisma = criarPrismaFalso();
     (prisma.healthEvent.updateMany as jest.Mock).mockResolvedValue({ count: 0 });
-    const service = new HealthEventsService(prisma, idempotenciaFalsa(prisma));
+    const service = new HealthEventsService(
+      comTransacao(prisma),
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(
       service.arquivar('animal-1', 'evento-inexistente', ESCOPO_ADMIN),

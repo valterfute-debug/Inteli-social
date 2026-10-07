@@ -1,9 +1,11 @@
+import { ESCOPO_ADMIN } from '../../test/escopos-teste';
+import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { CatalogosService } from './catalogos.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('CatalogosService', () => {
   it('lista as três frentes fixas de atuação', () => {
-    const service = new CatalogosService({} as PrismaService);
+    const service = new CatalogosService(comTransacao({} as PrismaService), auditoriaFalsa());
     const resposta = service.listarFrentes({ pagina: 1, limite: 20 });
 
     expect(resposta.total).toBe(3);
@@ -11,7 +13,7 @@ describe('CatalogosService', () => {
   });
 
   it('pagina a listagem de frentes corretamente', () => {
-    const service = new CatalogosService({} as PrismaService);
+    const service = new CatalogosService(comTransacao({} as PrismaService), auditoriaFalsa());
     const resposta = service.listarFrentes({ pagina: 2, limite: 2 });
 
     expect(resposta.itens).toHaveLength(1);
@@ -27,7 +29,7 @@ describe('CatalogosService', () => {
         count: jest.fn().mockResolvedValue(1),
       },
     } as unknown as PrismaService;
-    const service = new CatalogosService(prisma);
+    const service = new CatalogosService(comTransacao(prisma), auditoriaFalsa());
 
     const resposta = await service.listarEspecies({ pagina: 1, limite: 20 });
 
@@ -42,12 +44,18 @@ describe('CatalogosService', () => {
       email: 'maria@exemplo.invalid',
       telefone: null,
     });
-    const service = new CatalogosService({ responsible: { create } } as unknown as PrismaService);
+    const service = new CatalogosService(
+      comTransacao({ responsible: { create } } as unknown as PrismaService),
+      auditoriaFalsa(),
+    );
 
-    const resposta = await service.criarResponsavel({
-      nome: '  Maria ',
-      email: 'maria@exemplo.invalid',
-    });
+    const resposta = await service.criarResponsavel(
+      {
+        nome: '  Maria ',
+        email: 'maria@exemplo.invalid',
+      },
+      ESCOPO_ADMIN,
+    );
 
     expect(create).toHaveBeenCalledWith({
       data: {

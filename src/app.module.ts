@@ -14,6 +14,7 @@ import { FotosModule } from './fotos/fotos.module';
 import { AuthModule } from './auth/auth.module';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { IdempotenciaModule } from './idempotencia/idempotencia.module';
+import { AuditoriaModule } from './auditoria/auditoria.module';
 @Module({
   imports: [
     PrismaModule,
@@ -53,6 +54,7 @@ import { IdempotenciaModule } from './idempotencia/idempotencia.module';
     ]),
     AuthModule,
     IdempotenciaModule,
+    AuditoriaModule,
     UsuariosModule,
     HealthModule,
     AnimalsModule,

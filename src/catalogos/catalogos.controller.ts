@@ -49,8 +49,8 @@ export class CatalogosController {
   @Post('responsibles')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Cadastrar responsável (tutor ou quem entregou o animal)' })
-  criarResponsavel(@Body() dto: CriarResponsavelDto) {
-    return this.catalogosService.criarResponsavel(dto);
+  criarResponsavel(@Body() dto: CriarResponsavelDto, @EscopoAtual() escopo: EscopoAcesso) {
+    return this.catalogosService.criarResponsavel(dto, escopo);
   }
 
   @Get('fronts')

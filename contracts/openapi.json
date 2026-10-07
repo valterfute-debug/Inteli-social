@@ -3,7 +3,7 @@
   "info": {
     "title": "Ampara Animal — contrato do Ciclo 1",
     "version": "0.3.0",
-    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos. Autorização: além do login, a conta precisa estar liberada na API (tabela Usuario); conta não liberada ou desativada recebe 403. ADMIN acessa todas as unidades; OPERADOR só as vinculadas (papéis provisórios até aprovação da Ampara). O escopo é decidido no servidor: filtros enviados pelo cliente nunca ampliam o acesso."
+    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos. Autorização: além do login, a conta precisa estar liberada na API (tabela Usuario); conta não liberada ou desativada recebe 403. ADMIN acessa todas as unidades; OPERADOR só as vinculadas (papéis provisórios até aprovação da Ampara). O escopo é decidido no servidor: filtros enviados pelo cliente nunca ampliam o acesso. Toda resposta traz o cabeçalho X-Request-Id (o cliente pode enviar o seu, de 8 a 64 caracteres [A-Za-z0-9_-]); ele aparece nos logs, no corpo dos erros e na trilha de auditoria."
   },
   "paths": {
     "/api/health": {
@@ -2674,6 +2674,144 @@
           }
         }
       }
+    },
+    "/api/v1/auditoria": {
+      "get": {
+        "summary": "Consultar a trilha de auditoria (somente ADMIN)",
+        "description": "Implementado. Eventos mais recentes primeiro. Filtros: entidade, entidadeId (histórico de um registro), usuarioId (ações de uma pessoa) e requisicaoId (o X-Request-Id de um relato de erro).",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "entidade",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "Animal",
+                "HealthEvent",
+                "Foto",
+                "Responsible"
+              ]
+            }
+          },
+          {
+            "name": "entidadeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuarioId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "requisicaoId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Página de eventos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "itens",
+                    "pagina",
+                    "limite",
+                    "total"
+                  ],
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventoAuditoria"
+                      }
+                    },
+                    "pagina": {
+                      "type": "integer"
+                    },
+                    "limite": {
+                      "type": "integer"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada, ou usuário não é ADMIN",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2715,6 +2853,10 @@
             "type": "object",
             "additionalProperties": true,
             "description": "Opcional, só em alguns 4xx. Ex.: 409 de microchip duplicado traz animalExistenteId e identificadorPublico para o frontend oferecer a transferência."
+          },
+          "requisicaoId": {
+            "type": "string",
+            "description": "Mesmo valor do cabeçalho X-Request-Id: informe-o ao relatar um erro"
           }
         },
         "example": {
@@ -3699,6 +3841,84 @@
                 }
               }
             }
+          }
+        }
+      },
+      "EventoAuditoria": {
+        "type": "object",
+        "required": [
+          "id",
+          "instante",
+          "usuarioId",
+          "acao",
+          "entidade",
+          "entidadeId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "instante": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "usuarioId": {
+            "type": "string",
+            "description": "Quem fez (id do Supabase Auth)"
+          },
+          "acao": {
+            "type": "string",
+            "enum": [
+              "ANIMAL_CRIADO",
+              "ANIMAL_ATUALIZADO",
+              "ANIMAL_ARQUIVADO",
+              "EVENTO_SAUDE_CRIADO",
+              "EVENTO_SAUDE_ARQUIVADO",
+              "FOTO_CONFIRMADA",
+              "RESPONSAVEL_CRIADO"
+            ]
+          },
+          "entidade": {
+            "type": "string",
+            "enum": [
+              "Animal",
+              "HealthEvent",
+              "Foto",
+              "Responsible"
+            ]
+          },
+          "entidadeId": {
+            "type": "string"
+          },
+          "unidadeId": {
+            "type": "string",
+            "nullable": true
+          },
+          "frente": {
+            "type": "string",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED"
+            ],
+            "nullable": true
+          },
+          "camposAlterados": {
+            "type": "object",
+            "nullable": true,
+            "description": "Só em edições: { campo: { antes, depois } }, com os nomes das colunas do banco",
+            "additionalProperties": {
+              "type": "object",
+              "properties": {
+                "antes": {},
+                "depois": {}
+              }
+            }
+          },
+          "requisicaoId": {
+            "type": "string",
+            "nullable": true
           }
         }
       }

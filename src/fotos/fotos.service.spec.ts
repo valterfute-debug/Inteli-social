@@ -1,3 +1,4 @@
+import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
 import { ESCOPO_ADMIN } from '../../test/escopos-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
@@ -32,7 +33,12 @@ describe('FotosService', () => {
       urlEnvio: 'https://exemplo.invalid/envio',
     });
     (prisma.foto.upsert as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     const resposta = await service.solicitarEnvio(
       {
@@ -52,7 +58,12 @@ describe('FotosService', () => {
     const prisma = criarPrismaFalso();
     const storage = criarStorageFalso();
     (prisma.foto.findUnique as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(
       service.confirmar('id-inexistente', ESCOPO_ADMIN, CHAVE_TESTE),
@@ -69,7 +80,12 @@ describe('FotosService', () => {
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
     (storage.obterMetadados as jest.Mock).mockResolvedValue(null);
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
       ConflictException,
@@ -90,7 +106,12 @@ describe('FotosService', () => {
       tipoMidia: 'image/jpeg',
     });
     (prisma.foto.update as jest.Mock).mockResolvedValue({});
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
@@ -105,7 +126,12 @@ describe('FotosService', () => {
       situacao: SituacaoFoto.CONFIRMADA,
       caminhoArmazenamento: 'admissao/f1.jpg',
     });
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     const resposta = await service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE);
 
@@ -120,7 +146,12 @@ describe('FotosService', () => {
       id: 'f1',
       situacao: SituacaoFoto.CONFIRMADA,
     });
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(
       service.solicitarEnvio(
@@ -150,7 +181,12 @@ describe('FotosService', () => {
       tamanhoBytes: 20 * 1024 * 1024,
       tipoMidia: 'image/jpeg',
     });
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
       BadRequestException,
@@ -172,7 +208,12 @@ describe('FotosService', () => {
       tamanhoBytes: 1000,
       tipoMidia: 'application/pdf',
     });
-    const service = new FotosService(prisma, storage, idempotenciaFalsa(prisma));
+    const service = new FotosService(
+      comTransacao(prisma),
+      storage,
+      idempotenciaFalsa(prisma),
+      auditoriaFalsa(),
+    );
 
     await expect(service.confirmar('f1', ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
       BadRequestException,

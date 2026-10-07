@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { FiltroExcecaoGlobal } from './common/filtros/filtro-excecao-global';
+import { middlewareContextoRequisicao } from './requisicao/contexto-requisicao';
 
 /**
  * Origens liberadas para o frontend. Sem CORS_ORIGINS: em desenvolvimento/teste qualquer origem;
@@ -23,6 +24,8 @@ export function configurarAplicacao(app: INestApplication) {
 
   // Atrás do proxy do Render: o IP real do cliente vem em X-Forwarded-For (usado pelo rate limit).
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
+  // Primeiro de tudo: até as respostas de erro mais precoces carregam o ID de correlação.
+  app.use(middlewareContextoRequisicao());
   app.use(helmet());
   // Respostas trazem dados pessoais e links assinados de fotos: nada de cache em proxy ou navegador.
   app.use((_requisicao: Request, resposta: Response, proximo: NextFunction) => {
@@ -39,7 +42,7 @@ export function configurarAplicacao(app: INestApplication) {
     origin: origem,
     methods: ['GET', 'POST', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Idempotency-Key'],
-    exposedHeaders: ['Idempotent-Replayed'],
+    exposedHeaders: ['Idempotent-Replayed', 'X-Request-Id'],
     maxAge: 600,
   });
   app.enableShutdownHooks();

@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Front } from '@prisma/client';
+import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
 import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
@@ -15,7 +16,10 @@ const NOMES_FRENTES: Record<Front, string> = {
 
 @Injectable()
 export class CatalogosService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditoria: AuditoriaService,
+  ) {}
 
   async listarEspecies({ pagina, limite }: PaginacaoQueryDto) {
     const where = { deletedAt: null };
@@ -120,14 +124,23 @@ export class CatalogosService {
     };
   }
 
-  async criarResponsavel(dto: CriarResponsavelDto) {
-    const responsavel = await this.prisma.responsible.create({
-      data: {
-        name: dto.nome.trim(),
-        endereco: dto.endereco,
-        email: dto.email,
-        telefone: dto.telefone,
-      },
+  async criarResponsavel(dto: CriarResponsavelDto, escopo: EscopoAcesso) {
+    const responsavel = await this.prisma.$transaction(async (tx) => {
+      const criado = await tx.responsible.create({
+        data: {
+          name: dto.nome.trim(),
+          endereco: dto.endereco,
+          email: dto.email,
+          telefone: dto.telefone,
+        },
+      });
+      await this.auditoria.registrar(tx, {
+        usuarioId: escopo.usuarioId,
+        acao: AcaoAuditoria.RESPONSAVEL_CRIADO,
+        entidade: 'Responsible',
+        entidadeId: criado.id,
+      });
+      return criado;
     });
     return {
       id: responsavel.id,

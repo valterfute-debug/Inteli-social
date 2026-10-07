@@ -9,6 +9,11 @@ import {
 } from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
 import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
+import {
+  AcaoAuditoria,
+  AuditoriaService,
+  calcularCamposAlterados,
+} from '../auditoria/auditoria.service';
 import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
@@ -29,6 +34,7 @@ export class AnimalsService {
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
     private readonly idempotencia: IdempotenciaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   async listar(query: ListarAnimaisQueryDto, escopo: EscopoAcesso) {
@@ -135,6 +141,14 @@ export class AnimalsService {
               },
               include: INCLUSAO_ANIMAL,
             });
+            await this.auditoria.registrar(tx, {
+              usuarioId: escopo.usuarioId,
+              acao: AcaoAuditoria.ANIMAL_CRIADO,
+              entidade: 'Animal',
+              entidadeId: criado.id,
+              unidadeId: criado.unitId,
+              frente: criado.front,
+            });
             return { recursoId: criado.id, resultado: criado };
           },
         );
@@ -205,34 +219,45 @@ export class AnimalsService {
       await this.garantirFotoConfirmada(dados.fotoEntradaId, escopo);
     }
 
-    try {
-      const resultado = await this.prisma.animal.updateMany({
-        where: { id, deletedAt: null, version: versao },
-        data: {
-          ...(dados.nome !== undefined ? { name: dados.nome } : {}),
-          ...(dados.microchip !== undefined ? { microchip: dados.microchip } : {}),
-          ...(dados.especieId !== undefined ? { speciesId: dados.especieId } : {}),
-          ...(dados.racaId !== undefined ? { breedId: dados.racaId } : {}),
-          ...(dados.unidadeId !== undefined ? { unitId: dados.unidadeId } : {}),
-          ...(dados.localizacaoId !== undefined ? { locationId: dados.localizacaoId } : {}),
-          ...(dados.responsavelId !== undefined ? { responsibleId: dados.responsavelId } : {}),
-          ...(dados.frente !== undefined ? { front: dados.frente } : {}),
-          ...(dados.dataEntrada !== undefined ? { dataEntrada: new Date(dados.dataEntrada) } : {}),
-          ...(dados.sexo !== undefined ? { sexo: dados.sexo } : {}),
-          ...(dados.idadeAproximadaMeses !== undefined
-            ? { idadeAproximadaMeses: dados.idadeAproximadaMeses }
-            : {}),
-          ...(dados.pesoKg !== undefined ? { pesoKg: dados.pesoKg } : {}),
-          ...(dados.porte !== undefined ? { porte: dados.porte } : {}),
-          ...(dados.cor !== undefined ? { cor: dados.cor } : {}),
-          ...(dados.observacoes !== undefined ? { observacoes: dados.observacoes } : {}),
-          ...(dados.fotoEntradaId !== undefined ? { fotoEntradaId: dados.fotoEntradaId } : {}),
-          version: { increment: 1 },
-        },
-      });
+    // Nomes das colunas do banco; undefined = campo não enviado (não muda).
+    const alteracoes = {
+      name: dados.nome,
+      microchip: dados.microchip,
+      speciesId: dados.especieId,
+      breedId: dados.racaId,
+      unitId: dados.unidadeId,
+      locationId: dados.localizacaoId,
+      responsibleId: dados.responsavelId,
+      front: dados.frente,
+      dataEntrada: dados.dataEntrada !== undefined ? new Date(dados.dataEntrada) : undefined,
+      sexo: dados.sexo,
+      idadeAproximadaMeses: dados.idadeAproximadaMeses,
+      pesoKg: dados.pesoKg,
+      porte: dados.porte,
+      cor: dados.cor,
+      observacoes: dados.observacoes,
+      fotoEntradaId: dados.fotoEntradaId,
+    };
 
-      // Outra edição venceu entre a leitura acima e esta escrita.
-      if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        const resultado = await tx.animal.updateMany({
+          where: { id, deletedAt: null, version: versao },
+          data: { ...alteracoes, version: { increment: 1 } },
+        });
+        // Outra edição venceu entre a leitura acima e esta escrita.
+        if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
+
+        await this.auditoria.registrar(tx, {
+          usuarioId: escopo.usuarioId,
+          acao: AcaoAuditoria.ANIMAL_ATUALIZADO,
+          entidade: 'Animal',
+          entidadeId: id,
+          unidadeId: alteracoes.unitId ?? existente.unitId,
+          frente: alteracoes.front ?? existente.front,
+          camposAlterados: calcularCamposAlterados(existente, alteracoes),
+        });
+      });
 
       return this.buscarPorId(id, escopo);
     } catch (erro) {
@@ -250,16 +275,26 @@ export class AnimalsService {
   async arquivar(id: string, escopo: EscopoAcesso) {
     const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
-      select: { unitId: true },
+      select: { unitId: true, front: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
     garantirUnidade(escopo, animal.unitId);
 
-    const resultado = await this.prisma.animal.updateMany({
-      where: { id, deletedAt: null, ...filtroPorUnidade(escopo) },
-      data: { deletedAt: new Date() },
+    await this.prisma.$transaction(async (tx) => {
+      const resultado = await tx.animal.updateMany({
+        where: { id, deletedAt: null, ...filtroPorUnidade(escopo) },
+        data: { deletedAt: new Date() },
+      });
+      if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
+      await this.auditoria.registrar(tx, {
+        usuarioId: escopo.usuarioId,
+        acao: AcaoAuditoria.ANIMAL_ARQUIVADO,
+        entidade: 'Animal',
+        entidadeId: id,
+        unidadeId: animal.unitId,
+        frente: animal.front,
+      });
     });
-    if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
   }
 
   private garantirRegrasAdmissao(estado: EstadoAdmissao) {

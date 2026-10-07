@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { SituacaoFoto } from '@prisma/client';
+import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
 import { EscopoAcesso, ehAdmin } from '../auth/escopo';
 import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -26,6 +27,7 @@ export class FotosService {
     private readonly prisma: PrismaService,
     private readonly storage: SupabaseStorageService,
     private readonly idempotencia: IdempotenciaService,
+    private readonly auditoria: AuditoriaService,
   ) {}
 
   /**
@@ -108,9 +110,14 @@ export class FotosService {
       throw new BadRequestException('Tipo do arquivo enviado difere do informado na solicitação');
     }
 
-    await this.prisma.foto.update({
-      where: { id },
-      data: { situacao: SituacaoFoto.CONFIRMADA },
+    await this.prisma.$transaction(async (tx) => {
+      await tx.foto.update({ where: { id }, data: { situacao: SituacaoFoto.CONFIRMADA } });
+      await this.auditoria.registrar(tx, {
+        usuarioId: escopo.usuarioId,
+        acao: AcaoAuditoria.FOTO_CONFIRMADA,
+        entidade: 'Foto',
+        entidadeId: foto.id,
+      });
     });
     await this.idempotencia.registrar(ctx, foto.id);
 
