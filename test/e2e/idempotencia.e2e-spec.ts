@@ -17,7 +17,6 @@ describe('Idempotência (e2e, banco real)', () => {
     unidadeId: string;
     responsavelId: string;
   };
-  let unidadeCcpa: { unidadeId: string };
 
   const http = () => request(ambiente.app.getHttpServer());
 
@@ -49,13 +48,11 @@ describe('Idempotência (e2e, banco real)', () => {
     ambiente = await criarAmbienteE2E();
     const { prisma } = ambiente;
     const casAdote = await ambiente.idUnidade('CasAdote');
-    const ccpa = await ambiente.idUnidade('CCPA');
     catalogo = {
       especieId: (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id,
       unidadeId: casAdote,
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
-    unidadeCcpa = { unidadeId: ccpa };
     ana = await ambiente.usuario('ana');
     beto = await ambiente.usuario('beto');
   });
@@ -68,7 +65,6 @@ describe('Idempotência (e2e, banco real)', () => {
     return {
       nome: 'Luna',
       especieId: catalogo.especieId,
-      unidadeId: catalogo.unidadeId,
       responsavelId: catalogo.responsavelId,
       frente: 'CASADOTE',
       fotoEntradaId: await fotoConfirmada(quem),
@@ -125,7 +121,6 @@ describe('Idempotência (e2e, banco real)', () => {
   it('o reenvio não esbarra nas próprias validações (microchip já cadastrado pela 1ª vez)', async () => {
     const corpo = await admissao(ana, {
       frente: 'CCPA',
-      ...unidadeCcpa,
       microchip: '981000123456789',
       sexo: 'FEMEA',
       idadeAproximadaMeses: 12,
@@ -148,7 +143,6 @@ describe('Idempotência (e2e, banco real)', () => {
   it('cadastros simultâneos com o mesmo microchip (chaves diferentes): só um passa, o banco barra o resto', async () => {
     const extra = {
       frente: 'CCPA',
-      ...unidadeCcpa,
       microchip: '981000999000111',
       sexo: 'MACHO',
       idadeAproximadaMeses: 6,
@@ -169,7 +163,6 @@ describe('Idempotência (e2e, banco real)', () => {
   it('replay concorrente com microchip e a mesma chave não esbarra no próprio cadastro', async () => {
     const corpo = await admissao(ana, {
       frente: 'CCPA',
-      ...unidadeCcpa,
       microchip: '981000777000111',
       sexo: 'MACHO',
       idadeAproximadaMeses: 6,

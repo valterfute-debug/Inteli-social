@@ -76,9 +76,4 @@ export class ListarAnimaisQueryDto {
   @IsOptional()
   @IsEnum(Front)
   frente?: Front;
-
-  @ApiPropertyOptional({ format: 'uuid' })
-  @IsOptional()
-  @IsUUID('4')
-  unidadeId?: string;
 }

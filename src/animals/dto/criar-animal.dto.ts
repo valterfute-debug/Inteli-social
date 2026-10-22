@@ -48,16 +48,6 @@ export class CriarAnimalDto {
   racaId?: string;
 
   @ApiProperty({
-    required: false,
-    format: 'uuid',
-    description:
-      'Opcional e fora do formulário. Sem ele, o servidor usa a única unidade do usuário ou a unidade da frente',
-  })
-  @IsOptional()
-  @IsUUID('4')
-  unidadeId?: string;
-
-  @ApiProperty({
     format: 'uuid',
     description: 'Responsável cadastrado (endereço fica no cadastro do responsável)',
   })

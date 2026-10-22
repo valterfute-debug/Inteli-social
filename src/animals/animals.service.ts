@@ -36,7 +36,10 @@ function ocultarTextoLivre(campos: ReturnType<typeof calcularCamposAlterados>) {
   return campos;
 }
 
-/** Nome da unidade que corresponde a cada frente, usado quando o cadastro não informa a unidade. */
+/**
+ * Unidade de cada frente. A unidade saiu do formulário e das respostas (pedido da Ampara): o
+ * servidor a deriva da frente e a mantém só para a auditoria e a linha do tempo.
+ */
 const UNIDADE_DA_FRENTE: Record<Front, string> = {
   CCPA: 'CCPA',
   CED: 'CED',
@@ -79,7 +82,7 @@ export class AnimalsService {
   }
 
   montarFiltroListagem(query: ListarAnimaisQueryDto): Prisma.AnimalWhereInput {
-    const { busca, nome, identificadorPublico, microchip, especieId, frente, unidadeId } = query;
+    const { busca, nome, identificadorPublico, microchip, especieId, frente } = query;
     return {
       deletedAt: null,
       ...(busca
@@ -98,7 +101,6 @@ export class AnimalsService {
       ...(microchip ? { microchip } : {}),
       ...(especieId ? { speciesId: especieId } : {}),
       ...(frente ? { front: frente } : {}),
-      ...(unidadeId ? { unitId: unidadeId } : {}),
     };
   }
 
@@ -111,7 +113,7 @@ export class AnimalsService {
     const anterior = await this.idempotencia.verificarReenvio(ctx);
     if (anterior) return { animal: await this.buscarPorId(anterior), reenvio: true };
 
-    const unidadeId = await this.resolverUnidade(dto);
+    const unidadeId = await this.resolverUnidade(dto.frente);
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
@@ -205,13 +207,7 @@ export class AnimalsService {
   async atualizar(id: string, dto: AtualizarAnimalDto, usuario: UsuarioAutenticado) {
     const { versao, ...dados } = dto;
     // O IsOptional do PartialType também aceita null; estes campos são obrigatórios e não podem ser limpos.
-    const obrigatorios = [
-      'especieId',
-      'unidadeId',
-      'responsavelId',
-      'frente',
-      'fotoEntradaId',
-    ] as const;
+    const obrigatorios = ['especieId', 'responsavelId', 'frente', 'fotoEntradaId'] as const;
     const limpos = obrigatorios.filter((campo) => dados[campo] === null);
     if (limpos.length > 0) {
       throw new BadRequestException(limpos.map((campo) => `${campo} não pode ser nulo`));
@@ -228,7 +224,7 @@ export class AnimalsService {
     if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
 
     // As regras valem para o estado final: numa transferência CED → CasAdote, por exemplo,
-    // basta enviar frente/unidade/localização e o restante vem do cadastro atual.
+    // basta enviar a frente e o restante vem do cadastro atual.
     const valorFinal = <T>(novo: T | undefined, atual: T) => (novo !== undefined ? novo : atual);
     const especieSilvestre =
       dados.especieId !== undefined && dados.especieId !== existente.speciesId
@@ -250,6 +246,11 @@ export class AnimalsService {
     if (dados.fotoEntradaId !== undefined) {
       await this.garantirFotoConfirmada(dados.fotoEntradaId, usuario);
     }
+    // Mudou a frente: a unidade acompanha.
+    const unidadeId =
+      dados.frente !== undefined && dados.frente !== existente.front
+        ? await this.resolverUnidade(dados.frente)
+        : undefined;
 
     // Nomes das colunas do banco; undefined = campo não enviado (não muda).
     const alteracoes = {
@@ -257,10 +258,9 @@ export class AnimalsService {
       microchip: dados.microchip,
       speciesId: dados.especieId,
       breedId: dados.racaId,
-      unitId: dados.unidadeId,
+      unitId: unidadeId,
       // A localização antiga pertence à unidade de origem: numa transferência ela é descartada.
-      locationId:
-        dados.unidadeId !== undefined && dados.unidadeId !== existente.unitId ? null : undefined,
+      locationId: unidadeId !== undefined && unidadeId !== existente.unitId ? null : undefined,
       responsibleId: dados.responsavelId,
       front: dados.frente,
       dataEntrada: dados.dataEntrada !== undefined ? new Date(dados.dataEntrada) : undefined,
@@ -282,7 +282,7 @@ export class AnimalsService {
         // Outra edição venceu entre a leitura acima e esta escrita.
         if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
 
-        // Passagem entre áreas (frente) ou unidades: o mesmo cadastro segue, com a linha do tempo.
+        // Passagem entre áreas (frente): o mesmo cadastro segue, com a linha do tempo.
         const frenteDestino = alteracoes.front ?? existente.front;
         const unidadeDestinoId = alteracoes.unitId ?? existente.unitId;
         if (frenteDestino !== existente.front || unidadeDestinoId !== existente.unitId) {
@@ -323,7 +323,7 @@ export class AnimalsService {
   }
 
   /**
-   * Linha do tempo de áreas e unidades do animal, da mais recente para a mais antiga. Vale também
+   * Linha do tempo das áreas (frentes) do animal, da mais recente para a mais antiga. Vale também
    * para animal arquivado: o histórico não some com o arquivamento.
    */
   async listarMovimentacoes(animalId: string, { pagina, limite }: ListarMovimentacoesQueryDto) {
@@ -336,7 +336,6 @@ export class AnimalsService {
     const [itens, total] = await Promise.all([
       this.prisma.movimentacaoAnimal.findMany({
         where,
-        include: { unidadeOrigem: true, unidadeDestino: true },
         skip: (pagina - 1) * limite,
         take: limite,
         orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
@@ -349,10 +348,6 @@ export class AnimalsService {
         animalId: m.animalId,
         frenteOrigem: m.frenteOrigem,
         frenteDestino: m.frenteDestino,
-        unidadeOrigemId: m.unidadeOrigemId,
-        unidadeOrigemNome: m.unidadeOrigem ? m.unidadeOrigem.name : null,
-        unidadeDestinoId: m.unidadeDestinoId,
-        unidadeDestinoNome: m.unidadeDestino.name,
         usuarioId: m.usuarioId,
         criadoEm: m.createdAt.toISOString(),
       })),
@@ -386,15 +381,11 @@ export class AnimalsService {
     });
   }
 
-  /**
-   * A unidade não faz parte do formulário e já não delimita acesso (todas as contas ativas têm as
-   * mesmas permissões). Sem `unidadeId`, vale a unidade de mesmo nome da frente.
-   */
-  private async resolverUnidade(dto: CriarAnimalDto) {
-    if (dto.unidadeId) return dto.unidadeId;
+  /** A unidade do animal é sempre a de mesmo nome da frente (ver UNIDADE_DA_FRENTE). */
+  private async resolverUnidade(frente: Front) {
     const unidade = await this.prisma.unit.findFirst({
       where: {
-        name: { equals: UNIDADE_DA_FRENTE[dto.frente], mode: 'insensitive' },
+        name: { equals: UNIDADE_DA_FRENTE[frente], mode: 'insensitive' },
         deletedAt: null,
       },
       select: { id: true },
@@ -506,7 +497,7 @@ export class AnimalsService {
       }
       if (erro.code === 'P2003' || erro.code === 'P2025') {
         throw new BadRequestException(
-          'Referência inválida: verifique espécie, raça (deve ser da espécie), unidade ou responsável',
+          'Referência inválida: verifique espécie, raça (deve ser da espécie) ou responsável',
         );
       }
     }

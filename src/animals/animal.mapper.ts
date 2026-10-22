@@ -3,7 +3,6 @@ import { Prisma } from '@prisma/client';
 /** Relações carregadas em toda leitura de animal: a ficha e a lista exibem os nomes, não só os ids. */
 export const INCLUSAO_ANIMAL = {
   species: true,
-  unit: true,
   breed: true,
   responsible: true,
   fotoEntrada: true,
@@ -22,8 +21,6 @@ export function mapearAnimal(animal: AnimalComRelacoes, fotoEntradaUrl: string |
     especieSilvestre: animal.species.silvestre,
     racaId: animal.breedId,
     racaNome: animal.breed ? animal.breed.name : null,
-    unidadeId: animal.unitId,
-    unidadeNome: animal.unit.name,
     responsavelId: animal.responsibleId,
     responsavelNome: animal.responsible.name,
     responsavelEndereco: animal.responsible.endereco,

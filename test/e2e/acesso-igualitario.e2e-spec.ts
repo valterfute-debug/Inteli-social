@@ -14,7 +14,6 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
   let beto: UsuarioTeste;
   let semLiberacao: UsuarioTeste;
   let desativado: UsuarioTeste;
-  let unidadeCasAdote: string;
   let unidadeCed: string;
   let catalogo: { especieId: string; responsavelId: string };
   let animalId: string;
@@ -51,7 +50,6 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
 
   beforeAll(async () => {
     ambiente = await criarAmbienteE2E();
-    unidadeCasAdote = await ambiente.idUnidade('CasAdote');
     unidadeCed = await ambiente.idUnidade('CED');
     const { prisma } = ambiente;
     catalogo = {
@@ -164,7 +162,7 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         .send(admissaoCasAdote(foto))
         .expect(201);
       animalId = criado.body.id;
-      expect(criado.body.unidadeNome).toBe('CasAdote');
+      expect(criado.body).not.toHaveProperty('unidadeNome');
 
       const lista = await http().get('/api/v1/animals').set('Authorization', beto.autorizacao);
       expect(lista.body.itens.map((a: { id: string }) => a.id)).toContain(animalId);
@@ -176,35 +174,35 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
       expect(ficha.body.fotoEntradaUrl).toContain('storage.invalid/leitura');
     });
 
-    it('cadastra em qualquer unidade, inclusive informando outra', async () => {
-      const foto = await fotoConfirmada(beto);
-      const resposta = await http()
-        .post('/api/v1/animals')
-        .set('Idempotency-Key', randomUUID())
-        .set('Authorization', beto.autorizacao)
-        .send(admissaoCasAdote(foto, { unidadeId: unidadeCed }))
-        .expect(201);
-      expect(resposta.body.unidadeNome).toBe('CED');
-    });
-
     it('Beto edita e transfere o animal de Ana; Ana continua vendo e editando', async () => {
       const transferido = await http()
         .patch(`/api/v1/animals/${animalId}`)
         .set('Authorization', beto.autorizacao)
-        .send({ versao: 1, unidadeId: unidadeCed, cor: 'Preta' })
+        .send({
+          versao: 1,
+          frente: 'CED',
+          cor: 'Preta',
+          microchip: '555000111',
+          sexo: 'MACHO',
+          idadeAproximadaMeses: 12,
+          pesoKg: 8,
+          porte: 'MEDIO',
+        })
         .expect(200);
-      expect(transferido.body).toMatchObject({ unidadeNome: 'CED', cor: 'Preta', versao: 2 });
+      expect(transferido.body).toMatchObject({ frente: 'CED', cor: 'Preta', versao: 2 });
+      const noBanco = await ambiente.prisma.animal.findUniqueOrThrow({ where: { id: animalId } });
+      expect(noBanco.unitId).toBe(unidadeCed);
 
       const lidoPorAna = await http()
         .get(`/api/v1/animals/${animalId}`)
         .set('Authorization', ana.autorizacao)
         .expect(200);
-      expect(lidoPorAna.body.unidadeNome).toBe('CED');
+      expect(lidoPorAna.body.frente).toBe('CED');
 
       await http()
         .patch(`/api/v1/animals/${animalId}`)
         .set('Authorization', ana.autorizacao)
-        .send({ versao: 2, unidadeId: unidadeCasAdote })
+        .send({ versao: 2, frente: 'CASADOTE' })
         .expect(200);
     });
   });

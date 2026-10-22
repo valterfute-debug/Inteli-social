@@ -83,7 +83,6 @@ export class ProntuarioService {
     campo('Peso (kg)', animal.pesoKg?.toString());
     campo('Data de entrada', animal.dataEntrada ? formatarData(animal.dataEntrada) : null);
     campo('Frente', animal.front);
-    campo('Unidade', animal.unit.name);
     campo('Responsável', animal.responsible.name);
     campo('Endereço do responsável', animal.responsible.endereco);
 

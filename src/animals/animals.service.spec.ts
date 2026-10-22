@@ -66,7 +66,7 @@ function criarPrismaFalso() {
       findMany: jest.fn(),
       count: jest.fn(),
     },
-    unit: { findFirst: jest.fn() },
+    unit: { findFirst: jest.fn().mockResolvedValue({ id: 'unidade-1' }) },
     species: {
       findFirst: jest.fn().mockResolvedValue({ silvestre: false }),
     },
@@ -90,7 +90,6 @@ function criarStorageFalso() {
 
 const BASE_CASADOTE: CriarAnimalDto = {
   especieId: 'especie-1',
-  unidadeId: 'unidade-1',
   responsavelId: 'responsavel-1',
   frente: Front.CASADOTE,
   fotoEntradaId: 'foto-1',
@@ -127,7 +126,9 @@ describe('AnimalsService', () => {
       expect(resposta?.identificadorPublico).toBe('QA-001');
       expect(resposta?.versao).toBe(1);
       expect(resposta?.especieNome).toBe('Cão');
-      expect(resposta?.unidadeNome).toBe('CasAdote');
+      // A unidade saiu da resposta (pedido da Ampara); o servidor a guarda só internamente.
+      expect(resposta).not.toHaveProperty('unidadeId');
+      expect(resposta).not.toHaveProperty('unidadeNome');
       expect(resposta?.fotoEntradaUrl).toBe('https://exemplo.invalid/foto-1');
     });
 
@@ -151,7 +152,7 @@ describe('AnimalsService', () => {
       expect(animal).not.toHaveProperty('localizacaoNome');
     });
 
-    it('cadastra sem unidade nem localização: usa a unidade da frente e registra a entrada', async () => {
+    it('usa sempre a unidade da frente e registra a entrada', async () => {
       const prisma = criarPrismaFalso();
       (prisma.unit.findFirst as jest.Mock).mockResolvedValue({ id: 'unidade-casadote' });
       (prisma.animal.create as jest.Mock).mockResolvedValue(
@@ -163,9 +164,7 @@ describe('AnimalsService', () => {
         idempotenciaFalsa(prisma),
         auditoriaFalsa(),
       );
-      const semUnidade = { ...BASE_CASADOTE, unidadeId: undefined };
-
-      await service.criar(semUnidade, USUARIO_TESTE, CHAVE_TESTE);
+      await service.criar(BASE_CASADOTE, USUARIO_TESTE, CHAVE_TESTE);
 
       expect(prisma.unit.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -187,23 +186,6 @@ describe('AnimalsService', () => {
       });
     });
 
-    it('usa a unidade enviada, sem procurar a da frente', async () => {
-      const prisma = criarPrismaFalso();
-      (prisma.animal.create as jest.Mock).mockResolvedValue(criarAnimalFalso());
-      const service = new AnimalsService(
-        comTransacao(prisma),
-        criarStorageFalso(),
-        idempotenciaFalsa(prisma),
-        auditoriaFalsa(),
-      );
-
-      await service.criar(BASE_CASADOTE, USUARIO_TESTE, CHAVE_TESTE);
-
-      const { data } = (prisma.animal.create as jest.Mock).mock.calls[0][0];
-      expect(data.unitId).toBe('unidade-1');
-      expect(prisma.unit.findFirst).not.toHaveBeenCalled();
-    });
-
     it('rejeita com 400 quando não há como definir a unidade', async () => {
       const prisma = criarPrismaFalso();
       (prisma.unit.findFirst as jest.Mock).mockResolvedValue(null);
@@ -213,9 +195,7 @@ describe('AnimalsService', () => {
         idempotenciaFalsa(prisma),
         auditoriaFalsa(),
       );
-      const semUnidade = { ...BASE_CASADOTE, unidadeId: undefined };
-
-      await expect(service.criar(semUnidade, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      await expect(service.criar(BASE_CASADOTE, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
         BadRequestException,
       );
       expect(prisma.animal.create).not.toHaveBeenCalled();
@@ -436,14 +416,12 @@ describe('AnimalsService', () => {
         limite: 20,
         especieId: 'especie-1',
         frente: Front.CED,
-        unidadeId: 'unidade-1',
         microchip: '123',
       });
 
       expect(where).toMatchObject({
         speciesId: 'especie-1',
         front: Front.CED,
-        unitId: 'unidade-1',
         microchip: '123',
       });
       expect(where.OR).toBeUndefined();
@@ -513,7 +491,7 @@ describe('AnimalsService', () => {
       expect(prisma.animal.findFirst).not.toHaveBeenCalled();
     });
 
-    it('permite transferir de CED para CasAdote enviando só frente e unidade', async () => {
+    it('permite transferir de CED para CasAdote enviando só a frente', async () => {
       const prisma = criarPrismaFalso();
       const completoCed = criarAnimalFalso({
         front: Front.CED,
@@ -538,7 +516,6 @@ describe('AnimalsService', () => {
         {
           versao: 1,
           frente: Front.CASADOTE,
-          unidadeId: 'unidade-1',
         },
         USUARIO_TESTE,
       );
@@ -654,6 +631,7 @@ describe('AnimalsService', () => {
 
     it('registra a passagem CED → CasAdote no mesmo animal, com origem, destino e usuário', async () => {
       const prisma = criarPrismaFalso();
+      (prisma.unit.findFirst as jest.Mock).mockResolvedValue({ id: 'unidade-casadote' });
       (prisma.animal.findFirst as jest.Mock)
         .mockResolvedValueOnce(animalCed())
         .mockResolvedValueOnce({ ...animalCed(), front: Front.CASADOTE, version: 2 });
@@ -661,7 +639,7 @@ describe('AnimalsService', () => {
 
       await montar(prisma).atualizar(
         ID_ANIMAL,
-        { versao: 1, frente: Front.CASADOTE, unidadeId: 'unidade-casadote' },
+        { versao: 1, frente: Front.CASADOTE },
         USUARIO_TESTE,
       );
 
@@ -683,8 +661,9 @@ describe('AnimalsService', () => {
       });
     });
 
-    it('trocar só a frente mantém a unidade (origem e destino iguais)', async () => {
+    it('a unidade acompanha a frente: buscar a unidade de mesmo nome da nova frente', async () => {
       const prisma = criarPrismaFalso();
+      (prisma.unit.findFirst as jest.Mock).mockResolvedValue({ id: 'unidade-casadote' });
       (prisma.animal.findFirst as jest.Mock)
         .mockResolvedValueOnce(animalCed())
         .mockResolvedValueOnce({ ...animalCed(), front: Front.CASADOTE, version: 2 });
@@ -696,12 +675,22 @@ describe('AnimalsService', () => {
         USUARIO_TESTE,
       );
 
-      expect(prisma.movimentacaoAnimal.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          unidadeOrigemId: 'unidade-1',
-          unidadeDestinoId: 'unidade-1',
+      expect(prisma.unit.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ name: { equals: 'CasAdote', mode: 'insensitive' } }),
         }),
-      });
+      );
+    });
+
+    it('edição sem mudar a frente não procura unidade', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.findFirst as jest.Mock).mockResolvedValue(animalCed());
+      (prisma.animal.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await montar(prisma).atualizar(ID_ANIMAL, { versao: 1, cor: 'Preta' }, USUARIO_TESTE);
+
+      expect(prisma.unit.findFirst).not.toHaveBeenCalled();
+      expect((prisma.animal.updateMany as jest.Mock).mock.calls[0][0].data.unitId).toBeUndefined();
     });
 
     it('edição que não muda frente nem unidade não gera movimentação', async () => {
@@ -779,11 +768,10 @@ describe('AnimalsService', () => {
       expect(resposta.itens[0]).toMatchObject({
         frenteOrigem: Front.CED,
         frenteDestino: Front.CASADOTE,
-        unidadeOrigemNome: 'CED',
-        unidadeDestinoNome: 'CasAdote',
         criadoEm: '2026-03-01T10:00:00.000Z',
       });
-      expect(resposta.itens[1]).toMatchObject({ frenteOrigem: null, unidadeOrigemNome: null });
+      expect(resposta.itens[1]).toMatchObject({ frenteOrigem: null });
+      expect(resposta.itens[0]).not.toHaveProperty('unidadeOrigemNome');
     });
 
     it('histórico de animal inexistente: 404', async () => {

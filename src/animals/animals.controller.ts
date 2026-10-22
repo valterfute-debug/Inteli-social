@@ -63,7 +63,7 @@ export class AnimalsController {
   }
 
   @Get(':id/movimentacoes')
-  @ApiOperation({ summary: 'Linha do tempo de áreas e unidades do animal' })
+  @ApiOperation({ summary: 'Linha do tempo das áreas (frentes) do animal' })
   listarMovimentacoes(
     @Param('id', ParseUUIDPipe) id: string,
     @Query() query: ListarMovimentacoesQueryDto,

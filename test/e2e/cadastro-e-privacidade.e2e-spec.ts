@@ -82,12 +82,29 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
 
       expect(resposta.status).toBe(201);
       expect(resposta.body).toMatchObject({
-        unidadeId: unidadeCasAdote,
         responsavelNome: 'Maria Fictícia',
         responsavelEndereco: 'Rua das Flores, 10',
       });
       expect(resposta.body).not.toHaveProperty('localizacaoId');
       expect(resposta.body).not.toHaveProperty('localizacaoNome');
+      expect(resposta.body).not.toHaveProperty('unidadeId');
+      expect(resposta.body).not.toHaveProperty('unidadeNome');
+      const salvo = await ambiente.prisma.animal.findUniqueOrThrow({
+        where: { id: resposta.body.id },
+      });
+      expect(salvo.unitId).toBe(unidadeCasAdote);
+    });
+
+    it('rejeita unidadeId com 400 (a unidade saiu do cadastro)', async () => {
+      const resposta = await cadastrar(contaB, {
+        nome: 'Rex',
+        especieId: especieCao,
+        responsavelId,
+        frente: 'CASADOTE',
+        unidadeId: unidadeCasAdote,
+      });
+
+      expect(resposta.status).toBe(400);
     });
 
     it('rejeita localizacaoId com 400 (campo desconhecido)', async () => {

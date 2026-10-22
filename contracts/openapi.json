@@ -141,7 +141,7 @@
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/raça/unidade/responsável e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. O filtro unidadeId apenas filtra a lista.",
+        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/raça/responsável e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -336,16 +336,6 @@
                 "CASADOTE",
                 "CED"
               ]
-            }
-          },
-          {
-            "name": "unidadeId",
-            "in": "query",
-            "required": false,
-            "description": "Unidade atual",
-            "schema": {
-              "type": "string",
-              "format": "uuid"
             }
           }
         ]
@@ -2691,8 +2681,8 @@
         { "name": "id", "in": "path", "required": true, "description": "Identificador do animal", "schema": { "type": "string", "format": "uuid" } }
       ],
       "get": {
-        "summary": "Linha do tempo de áreas e unidades do animal",
-        "description": "Implementado. Lista as movimentações do animal, da mais recente para a mais antiga: a entrada (origem nula) e cada passagem de área (frente) ou unidade, com o usuário e o instante. Vale também para animal arquivado. Registros anteriores a esta versão não foram reconstruídos (ficam só na auditoria). Qualquer conta ativa consulta.",
+        "summary": "Linha do tempo das áreas (frentes) do animal",
+        "description": "Implementado. Lista as movimentações do animal, da mais recente para a mais antiga: a entrada (origem nula) e cada passagem de área (frente), com o usuário e o instante. Vale também para animal arquivado. Registros anteriores a esta versão não foram reconstruídos (ficam só na auditoria). Qualquer conta ativa consulta.",
         "x-situacao": "implementado",
         "security": [{ "bearerSupabase": [] }],
         "parameters": [
@@ -3099,7 +3089,7 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais. A unidade não é pedida no formulário: sem unidadeId, o servidor usa a única unidade do usuário ou a unidade da frente. Localização física não faz mais parte do cadastro.",
+        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais. A unidade não faz parte do cadastro nem da resposta: o servidor a deriva da frente. Enviar unidadeId retorna 400. Localização física não faz mais parte do cadastro.",
         "required": [
           "especieId",
           "responsavelId",
@@ -3130,11 +3120,6 @@
             "description": "Identificador UUID",
             "format": "uuid",
             "nullable": true
-          },
-          "unidadeId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
           },
           "responsavelId": {
             "type": "string",
@@ -3214,7 +3199,6 @@
           "microchip": null,
           "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "racaId": null,
-          "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
           "observacoes": null,
@@ -3252,11 +3236,6 @@
             "description": "Identificador UUID",
             "format": "uuid",
             "nullable": true
-          },
-          "unidadeId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
           },
           "responsavelId": {
             "type": "string",
@@ -3336,7 +3315,7 @@
             "description": "Foto de entrada já confirmada (POST /fotos e POST /fotos/{id}/confirmacao)."
           }
         },
-        "description": "Atualização parcial com controle de versão. As regras por frente são avaliadas sobre o estado final (cadastro atual + alterações): uma transferência CED para CASADOTE envia só frente, unidade e localização."
+        "description": "Atualização parcial com controle de versão. As regras por frente são avaliadas sobre o estado final (cadastro atual + alterações): uma transferência CED para CASADOTE envia só a frente (a unidade acompanha a frente)."
       },
       "Animal": {
         "type": "object",
@@ -3378,11 +3357,6 @@
             "description": "Identificador UUID",
             "format": "uuid",
             "nullable": true
-          },
-          "unidadeId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
           },
           "responsavelId": {
             "type": "string",
@@ -3479,9 +3453,6 @@
             "type": "boolean",
             "description": "Espécie silvestre (identificação por nome)"
           },
-          "unidadeNome": {
-            "type": "string"
-          },
           "racaNome": {
             "type": "string",
             "nullable": true
@@ -3498,7 +3469,7 @@
             "type": "string",
             "format": "uri",
             "nullable": true,
-            "description": "Link assinado e temporário da foto (padrão 15 min, FOTO_URL_VALIDADE_SEGUNDOS). Só é emitido para quem tem acesso à unidade do animal. Não guardar o link: guardar a imagem e pedir a ficha de novo quando o link vencer."
+            "description": "Link assinado e temporário da foto (padrão 15 min, FOTO_URL_VALIDADE_SEGUNDOS). Não guardar o link: guardar a imagem e pedir a ficha de novo quando o link vencer."
           }
         },
         "example": {
@@ -3508,7 +3479,6 @@
           "microchip": null,
           "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "racaId": null,
-          "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
           "fotoEntradaId": null,
@@ -3775,16 +3745,12 @@
       },
       "Movimentacao": {
         "type": "object",
-        "required": ["id", "animalId", "frenteDestino", "unidadeDestinoId", "unidadeDestinoNome", "usuarioId", "criadoEm"],
+        "required": ["id", "animalId", "frenteDestino", "usuarioId", "criadoEm"],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "animalId": { "type": "string", "format": "uuid" },
           "frenteOrigem": { "type": "string", "nullable": true, "enum": ["CCPA", "CASADOTE", "CED"], "description": "Nula na entrada do animal" },
           "frenteDestino": { "type": "string", "enum": ["CCPA", "CASADOTE", "CED"] },
-          "unidadeOrigemId": { "type": "string", "format": "uuid", "nullable": true },
-          "unidadeOrigemNome": { "type": "string", "nullable": true },
-          "unidadeDestinoId": { "type": "string", "format": "uuid" },
-          "unidadeDestinoNome": { "type": "string" },
           "usuarioId": { "type": "string", "description": "Conta que registrou (id do Supabase Auth)" },
           "criadoEm": { "type": "string", "format": "date-time" }
         }

@@ -205,14 +205,13 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       const paraCasAdote = await http()
         .patch(`/api/v1/animals/${id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
       expect(paraCasAdote.body).toMatchObject({
         id,
         identificadorPublico,
         microchip: '888000111',
         frente: 'CASADOTE',
-        unidadeId: unidades.casAdote,
         versao: 2,
         criadoEm,
       });
@@ -220,7 +219,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       const paraCcpa = await http()
         .patch(`/api/v1/animals/${id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 2, frente: 'CCPA', unidadeId: unidades.ccpa })
+        .send({ versao: 2, frente: 'CCPA' })
         .expect(200);
       expect(paraCcpa.body).toMatchObject({
         id,
@@ -263,12 +262,12 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       await http()
         .patch(`/api/v1/animals/${id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
       await http()
         .patch(`/api/v1/animals/${id}`)
         .set('Authorization', contaB.autorizacao)
-        .send({ versao: 2, frente: 'CCPA', unidadeId: unidades.ccpa })
+        .send({ versao: 2, frente: 'CCPA' })
         .expect(200);
 
       const resposta = await http()
@@ -360,15 +359,20 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       }
     });
 
-    it('trocar só a frente não muda a unidade (a unidade segue o que for enviado)', async () => {
-      const criado = await cadastrar(contaA, cadastroCed('888000222', { unidadeId: unidades.ced }));
+    it('a unidade acompanha a frente e não aparece na resposta', async () => {
+      const criado = await cadastrar(contaA, cadastroCed('888000222'));
       const atualizado = await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
         .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
 
-      expect(atualizado.body).toMatchObject({ frente: 'CASADOTE', unidadeId: unidades.ced });
+      expect(atualizado.body.frente).toBe('CASADOTE');
+      expect(atualizado.body).not.toHaveProperty('unidadeId');
+      const salvo = await ambiente.prisma.animal.findUniqueOrThrow({
+        where: { id: criado.body.id },
+      });
+      expect(salvo.unitId).toBe(unidades.casAdote);
     });
 
     it('o CasAdote recebe animal que já tem identificação, sem repetir exigências', async () => {
@@ -376,7 +380,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       const recebido = await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
       expect(recebido.body.frente).toBe('CASADOTE');
 
@@ -414,12 +418,11 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
     it('qualquer conta passa o animal do CED ao CasAdote e todas continuam vendo a ficha', async () => {
       const criado = await cadastrar(contaB, cadastroCed('888000444'));
       expect(criado.status).toBe(201);
-      expect(criado.body.unidadeId).toBe(unidades.ced);
 
       await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
         .set('Authorization', contaB.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
 
       // Depois da passagem, quem cadastrou e as outras contas continuam enxergando o animal.
@@ -428,7 +431,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
           .get(`/api/v1/animals/${criado.body.id}`)
           .set('Authorization', quem.autorizacao)
           .expect(200);
-        expect(ficha.body).toMatchObject({ frente: 'CASADOTE', unidadeId: unidades.casAdote });
+        expect(ficha.body).toMatchObject({ frente: 'CASADOTE' });
       }
     });
 
@@ -444,7 +447,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
 
       const historico = await http()

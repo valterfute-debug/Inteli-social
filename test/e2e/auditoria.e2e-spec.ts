@@ -84,7 +84,6 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
         nome: 'Luna',
         cor: 'Preta',
         especieId: catalogo.especieId,
-        unidadeId: catalogo.unidadeId,
         responsavelId: catalogo.responsavelId,
         frente: 'CASADOTE',
         fotoEntradaId: await fotoConfirmada(contaB),
