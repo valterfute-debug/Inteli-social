@@ -2742,7 +2742,7 @@
       },
       "post": {
         "summary": "Registrar atendimento clínico",
-        "description": "Implementado. Cria o atendimento (anamnese, exame físico, exames complementares e tratamento, todos opcionais). Sem tipo, o primeiro atendimento do animal é a ADMISSAO e os seguintes são ACOMPANHAMENTO; só existe uma admissão por animal. O responsável gravado é o vigente no cadastro do animal. Um novo atendimento nunca altera os anteriores.",
+        "description": "Implementado. Cria o atendimento (anamnese, exame físico, exames complementares e tratamento, todos opcionais). Animais cadastrados por POST /animals já nascem com a ADMISSAO (vazia), que se completa com PATCH; por isso aqui, sem tipo, o atendimento é ACOMPANHAMENTO. Só animais antigos, sem admissão, recebem ADMISSAO neste POST. Só existe uma admissão por animal. O responsável gravado é o vigente no cadastro do animal. Um novo atendimento nunca altera os anteriores.",
         "x-situacao": "implementado",
         "security": [{ "bearerSupabase": [] }],
         "parameters": [
@@ -3209,7 +3209,7 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais. A unidade não faz parte do cadastro nem da resposta: o servidor a deriva da frente. Enviar unidadeId retorna 400. Localização física não faz mais parte do cadastro.",
+        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais. A unidade não faz parte do cadastro nem da resposta: o servidor a deriva da frente. Enviar unidadeId retorna 400. O cadastro cria junto o prontuário de admissão (atendimento ADMISSAO vazio, em GET /animals/{id}/atendimentos), para a equipe clínica preencher. Localização física não faz mais parte do cadastro.",
         "required": [
           "especieId",
           "responsavelId",

@@ -1,3 +1,4 @@
+import { inflateSync } from 'node:zlib';
 import { NotFoundException } from '@nestjs/common';
 import { Front, Sexo, TipoAtendimento, TipoEventoSaude } from '@prisma/client';
 import { ProntuarioService } from './prontuario.service';
@@ -111,7 +112,60 @@ describe('ProntuarioService', () => {
     );
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
+
+  it('cada atendimento segue as 6 seções do exame clínico, na ordem combinada', async () => {
+    const prisma = criarPrismaFalso();
+    (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalComRelacoesFalso());
+    (prisma.healthEvent.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.atendimentoClinico.findMany as jest.Mock).mockResolvedValue([
+      {
+        id: 'atendimento-1',
+        tipo: TipoAtendimento.ADMISSAO,
+        dataAtendimento: new Date('2026-02-01T00:00:00.000Z'),
+        responsible: { name: 'Maria', endereco: 'Rua das Flores, 10', telefone: null },
+        anamnese: 'a',
+        exameFisico: 'b',
+        examesComplementares: 'c',
+        tratamento: 'd',
+      },
+    ]);
+
+    const pdf = await new ProntuarioService(prisma).gerarPdf(
+      'a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1',
+    );
+
+    // O pdf-lib comprime o conteúdo das páginas e grava cada texto em hexadecimal (WinAnsi).
+    const conteudo = textoDasPaginas(pdf).toUpperCase();
+    const posicoes = [
+      '1. Identificação do animal',
+      '2. Identificação do responsável',
+      '3. Anamnese',
+      '4. Exame físico',
+      '5. Exames complementares',
+      '6. Tratamento',
+    ].map((titulo) =>
+      conteudo.indexOf(Buffer.from(`${titulo}:`, 'latin1').toString('hex').toUpperCase()),
+    );
+    expect(posicoes.every((posicao) => posicao >= 0)).toBe(true);
+    expect([...posicoes].sort((a, b) => a - b)).toEqual(posicoes);
+    // A unidade saiu da ficha (pedido da Ampara).
+    expect(conteudo).not.toContain(Buffer.from('Unidade:', 'latin1').toString('hex').toUpperCase());
+  });
 });
+
+/** Junta o conteúdo descomprimido de todos os blocos (streams) do PDF. */
+function textoDasPaginas(pdf: Buffer) {
+  const bruto = pdf.toString('latin1');
+  const partes: string[] = [];
+  for (const trecho of bruto.matchAll(/stream\r?\n([\s\S]*?)\r?\nendstream/g)) {
+    try {
+      partes.push(inflateSync(Buffer.from(trecho[1], 'latin1')).toString('latin1'));
+    } catch {
+      // Bloco que não é conteúdo comprimido (ex.: fonte): ignorado.
+    }
+  }
+  return partes.join('\n');
+}
 
 describe('formatarDataLocal', () => {
   it('usa o fuso de São Paulo: 22h do dia 1º continua dia 1º', () => {

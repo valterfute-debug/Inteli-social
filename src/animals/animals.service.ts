@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Front, Prisma, SituacaoFoto } from '@prisma/client';
+import { Front, Prisma, SituacaoFoto, TipoAtendimento } from '@prisma/client';
 import { UsuarioAutenticado } from '../auth/tipos';
 import {
   AcaoAuditoria,
@@ -185,6 +185,25 @@ export class AnimalsService {
               acao: AcaoAuditoria.ANIMAL_CRIADO,
               entidade: 'Animal',
               entidadeId: criado.id,
+              unidadeId: criado.unitId,
+              frente: criado.front,
+            });
+            // Todo animal que chega tem prontuário (pedido da Ampara): a ficha de admissão nasce
+            // junto, vazia, e a equipe clínica a preenche com PATCH /atendimentos/{id}.
+            const admissao = await tx.atendimentoClinico.create({
+              data: {
+                animalId: criado.id,
+                responsibleId: criado.responsibleId,
+                tipo: TipoAtendimento.ADMISSAO,
+                dataAtendimento: criado.dataEntrada ?? new Date(),
+                criadoPorId: usuario.id,
+              },
+            });
+            await this.auditoria.registrar(tx, {
+              usuarioId: usuario.id,
+              acao: AcaoAuditoria.ATENDIMENTO_CLINICO_CRIADO,
+              entidade: 'AtendimentoClinico',
+              entidadeId: admissao.id,
               unidadeId: criado.unitId,
               frente: criado.front,
             });

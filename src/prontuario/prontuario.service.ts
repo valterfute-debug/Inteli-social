@@ -121,12 +121,25 @@ export class ProntuarioService {
         { negrito: true },
       );
       novaLinha();
-      campo('Responsável', atendimento.responsible.name);
+      // Estrutura do exame clínico definida com a Ampara: seções 1 a 6, nesta ordem.
+      const responsavel = atendimento.responsible;
       const secoes: Array<[string, string | null]> = [
-        ['Anamnese', atendimento.anamnese],
-        ['Exame físico', atendimento.exameFisico],
-        ['Exames complementares', atendimento.examesComplementares],
-        ['Tratamento', atendimento.tratamento],
+        [
+          '1. Identificação do animal',
+          [animal.publicId, animal.name, animal.species.name, animal.breed?.name]
+            .filter(Boolean)
+            .join(' - '),
+        ],
+        [
+          '2. Identificação do responsável',
+          [responsavel.name, responsavel.endereco, responsavel.telefone]
+            .filter(Boolean)
+            .join(' - '),
+        ],
+        ['3. Anamnese', atendimento.anamnese],
+        ['4. Exame físico', atendimento.exameFisico],
+        ['5. Exames complementares', atendimento.examesComplementares],
+        ['6. Tratamento', atendimento.tratamento],
       ];
       for (const [rotulo, texto] of secoes) {
         escrever(`${rotulo}:`, { negrito: true, tamanho: 10 });

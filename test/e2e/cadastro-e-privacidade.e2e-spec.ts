@@ -333,6 +333,45 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
         .expect(200);
     });
 
+    it('todo animal cadastrado já tem o prontuário de admissão, que a equipe preenche', async () => {
+      const animal = await cadastrar(contaB, {
+        nome: 'Chegou hoje',
+        especieId: especieCao,
+        responsavelId,
+        frente: 'CASADOTE',
+      });
+      expect(animal.status).toBe(201);
+      const rota = `/api/v1/animals/${animal.body.id}/atendimentos`;
+
+      const lista = await http().get(rota).set('Authorization', contaA.autorizacao).expect(200);
+      expect(lista.body.total).toBe(1);
+      const [admissao] = lista.body.itens;
+      expect(admissao).toMatchObject({
+        tipo: 'ADMISSAO',
+        animal: { id: animal.body.id, nome: 'Chegou hoje' },
+        responsavel: { id: responsavelId, nome: 'Maria Fictícia', endereco: 'Rua das Flores, 10' },
+        anamnese: null,
+        exameFisico: null,
+        examesComplementares: null,
+        tratamento: null,
+        versao: 1,
+      });
+
+      // Não existe segunda admissão: a primeira é completada.
+      await http()
+        .post(rota)
+        .set('Authorization', contaA.autorizacao)
+        .set('Idempotency-Key', randomUUID())
+        .send({ tipo: 'ADMISSAO' })
+        .expect(409);
+      const preenchida = await http()
+        .patch(`${rota}/${admissao.id}`)
+        .set('Authorization', contaA.autorizacao)
+        .send({ versao: 1, anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' })
+        .expect(200);
+      expect(preenchida.body).toMatchObject({ anamnese: 'Resgatado na rua', versao: 2 });
+    });
+
     it('dados clínicos de um animal são acessíveis a qualquer conta ativa', async () => {
       const animal = await cadastrar(contaB, {
         nome: 'Tom',

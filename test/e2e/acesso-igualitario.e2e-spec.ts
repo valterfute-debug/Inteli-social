@@ -218,7 +218,7 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         .post(`/api/v1/animals/${animalId}/atendimentos`)
         .set('Authorization', beto.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'Admissão' })
+        .send({ anamnese: 'Retorno' })
         .expect(201);
 
       const eventos = await http()
@@ -230,7 +230,8 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         .get(`/api/v1/animals/${animalId}/atendimentos`)
         .set('Authorization', ana.autorizacao)
         .expect(200);
-      expect(atendimentos.body.total).toBe(1);
+      // A admissão criada com o cadastro + o acompanhamento registrado por Beto.
+      expect(atendimentos.body.total).toBe(2);
     });
 
     it('prontuário em PDF para qualquer conta', async () => {

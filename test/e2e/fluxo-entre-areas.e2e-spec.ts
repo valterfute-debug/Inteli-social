@@ -442,7 +442,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
         .post(`/api/v1/animals/${criado.body.id}/atendimentos`)
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'Admissão no CED' })
+        .send({ anamnese: 'Acompanhamento no CED' })
         .expect(201);
 
       await http()
@@ -455,7 +455,13 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
         .get(`/api/v1/animals/${criado.body.id}/atendimentos`)
         .set('Authorization', contaA.autorizacao)
         .expect(200);
-      expect(historico.body.itens.map((i: { id: string }) => i.id)).toEqual([atendimento.body.id]);
+      // A admissão (criada com o cadastro) e o acompanhamento seguem no mesmo animal.
+      expect(historico.body.total).toBe(2);
+      expect(historico.body.itens.map((i: { id: string }) => i.id)).toContain(atendimento.body.id);
+      expect(historico.body.itens.map((i: { tipo: string }) => i.tipo).sort()).toEqual([
+        'ACOMPANHAMENTO',
+        'ADMISSAO',
+      ]);
     });
   });
 });

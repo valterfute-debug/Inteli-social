@@ -7,7 +7,7 @@ import {
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
-import { Front, Porte, Prisma, SituacaoFoto, Sexo } from '@prisma/client';
+import { Front, Porte, Prisma, SituacaoFoto, Sexo, TipoAtendimento } from '@prisma/client';
 import { AnimalsService } from './animals.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
@@ -66,6 +66,9 @@ function criarPrismaFalso() {
       create: jest.fn(),
       findMany: jest.fn(),
       count: jest.fn(),
+    },
+    atendimentoClinico: {
+      create: jest.fn().mockResolvedValue({ id: 'admissao-1' }),
     },
     unit: { findFirst: jest.fn().mockResolvedValue({ id: 'unidade-1' }) },
     species: {
@@ -185,6 +188,34 @@ describe('AnimalsService', () => {
           usuarioId: USUARIO_TESTE.id,
         },
       });
+    });
+
+    it('todo animal novo já nasce com o prontuário de admissão (vazio) e auditado', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.create as jest.Mock).mockResolvedValue(
+        criarAnimalFalso({ dataEntrada: new Date('2026-10-20T12:00:00.000Z') }),
+      );
+      const auditoria = auditoriaFalsa();
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoria,
+      );
+
+      await service.criar(BASE_CASADOTE, USUARIO_TESTE, CHAVE_TESTE);
+
+      expect(prisma.atendimentoClinico.create).toHaveBeenCalledWith({
+        data: {
+          animalId: ID_ANIMAL,
+          responsibleId: 'responsavel-1',
+          tipo: TipoAtendimento.ADMISSAO,
+          dataAtendimento: new Date('2026-10-20T12:00:00.000Z'),
+          criadoPorId: USUARIO_TESTE.id,
+        },
+      });
+      const acoes = (auditoria.registrar as jest.Mock).mock.calls.map(([, dados]) => dados.acao);
+      expect(acoes).toEqual(['ANIMAL_CRIADO', 'ATENDIMENTO_CLINICO_CRIADO']);
     });
 
     it('frente MANTENEDOR usa a unidade "Mantenedor"', async () => {
