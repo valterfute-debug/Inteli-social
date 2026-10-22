@@ -9,6 +9,7 @@ import { AnimalsModule } from './animals/animals.module';
 import { CatalogosModule } from './catalogos/catalogos.module';
 import { HealthEventsModule } from './health-events/health-events.module';
 import { ProntuarioModule } from './prontuario/prontuario.module';
+import { AtendimentosClinicosModule } from './atendimentos-clinicos/atendimentos-clinicos.module';
 import { StorageModule } from './storage/storage.module';
 import { FotosModule } from './fotos/fotos.module';
 import { AuthModule } from './auth/auth.module';
@@ -64,6 +65,7 @@ import { ManutencaoModule } from './manutencao/manutencao.module';
     CatalogosModule,
     HealthEventsModule,
     ProntuarioModule,
+    AtendimentosClinicosModule,
     StorageModule,
     FotosModule,
   ],

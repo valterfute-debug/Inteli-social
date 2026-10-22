@@ -969,3 +969,20 @@ Veja [contrato](../contracts/openapi.json), [modelo](#modelo), [limitações de 
 O CRUD de Animal e os endpoints de catálogo (espécies, raças, unidades, localizações, responsáveis, frentes) já estão implementados. Não há upload de foto, autenticação, histórico de peso ou sincronização offline implementados: são entregas planejadas para a Sprint 2 e/ou Sprint 3. A integridade cruzada está aplicada em produção (ver [integridade e campos opcionais](#integridade)).
 
 CI está preparado com URLs fictícias e não precisa de secrets; execução GitHub pendente. Não há provedor de API definido, CD ou homologação comprovada. Produção inicia com npm run start após build; orientações de release estão no guia manual.
+
+## Prontuário clínico por atendimento (feat/prontuario-clinico-animal)
+
+Modelo: `AtendimentoClinico` (N por animal). Cada atendimento tem `tipo` (`ADMISSAO` ou `ACOMPANHAMENTO`), `dataAtendimento` e as seções `anamnese`, `exameFisico`, `examesComplementares` e `tratamento`, todas texto livre e opcionais (estrutura simples e extensível; a Ampara ainda não definiu campos estruturados).
+
+Decisões:
+
+- **Histórico**: um novo atendimento é uma nova linha; nunca sobrescreve os anteriores. Não há exclusão de atendimento pela API. As FKs para `Animal` e `Responsible` são `RESTRICT`.
+- **Admissão única**: índice parcial `AtendimentoClinico_admissao_ativa_key` (um `ADMISSAO` ativo por animal). Sem `tipo` informado, o primeiro atendimento é a admissão e os seguintes são acompanhamentos.
+- **Identificação**: animal e responsável são lidos pelos relacionamentos, não copiados. `responsibleId` do atendimento guarda o responsável vigente na criação; trocar o responsável do animal depois não reescreve atendimentos antigos. O endereço exibido é o do cadastro atual do responsável (não há histórico de endereço).
+- **Fluxo**: o prontuário é criado por ação explícita (`POST /animals/{animalId}/atendimentos`), não automaticamente no cadastro, para não bloquear a admissão básica. `Idempotency-Key` é obrigatória (reenvio offline não duplica).
+- **Acesso**: herdado do animal (404 se não existe ou está arquivado; 403 fora das unidades do usuário).
+- **Edição**: `PATCH` com controle de versão. A auditoria registra quais seções mudaram, não o texto clínico.
+- **PDF**: `GET /animals/{id}/prontuario` passou a listar os atendimentos clínicos.
+- **Fora de escopo**: anexos/imagens de exames (o armazenamento atual é só de foto de entrada), prescrição, diagnóstico automático.
+
+Dependência: esta branch parte de `main` e não depende de `feat/ajustar-cadastro-animal`; as duas alteram `prisma/schema.prisma`, `prontuario.service.ts`, `auditoria.service.ts`, `contracts/openapi.json`, `scripts/validar-openapi.cjs` e `docs/wad.md` em trechos diferentes. Ao integrar, a segunda a entrar exige resolver conflitos simples nesses arquivos (e o ajuste do PDF, que lá deixa de mostrar a localização).
