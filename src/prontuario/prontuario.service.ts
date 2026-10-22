@@ -16,7 +16,7 @@ export class ProntuarioService {
   async gerarPdf(animalId: string, escopo: EscopoAcesso): Promise<Buffer> {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
-      include: { species: true, breed: true, unit: true, location: true, responsible: true },
+      include: { species: true, breed: true, unit: true, responsible: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
     garantirUnidade(escopo, animal.unitId);
@@ -73,8 +73,8 @@ export class ProntuarioService {
     campo('Data de entrada', animal.dataEntrada ? formatarData(animal.dataEntrada) : null);
     campo('Frente', animal.front);
     campo('Unidade', animal.unit.name);
-    campo('Localização', animal.location.name);
     campo('Responsável', animal.responsible.name);
+    campo('Endereço do responsável', animal.responsible.endereco);
 
     novaLinha(10);
     escrever('Histórico de Saúde', { negrito: true, tamanho: 14 });

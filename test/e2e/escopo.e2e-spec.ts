@@ -18,7 +18,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
   let desativado: UsuarioTeste;
   let unidadeCasAdote: string;
   let unidadeCed: string;
-  let catalogo: { especieId: string; canilId: string; coloniaId: string; responsavelId: string };
+  let catalogo: { especieId: string; responsavelId: string };
   let animalId: string;
 
   const http = () => request(ambiente.app.getHttpServer());
@@ -45,7 +45,6 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       nome: 'Luna',
       especieId: catalogo.especieId,
       unidadeId,
-      localizacaoId: unidadeId === unidadeCasAdote ? catalogo.canilId : catalogo.coloniaId,
       responsavelId: catalogo.responsavelId,
       frente: 'CASADOTE',
       fotoEntradaId,
@@ -59,16 +58,6 @@ describe('Escopo por unidade (e2e, banco real)', () => {
     const { prisma } = ambiente;
     catalogo = {
       especieId: (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id,
-      canilId: (
-        await prisma.location.findUniqueOrThrow({
-          where: { unitId_name: { unitId: unidadeCasAdote, name: 'Canil' } },
-        })
-      ).id,
-      coloniaId: (
-        await prisma.location.findUniqueOrThrow({
-          where: { unitId_name: { unitId: unidadeCed, name: 'Colônia' } },
-        })
-      ).id,
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
 
@@ -215,7 +204,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       await http()
         .patch(`/api/v1/animals/${animalId}`)
         .set('Authorization', opCasAdote.autorizacao)
-        .send({ versao: 1, unidadeId: unidadeCed, localizacaoId: catalogo.coloniaId })
+        .send({ versao: 1, unidadeId: unidadeCed })
         .expect(403);
     });
 
@@ -223,7 +212,7 @@ describe('Escopo por unidade (e2e, banco real)', () => {
       await http()
         .patch(`/api/v1/animals/${animalId}`)
         .set('Authorization', admin.autorizacao)
-        .send({ versao: 1, unidadeId: unidadeCed, localizacaoId: catalogo.coloniaId })
+        .send({ versao: 1, unidadeId: unidadeCed })
         .expect(200);
 
       await http()

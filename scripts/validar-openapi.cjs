@@ -20,6 +20,7 @@ const ENDPOINTS_IMPLEMENTADOS = new Set([
   'GET /api/v1/locations',
   'GET /api/v1/responsibles',
   'POST /api/v1/responsibles',
+  'PATCH /api/v1/responsibles/{id}',
   'GET /api/v1/fronts',
   'GET /api/v1/animals/{animalId}/health-events',
   'POST /api/v1/animals/{animalId}/health-events',

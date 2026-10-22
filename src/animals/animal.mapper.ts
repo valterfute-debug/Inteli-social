@@ -4,7 +4,8 @@ import { Prisma } from '@prisma/client';
 export const INCLUSAO_ANIMAL = {
   species: true,
   unit: true,
-  location: true,
+  breed: true,
+  responsible: true,
   fotoEntrada: true,
 } satisfies Prisma.AnimalInclude;
 
@@ -20,11 +21,12 @@ export function mapearAnimal(animal: AnimalComRelacoes, fotoEntradaUrl: string |
     especieNome: animal.species.name,
     especieSilvestre: animal.species.silvestre,
     racaId: animal.breedId,
+    racaNome: animal.breed ? animal.breed.name : null,
     unidadeId: animal.unitId,
     unidadeNome: animal.unit.name,
-    localizacaoId: animal.locationId,
-    localizacaoNome: animal.location.name,
     responsavelId: animal.responsibleId,
+    responsavelNome: animal.responsible.name,
+    responsavelEndereco: animal.responsible.endereco,
     frente: animal.front,
     dataEntrada: animal.dataEntrada ? animal.dataEntrada.toISOString() : null,
     sexo: animal.sexo,

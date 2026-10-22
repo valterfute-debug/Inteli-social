@@ -141,7 +141,7 @@
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/unidade/localização e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. Restrito às unidades do usuário: o filtro unidadeId não amplia o acesso.",
+        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/raça/unidade/responsável e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. Restrito às unidades do usuário: o filtro unidadeId não amplia o acesso.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1430,7 +1430,7 @@
     "/api/v1/responsibles": {
       "get": {
         "summary": "Listar responsáveis",
-        "description": "Implementado. Lista responsáveis ativos e não arquivados.",
+        "description": "Implementado. Lista responsáveis ativos e não arquivados, com nome e endereço. E-mail e telefone só são devolvidos ao administrador.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1617,6 +1617,112 @@
           },
           "403": {
             "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/responsibles/{id}": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do responsável",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "patch": {
+        "summary": "Atualizar responsável",
+        "description": "Implementado. Atualiza nome, endereço, e-mail ou telefone do responsável. Administrador edita qualquer um; operador só quem ainda não tem animais ou tem animal ativo nas suas unidades (403 nos demais). O endereço pertence ao responsável e vale para todos os animais vinculados a ele.",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarResponsavel"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Responsável atualizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Responsavel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Responsável não encontrado",
             "content": {
               "application/json": {
                 "schema": {
@@ -2893,11 +2999,9 @@
       "CriarAnimal": {
         "type": "object",
         "additionalProperties": false,
-        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais.",
+        "description": "Dados de admissão. O identificador público é gerado pelo servidor; foto de entrada confirmada é obrigatória. Regras por frente (validadas no servidor): CCPA e CED exigem microchip, sexo, idadeAproximadaMeses, pesoKg e porte; CASADOTE não exige campos adicionais; espécies silvestres exigem nome e dispensam os demais. A unidade não é pedida no formulário: sem unidadeId, o servidor usa a única unidade do usuário ou a unidade da frente. Localização física não faz mais parte do cadastro.",
         "required": [
           "especieId",
-          "unidadeId",
-          "localizacaoId",
           "responsavelId",
           "frente",
           "fotoEntradaId"
@@ -2928,11 +3032,6 @@
             "nullable": true
           },
           "unidadeId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
-          },
-          "localizacaoId": {
             "type": "string",
             "description": "Identificador UUID",
             "format": "uuid"
@@ -3016,7 +3115,6 @@
           "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "racaId": null,
           "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
-          "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
           "observacoes": null,
@@ -3056,11 +3154,6 @@
             "nullable": true
           },
           "unidadeId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
-          },
-          "localizacaoId": {
             "type": "string",
             "description": "Identificador UUID",
             "format": "uuid"
@@ -3191,11 +3284,6 @@
             "description": "Identificador UUID",
             "format": "uuid"
           },
-          "localizacaoId": {
-            "type": "string",
-            "description": "Identificador UUID",
-            "format": "uuid"
-          },
           "responsavelId": {
             "type": "string",
             "description": "Identificador UUID",
@@ -3294,8 +3382,17 @@
           "unidadeNome": {
             "type": "string"
           },
-          "localizacaoNome": {
+          "racaNome": {
+            "type": "string",
+            "nullable": true
+          },
+          "responsavelNome": {
             "type": "string"
+          },
+          "responsavelEndereco": {
+            "type": "string",
+            "nullable": true,
+            "description": "Endereço do cadastro do responsável"
           },
           "fotoEntradaUrl": {
             "type": "string",
@@ -3312,7 +3409,6 @@
           "especieId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "racaId": null,
           "unidadeId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
-          "localizacaoId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "responsavelId": "56b9f220-3c58-4adc-9dfa-102b90720e12",
           "frente": "CASADOTE",
           "fotoEntradaId": null,
@@ -3726,6 +3822,34 @@
         "example": {
           "nome": "Maria Exemplo",
           "telefone": "(11) 91234-5678"
+        }
+      },
+      "AtualizarResponsavel": {
+        "type": "object",
+        "additionalProperties": false,
+        "minProperties": 1,
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "endereco": {
+            "type": "string",
+            "maxLength": 300,
+            "nullable": true
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "maxLength": 160,
+            "nullable": true
+          },
+          "telefone": {
+            "type": "string",
+            "maxLength": 30,
+            "nullable": true
+          }
         }
       },
       "Responsavel": {
