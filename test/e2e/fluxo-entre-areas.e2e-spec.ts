@@ -157,16 +157,19 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       expect(a.body.identificadorPublico).not.toBe(b.body.identificadorPublico);
     });
 
-    it('mantenedor é o local dos silvestres: a unidade "Mantenedor" aparece na ficha e na linha do tempo', async () => {
+    it('mantenedor é uma atuação (frente): aparece na ficha e na linha do tempo', async () => {
       const criado = await cadastrar(contaA, {
         nome: 'Onça do Mantenedor',
         especieId: especieSilvestre,
         responsavelId,
-        frente: 'CED',
-        unidadeId: unidades.mantenedor,
+        frente: 'MANTENEDOR',
       });
       expect(criado.status).toBe(201);
-      expect(criado.body).toMatchObject({ unidadeNome: 'Mantenedor', frente: 'CED' });
+      expect(criado.body).toMatchObject({ frente: 'MANTENEDOR' });
+      const salvo = await ambiente.prisma.animal.findUniqueOrThrow({
+        where: { id: criado.body.id },
+      });
+      expect(salvo.unitId).toBe(unidades.mantenedor);
 
       const linha = await http()
         .get(`/api/v1/animals/${criado.body.id}/movimentacoes`)
@@ -175,9 +178,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       expect(linha.body.itens).toHaveLength(1);
       expect(linha.body.itens[0]).toMatchObject({
         frenteOrigem: null,
-        frenteDestino: 'CED',
-        unidadeOrigemNome: null,
-        unidadeDestinoNome: 'Mantenedor',
+        frenteDestino: 'MANTENEDOR',
       });
     });
 

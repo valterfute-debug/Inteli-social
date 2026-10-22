@@ -17,6 +17,7 @@ const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
   CASADOTE: 'CasAdote',
   CED: 'Captura, Esterilização e Devolução',
+  MANTENEDOR: 'Mantenedor',
 };
 
 @Injectable()

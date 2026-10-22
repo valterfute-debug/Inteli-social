@@ -40,6 +40,15 @@ describe('validarRegrasAdmissao', () => {
     expect(validarRegrasAdmissao({ frente: Front.CASADOTE, especieSilvestre: false })).toEqual([]);
   });
 
+  it('Mantenedor não exige campos adicionais (mas o silvestre continua exigindo o nome)', () => {
+    expect(validarRegrasAdmissao({ frente: Front.MANTENEDOR, especieSilvestre: false })).toEqual(
+      [],
+    );
+    expect(validarRegrasAdmissao({ frente: Front.MANTENEDOR, especieSilvestre: true })).toEqual([
+      'nome é obrigatório para animais silvestres',
+    ]);
+  });
+
   it('silvestre exige nome e dispensa microchip em qualquer frente', () => {
     expect(validarRegrasAdmissao({ frente: Front.CED, especieSilvestre: true })).toEqual([
       'nome é obrigatório para animais silvestres',

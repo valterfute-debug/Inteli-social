@@ -10,6 +10,8 @@ enum Front {
   CCPA
   CASADOTE
   CED
+  // Atuação de quem mantém silvestres (pedido da Ampara: "mantenedor como atuação").
+  MANTENEDOR
 }
 enum Sexo {
   MACHO

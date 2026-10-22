@@ -5,19 +5,24 @@ import { CatalogosService } from './catalogos.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 describe('CatalogosService', () => {
-  it('lista as três frentes fixas de atuação', () => {
+  it('lista as quatro frentes fixas de atuação, incluindo o Mantenedor', () => {
     const service = new CatalogosService(comTransacao({} as PrismaService), auditoriaFalsa());
     const resposta = service.listarFrentes({ pagina: 1, limite: 20 });
 
-    expect(resposta.total).toBe(3);
-    expect(resposta.itens.map((item) => item.codigo)).toEqual(['CCPA', 'CASADOTE', 'CED']);
+    expect(resposta.total).toBe(4);
+    expect(resposta.itens.map((item) => item.codigo)).toEqual([
+      'CCPA',
+      'CASADOTE',
+      'CED',
+      'MANTENEDOR',
+    ]);
   });
 
   it('pagina a listagem de frentes corretamente', () => {
     const service = new CatalogosService(comTransacao({} as PrismaService), auditoriaFalsa());
     const resposta = service.listarFrentes({ pagina: 2, limite: 2 });
 
-    expect(resposta.itens).toHaveLength(1);
+    expect(resposta.itens).toHaveLength(2);
     expect(resposta.pagina).toBe(2);
   });
 

@@ -44,6 +44,7 @@ const UNIDADE_DA_FRENTE: Record<Front, string> = {
   CCPA: 'CCPA',
   CED: 'CED',
   CASADOTE: 'CasAdote',
+  MANTENEDOR: 'Mantenedor',
 };
 
 @Injectable()

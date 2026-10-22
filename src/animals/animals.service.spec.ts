@@ -186,6 +186,29 @@ describe('AnimalsService', () => {
       });
     });
 
+    it('frente MANTENEDOR usa a unidade "Mantenedor"', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.create as jest.Mock).mockResolvedValue(criarAnimalFalso());
+      const service = new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
+
+      await service.criar(
+        { ...BASE_CASADOTE, frente: Front.MANTENEDOR, nome: 'Onça do Mantenedor' },
+        USUARIO_TESTE,
+        CHAVE_TESTE,
+      );
+
+      expect(prisma.unit.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ name: { equals: 'Mantenedor', mode: 'insensitive' } }),
+        }),
+      );
+    });
+
     it('rejeita com 400 quando não há como definir a unidade', async () => {
       const prisma = criarPrismaFalso();
       (prisma.unit.findFirst as jest.Mock).mockResolvedValue(null);

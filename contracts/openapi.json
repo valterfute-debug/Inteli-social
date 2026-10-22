@@ -334,7 +334,8 @@
               "enum": [
                 "CCPA",
                 "CASADOTE",
-                "CED"
+                "CED",
+                "MANTENEDOR"
               ]
             }
           }
@@ -3128,11 +3129,12 @@
           },
           "frente": {
             "type": "string",
-            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas.",
+            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas; MANTENEDOR é a atuação dos silvestres mantidos pela Ampara (sem exigência adicional).",
             "enum": [
               "CCPA",
               "CASADOTE",
-              "CED"
+              "CED",
+              "MANTENEDOR"
             ]
           },
           "dataEntrada": {
@@ -3244,11 +3246,12 @@
           },
           "frente": {
             "type": "string",
-            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas.",
+            "description": "Frente atual. CCPA e CED são frentes de entrada (exigem identificação completa); CASADOTE recebe animais vindos delas; MANTENEDOR é a atuação dos silvestres mantidos pela Ampara (sem exigência adicional).",
             "enum": [
               "CCPA",
               "CASADOTE",
-              "CED"
+              "CED",
+              "MANTENEDOR"
             ]
           },
           "dataEntrada": {
@@ -3369,7 +3372,8 @@
             "enum": [
               "CCPA",
               "CASADOTE",
-              "CED"
+              "CED",
+              "MANTENEDOR"
             ]
           },
           "dataEntrada": {
@@ -3538,7 +3542,8 @@
             "enum": [
               "CCPA",
               "CASADOTE",
-              "CED"
+              "CED",
+              "MANTENEDOR"
             ]
           },
           "nome": {
@@ -3749,8 +3754,8 @@
         "properties": {
           "id": { "type": "string", "format": "uuid" },
           "animalId": { "type": "string", "format": "uuid" },
-          "frenteOrigem": { "type": "string", "nullable": true, "enum": ["CCPA", "CASADOTE", "CED"], "description": "Nula na entrada do animal" },
-          "frenteDestino": { "type": "string", "enum": ["CCPA", "CASADOTE", "CED"] },
+          "frenteOrigem": { "type": "string", "nullable": true, "enum": ["CCPA", "CASADOTE", "CED", "MANTENEDOR"], "description": "Nula na entrada do animal" },
+          "frenteDestino": { "type": "string", "enum": ["CCPA", "CASADOTE", "CED", "MANTENEDOR"] },
           "usuarioId": { "type": "string", "description": "Conta que registrou (id do Supabase Auth)" },
           "criadoEm": { "type": "string", "format": "date-time" }
         }
@@ -4156,7 +4161,8 @@
             "enum": [
               "CCPA",
               "CASADOTE",
-              "CED"
+              "CED",
+              "MANTENEDOR"
             ],
             "nullable": true
           },

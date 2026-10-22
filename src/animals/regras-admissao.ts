@@ -39,7 +39,8 @@ function vazio(valor: unknown) {
  * Regras definidas com a Ampara (reunião de validação da ficha):
  * - Animais silvestres são identificados pelo nome; não se exige microchip nem os demais campos.
  * - CCPA e CED exigem microchip, sexo, idade aproximada, peso e porte.
- * - CasAdote não tem exigência adicional.
+ * - CasAdote e Mantenedor não têm exigência adicional (no Mantenedor ficam os silvestres,
+ *   que já são identificados pelo nome).
  *
  * Retorna a lista de violações (vazia quando o estado é válido).
  */
