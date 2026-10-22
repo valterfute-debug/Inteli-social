@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
 import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
@@ -10,8 +9,8 @@ import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
  */
 describe('Auditoria e correlação (e2e, banco real)', () => {
   let ambiente: Awaited<ReturnType<typeof criarAmbienteE2E>>;
-  let admin: UsuarioTeste;
-  let operadora: UsuarioTeste;
+  let contaA: UsuarioTeste;
+  let contaB: UsuarioTeste;
   let catalogo: {
     especieId: string;
     unidadeId: string;
@@ -52,8 +51,8 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
       unidadeId: casAdote,
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
-    admin = await ambiente.usuario('admin-auditoria', PapelUsuario.ADMIN);
-    operadora = await ambiente.usuario('operadora-auditoria', PapelUsuario.OPERADOR, ['CasAdote']);
+    contaA = await ambiente.usuario('contaA-auditoria');
+    contaB = await ambiente.usuario('contaB-auditoria');
   });
 
   afterAll(async () => {
@@ -79,7 +78,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
   it('cadastro gera ANIMAL_CRIADO com ator, unidade, frente e o ID da requisição', async () => {
     const resposta = await http()
       .post('/api/v1/animals')
-      .set('Authorization', operadora.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .set('Idempotency-Key', randomUUID())
       .send({
         nome: 'Luna',
@@ -88,7 +87,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
         unidadeId: catalogo.unidadeId,
         responsavelId: catalogo.responsavelId,
         frente: 'CASADOTE',
-        fotoEntradaId: await fotoConfirmada(operadora),
+        fotoEntradaId: await fotoConfirmada(contaB),
       })
       .expect(201);
     animalId = resposta.body.id;
@@ -98,7 +97,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
     expect(evento).toMatchObject({
       acao: 'ANIMAL_CRIADO',
       entidade: 'Animal',
-      usuarioId: operadora.id,
+      usuarioId: contaB.id,
       unidadeId: catalogo.unidadeId,
       frente: 'CASADOTE',
       requisicaoId: requisicaoCriacao,
@@ -113,7 +112,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
   it('edição registra só os campos que mudaram, com antes e depois', async () => {
     await http()
       .patch(`/api/v1/animals/${animalId}`)
-      .set('Authorization', operadora.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .send({ versao: 1, nome: 'Luna', cor: 'Caramelo' })
       .expect(200);
 
@@ -125,7 +124,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
     const antes = (await eventosDo(animalId)).length;
     await http()
       .patch(`/api/v1/animals/${animalId}`)
-      .set('Authorization', operadora.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .send({ versao: 1, cor: 'Branca' })
       .expect(409);
     expect(await eventosDo(animalId)).toHaveLength(antes);
@@ -134,14 +133,14 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
   it('evento de saúde e arquivamento também são auditados', async () => {
     const evento = await http()
       .post(`/api/v1/animals/${animalId}/health-events`)
-      .set('Authorization', operadora.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .send({ tipo: 'VACINA', descricao: 'V10', data: '2026-10-01' })
       .expect(201);
     expect((await eventosDo(evento.body.id))[0].acao).toBe('EVENTO_SAUDE_CRIADO');
 
     await http()
       .delete(`/api/v1/animals/${animalId}`)
-      .set('Authorization', operadora.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .expect(204);
     expect((await eventosDo(animalId)).map((e) => e.acao)).toContain('ANIMAL_ARQUIVADO');
   });
@@ -164,10 +163,10 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
     ).rejects.toThrow(/somente inclusão/);
   });
 
-  it('consulta da trilha: ADMIN vê o histórico do animal; operador recebe 403', async () => {
+  it('consulta da trilha: qualquer conta ativa vê o histórico do animal', async () => {
     const resposta = await http()
       .get(`/api/v1/auditoria?entidadeId=${animalId}`)
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .expect(200);
     expect(resposta.body.itens.map((e: { acao: string }) => e.acao)).toEqual([
       'ANIMAL_ARQUIVADO',
@@ -177,7 +176,7 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
 
     await http()
       .get(`/api/v1/auditoria?requisicaoId=${requisicaoCriacao}`)
-      .set('Authorization', operadora.autorizacao)
-      .expect(403);
+      .set('Authorization', contaB.autorizacao)
+      .expect(200);
   });
 });

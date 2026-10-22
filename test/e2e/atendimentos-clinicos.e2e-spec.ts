@@ -1,17 +1,16 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
 import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
 
 /**
  * Prontuário clínico por atendimento: vínculo com o animal, admissão única, histórico
- * preservado, escopo por unidade e idempotência, com banco real.
+ * preservado, igualdade de acesso entre contas e idempotência, com banco real.
  */
 describe('Atendimentos clínicos (e2e, banco real)', () => {
   let ambiente: Awaited<ReturnType<typeof criarAmbienteE2E>>;
-  let admin: UsuarioTeste;
-  let opCed: UsuarioTeste;
+  let contaA: UsuarioTeste;
+  let contaB: UsuarioTeste;
   let animalId: string;
   let outroAnimalId: string;
   let responsavelId: string;
@@ -46,8 +45,8 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     responsavelId = (await ambiente.prisma.responsible.findFirstOrThrow()).id;
     animalId = await criarAnimal('AT-0001');
     outroAnimalId = await criarAnimal('AT-0002');
-    admin = await ambiente.usuario('admin-atendimentos', PapelUsuario.ADMIN);
-    opCed = await ambiente.usuario('op-ced-atendimentos', PapelUsuario.OPERADOR, ['CED']);
+    contaA = await ambiente.usuario('contaA-atendimentos');
+    contaB = await ambiente.usuario('op-ced-atendimentos');
   });
 
   afterAll(async () => {
@@ -59,7 +58,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     const corpo = { anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' };
     const criado = await http()
       .post(rota())
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', chave)
       .send(corpo)
       .expect(201);
@@ -75,7 +74,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     // Reenvio com a mesma chave: mesmo atendimento, sem duplicar.
     const reenvio = await http()
       .post(rota())
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', chave)
       .send(corpo)
       .expect(200);
@@ -86,20 +85,20 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
   it('recusa uma segunda admissão, mas aceita acompanhamentos sem alterar o histórico', async () => {
     await http()
       .post(rota())
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
       .send({ tipo: 'ADMISSAO' })
       .expect(409);
 
     const acompanhamento = await http()
       .post(rota())
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
       .send({ tratamento: 'Vermífugo' })
       .expect(201);
     expect(acompanhamento.body.tipo).toBe('ACOMPANHAMENTO');
 
-    const lista = await http().get(rota()).set('Authorization', admin.autorizacao).expect(200);
+    const lista = await http().get(rota()).set('Authorization', contaA.autorizacao).expect(200);
     expect(lista.body.total).toBe(2);
     const admissao = lista.body.itens.find((item: { tipo: string }) => item.tipo === 'ADMISSAO');
     expect(admissao).toMatchObject({ anamnese: 'Resgatado na rua', tratamento: null });
@@ -110,7 +109,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     const novo = await prisma.responsible.create({ data: { name: 'Novo tutor' } });
     await prisma.animal.update({ where: { id: animalId }, data: { responsibleId: novo.id } });
 
-    const lista = await http().get(rota()).set('Authorization', admin.autorizacao).expect(200);
+    const lista = await http().get(rota()).set('Authorization', contaA.autorizacao).expect(200);
     expect(
       lista.body.itens.every(
         (item: { responsavel: { id: string } }) => item.responsavel.id === responsavelId,
@@ -119,7 +118,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
 
     const depois = await http()
       .post(rota())
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
       .send({ anamnese: 'Retorno' })
       .expect(201);
@@ -128,12 +127,12 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
 
   it('atualiza com controle de versão', async () => {
     const [primeiro] = (
-      await http().get(rota()).set('Authorization', admin.autorizacao).expect(200)
+      await http().get(rota()).set('Authorization', contaA.autorizacao).expect(200)
     ).body.itens.filter((item: { tipo: string }) => item.tipo === 'ADMISSAO');
 
     const atualizado = await http()
       .patch(`${rota()}/${primeiro.id}`)
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .send({ versao: 1, examesComplementares: 'Hemograma normal' })
       .expect(200);
     expect(atualizado.body).toMatchObject({
@@ -144,39 +143,39 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
 
     await http()
       .patch(`${rota()}/${primeiro.id}`)
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .send({ versao: 1, tratamento: 'x' })
       .expect(409);
   });
 
   it('não encontra o atendimento por outro animal e não cria para animal inexistente', async () => {
     const [primeiro] = (
-      await http().get(rota()).set('Authorization', admin.autorizacao).expect(200)
+      await http().get(rota()).set('Authorization', contaA.autorizacao).expect(200)
     ).body.itens;
     await http()
       .get(`${rota(outroAnimalId)}/${primeiro.id}`)
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .expect(404);
     await http()
       .post(rota(randomUUID()))
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
       .send({})
       .expect(404);
   });
 
-  it('respeita o escopo por unidade: operador do CED não vê animal do CasAdote', async () => {
-    await http().get(rota()).set('Authorization', opCed.autorizacao).expect(403);
+  it('sem escopo por unidade: outra conta também consulta e registra no prontuário', async () => {
+    await http().get(rota()).set('Authorization', contaB.autorizacao).expect(200);
     await http()
       .post(rota())
-      .set('Authorization', opCed.autorizacao)
+      .set('Authorization', contaB.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({})
-      .expect(403);
+      .send({ tratamento: 'Registrado por outra conta' })
+      .expect(201);
   });
 
   it('exige Idempotency-Key na criação', async () => {
-    await http().post(rota()).set('Authorization', admin.autorizacao).send({}).expect(400);
+    await http().post(rota()).set('Authorization', contaA.autorizacao).send({}).expect(400);
   });
 
   describe('concorrência e idempotência', () => {
@@ -186,7 +185,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         [randomUUID(), randomUUID(), randomUUID()].map((chave) =>
           http()
             .post(rota(novoAnimal))
-            .set('Authorization', admin.autorizacao)
+            .set('Authorization', contaA.autorizacao)
             .set('Idempotency-Key', chave)
             .send({ anamnese: 'simultâneo' }),
         ),
@@ -207,7 +206,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         [1, 2, 3].map(() =>
           http()
             .post(rota(novoAnimal))
-            .set('Authorization', admin.autorizacao)
+            .set('Authorization', contaA.autorizacao)
             .set('Idempotency-Key', chave)
             .send({ tratamento: 'mesmo corpo' }),
         ),
@@ -223,7 +222,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       const novoAnimal = await criarAnimal('AT-0012');
       const criado = await http()
         .post(rota(novoAnimal))
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
         .send({})
         .expect(201);
@@ -232,7 +231,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         ['A', 'B'].map((texto) =>
           http()
             .patch(`${rota(novoAnimal)}/${criado.body.id}`)
-            .set('Authorization', admin.autorizacao)
+            .set('Authorization', contaA.autorizacao)
             .send({ versao: 1, tratamento: `edição ${texto}` }),
         ),
       );
@@ -240,7 +239,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       expect(respostas.map((r) => r.status).sort()).toEqual([200, 409]);
       const final = await http()
         .get(`${rota(novoAnimal)}/${criado.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(final.body.versao).toBe(2);
     });
@@ -251,14 +250,14 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       const chave = randomUUID();
       await http()
         .post(rota(a))
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
         .send({ anamnese: 'x' })
         .expect(201);
 
       await http()
         .post(rota(b))
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
         .send({ anamnese: 'x' })
         .expect(409);
@@ -270,14 +269,14 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       const chave = randomUUID();
       await http()
         .post(rota(novoAnimal))
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
         .send({ anamnese: 'um' })
         .expect(201);
 
       await http()
         .post(rota(novoAnimal))
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
         .send({ anamnese: 'dois' })
         .expect(409);

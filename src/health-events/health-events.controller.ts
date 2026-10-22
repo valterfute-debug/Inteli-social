@@ -15,8 +15,8 @@ import {
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
-import { EscopoAtual } from '../auth/decoradores';
-import { EscopoAcesso } from '../auth/escopo';
+import { UsuarioAtual } from '../auth/decoradores';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
 import { ListarEventosSaudeQueryDto } from './dto/listar-eventos-saude-query.dto';
 import { HealthEventsService } from './health-events.service';
@@ -31,9 +31,8 @@ export class HealthEventsController {
   listar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Query() query: ListarEventosSaudeQueryDto,
-    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    return this.healthEventsService.listar(animalId, query, escopo);
+    return this.healthEventsService.listar(animalId, query);
   }
 
   @Post()
@@ -46,12 +45,12 @@ export class HealthEventsController {
   async criar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Body() dto: CriarEventoSaudeDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Res({ passthrough: true }) resposta: Response,
   ) {
     const chave = lerChaveIdempotencia(idempotencyKey, false);
-    const { evento, reenvio } = await this.healthEventsService.criar(animalId, dto, escopo, chave);
+    const { evento, reenvio } = await this.healthEventsService.criar(animalId, dto, usuario, chave);
     resposta.status(reenvio ? HttpStatus.OK : HttpStatus.CREATED);
     if (reenvio) resposta.setHeader('Idempotent-Replayed', 'true');
     return evento;
@@ -63,8 +62,8 @@ export class HealthEventsController {
   arquivar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
   ) {
-    return this.healthEventsService.arquivar(animalId, id, escopo);
+    return this.healthEventsService.arquivar(animalId, id, usuario);
   }
 }

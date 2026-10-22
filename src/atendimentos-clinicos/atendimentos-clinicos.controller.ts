@@ -13,8 +13,8 @@ import {
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { EscopoAtual } from '../auth/decoradores';
-import { EscopoAcesso } from '../auth/escopo';
+import { UsuarioAtual } from '../auth/decoradores';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
 import { AtendimentosClinicosService } from './atendimentos-clinicos.service';
 import { AtualizarAtendimentoClinicoDto } from './dto/atualizar-atendimento-clinico.dto';
@@ -31,9 +31,8 @@ export class AtendimentosClinicosController {
   listar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Query() query: ListarAtendimentosClinicosQueryDto,
-    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    return this.atendimentosService.listar(animalId, query, escopo);
+    return this.atendimentosService.listar(animalId, query);
   }
 
   @Post()
@@ -46,7 +45,7 @@ export class AtendimentosClinicosController {
   async criar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Body() dto: CriarAtendimentoClinicoDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Res({ passthrough: true }) resposta: Response,
   ) {
@@ -54,7 +53,7 @@ export class AtendimentosClinicosController {
     const { atendimento, reenvio } = await this.atendimentosService.criar(
       animalId,
       dto,
-      escopo,
+      usuario,
       chave,
     );
     resposta.status(reenvio ? HttpStatus.OK : HttpStatus.CREATED);
@@ -67,9 +66,8 @@ export class AtendimentosClinicosController {
   buscar(
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Param('id', ParseUUIDPipe) id: string,
-    @EscopoAtual() escopo: EscopoAcesso,
   ) {
-    return this.atendimentosService.buscar(animalId, id, escopo);
+    return this.atendimentosService.buscar(animalId, id);
   }
 
   @Patch(':id')
@@ -78,8 +76,8 @@ export class AtendimentosClinicosController {
     @Param('animalId', ParseUUIDPipe) animalId: string,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AtualizarAtendimentoClinicoDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
   ) {
-    return this.atendimentosService.atualizar(animalId, id, dto, escopo);
+    return this.atendimentosService.atualizar(animalId, id, dto, usuario);
   }
 }

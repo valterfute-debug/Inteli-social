@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
 import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
@@ -11,9 +10,9 @@ import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
  */
 describe('Cadastro sem unidade/localização, onça e privacidade de responsáveis (e2e)', () => {
   let ambiente: Awaited<ReturnType<typeof criarAmbienteE2E>>;
-  let admin: UsuarioTeste;
-  let opCasAdote: UsuarioTeste;
-  let opCed: UsuarioTeste;
+  let contaA: UsuarioTeste;
+  let contaB: UsuarioTeste;
+  let contaC: UsuarioTeste;
   let unidadeCasAdote: string;
   let especieCao: string;
   let especieOnca: string;
@@ -51,15 +50,13 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     unidadeCasAdote = await ambiente.idUnidade('CasAdote');
     especieCao = (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id;
     especieOnca = (await prisma.species.findUniqueOrThrow({ where: { name: 'Onça' } })).id;
-    admin = await ambiente.usuario('admin-cadastro', PapelUsuario.ADMIN);
-    opCasAdote = await ambiente.usuario('op-casadote-cadastro', PapelUsuario.OPERADOR, [
-      'CasAdote',
-    ]);
-    opCed = await ambiente.usuario('op-ced-cadastro', PapelUsuario.OPERADOR, ['CED']);
+    contaA = await ambiente.usuario('contaA-cadastro');
+    contaB = await ambiente.usuario('op-casadote-cadastro');
+    contaC = await ambiente.usuario('op-ced-cadastro');
 
     const criado = await http()
       .post('/api/v1/responsibles')
-      .set('Authorization', admin.autorizacao)
+      .set('Authorization', contaA.autorizacao)
       .send({
         nome: 'Maria Fictícia',
         endereco: 'Rua das Flores, 10',
@@ -75,8 +72,8 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
   });
 
   describe('cadastro de animal', () => {
-    it('operador de uma só unidade cadastra sem unidade nem localização; ficha traz responsável e endereço', async () => {
-      const resposta = await cadastrar(opCasAdote, {
+    it('conta cadastra sem unidade nem localização (a unidade segue a frente); ficha traz responsável e endereço', async () => {
+      const resposta = await cadastrar(contaB, {
         nome: 'Luna',
         especieId: especieCao,
         responsavelId,
@@ -94,7 +91,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     });
 
     it('rejeita localizacaoId com 400 (campo desconhecido)', async () => {
-      const resposta = await cadastrar(opCasAdote, {
+      const resposta = await cadastrar(contaB, {
         nome: 'Rex',
         especieId: especieCao,
         responsavelId,
@@ -107,7 +104,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     });
 
     it('PATCH com null em campo obrigatório responde 400, não 500', async () => {
-      const criado = await cadastrar(opCasAdote, {
+      const criado = await cadastrar(contaB, {
         nome: 'Nina',
         especieId: especieCao,
         responsavelId,
@@ -117,7 +114,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
 
       const resposta = await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', opCasAdote.autorizacao)
+        .set('Authorization', contaB.autorizacao)
         .send({ versao: 1, responsavelId: null })
         .expect(400);
       expect(JSON.stringify(resposta.body.mensagem)).toContain('responsavelId');
@@ -128,7 +125,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     it('catálogo oferece a espécie Onça com as raças pintada e parda', async () => {
       const especies = await http()
         .get('/api/v1/species')
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(especies.body.itens.map((e: { nome: string }) => e.nome)).toEqual(
         expect.arrayContaining(['Onça']),
@@ -139,7 +136,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
 
       const racas = await http()
         .get(`/api/v1/breeds?especieId=${especieOnca}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(racas.body.itens.map((r: { nome: string }) => r.nome).sort()).toEqual([
         'Onça-parda',
@@ -154,7 +151,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
         where: { speciesId: especieCao },
       });
 
-      const ok = await cadastrar(opCasAdote, {
+      const ok = await cadastrar(contaB, {
         nome: 'Bagheera',
         especieId: especieOnca,
         racaId: parda.id,
@@ -164,7 +161,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
       expect(ok.status).toBe(201);
       expect(ok.body).toMatchObject({ racaNome: 'Onça-parda', especieNome: 'Onça' });
 
-      const errado = await cadastrar(opCasAdote, {
+      const errado = await cadastrar(contaB, {
         nome: 'Sombra',
         especieId: especieOnca,
         racaId: srdCao.id,
@@ -175,50 +172,47 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     });
   });
 
-  describe('privacidade e autorização de responsáveis', () => {
-    it('operador não recebe e-mail nem telefone; administrador recebe', async () => {
-      const operador = await http()
-        .get('/api/v1/responsibles')
-        .set('Authorization', opCed.autorizacao)
-        .expect(200);
-      const item = operador.body.itens.find((r: { id: string }) => r.id === responsavelId);
-      expect(item).toMatchObject({ nome: 'Maria Fictícia', endereco: 'Rua das Flores, 10' });
-      expect(item).not.toHaveProperty('email');
-      expect(item).not.toHaveProperty('telefone');
-
-      const adm = await http()
-        .get('/api/v1/responsibles')
-        .set('Authorization', admin.autorizacao)
-        .expect(200);
-      expect(adm.body.itens.find((r: { id: string }) => r.id === responsavelId)).toMatchObject({
-        email: 'maria@exemplo.invalid',
-        telefone: '(11) 90000-0000',
-      });
+  describe('responsáveis: contato, edição e auditoria', () => {
+    it('toda conta ativa vê nome, endereço, e-mail e telefone (permissões iguais)', async () => {
+      for (const quem of [contaC, contaA]) {
+        const resposta = await http()
+          .get('/api/v1/responsibles')
+          .set('Authorization', quem.autorizacao)
+          .expect(200);
+        expect(
+          resposta.body.itens.find((r: { id: string }) => r.id === responsavelId),
+        ).toMatchObject({
+          nome: 'Maria Fictícia',
+          endereco: 'Rua das Flores, 10',
+          email: 'maria@exemplo.invalid',
+          telefone: '(11) 90000-0000',
+        });
+      }
     });
 
-    it('operador de outra unidade não edita o responsável de animais alheios (403); quem tem vínculo edita', async () => {
+    it('qualquer conta edita o responsável, tenha ou não animais em "sua" unidade', async () => {
       await http()
         .patch(`/api/v1/responsibles/${responsavelId}`)
-        .set('Authorization', opCed.autorizacao)
-        .send({ endereco: 'Endereço indevido' })
-        .expect(403);
-
-      await http()
-        .patch(`/api/v1/responsibles/${responsavelId}`)
-        .set('Authorization', opCasAdote.autorizacao)
+        .set('Authorization', contaC.autorizacao)
         .send({ endereco: 'Rua Nova, 20', email: 'novo@exemplo.invalid' })
         .expect(200);
+
+      await http()
+        .patch(`/api/v1/responsibles/${responsavelId}`)
+        .set('Authorization', contaB.autorizacao)
+        .send({ endereco: 'Rua Nova, 20' })
+        .expect(200);
     });
 
-    it('responsável ainda sem animais pode ser corrigido por qualquer operador', async () => {
+    it('responsável recém-criado pode ser corrigido na sequência', async () => {
       const novo = await http()
         .post('/api/v1/responsibles')
-        .set('Authorization', opCed.autorizacao)
+        .set('Authorization', contaC.autorizacao)
         .send({ nome: 'Sem Animais' })
         .expect(201);
       await http()
         .patch(`/api/v1/responsibles/${novo.body.id}`)
-        .set('Authorization', opCed.autorizacao)
+        .set('Authorization', contaC.autorizacao)
         .send({ endereco: 'Rua Y' })
         .expect(200);
     });
@@ -226,12 +220,12 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     it('nome só com espaços é recusado (400) na criação e na edição', async () => {
       await http()
         .post('/api/v1/responsibles')
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ nome: '   ' })
         .expect(400);
       await http()
         .patch(`/api/v1/responsibles/${responsavelId}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ nome: '   ' })
         .expect(400);
     });
@@ -239,10 +233,11 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     it('a auditoria da edição guarda só os nomes dos campos, sem e-mail nem endereço', async () => {
       const trilha = await http()
         .get(`/api/v1/auditoria?entidade=Responsible&entidadeId=${responsavelId}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       const edicao = trilha.body.itens.find(
-        (e: { acao: string }) => e.acao === 'RESPONSAVEL_ATUALIZADO',
+        (e: { acao: string; camposAlterados: Record<string, unknown> | null }) =>
+          e.acao === 'RESPONSAVEL_ATUALIZADO' && e.camposAlterados?.email !== undefined,
       );
       expect(edicao).toBeDefined();
       expect(Object.keys(edicao.camposAlterados)).toEqual(
@@ -256,8 +251,8 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
   });
 
   describe('auditoria do prontuário', () => {
-    it('aceita filtrar por AtendimentoClinico, recusa entidade desconhecida e restringe a ADMIN', async () => {
-      const animal = await cadastrar(opCasAdote, {
+    it('aceita filtrar por AtendimentoClinico, recusa entidade desconhecida e vale para qualquer conta', async () => {
+      const animal = await cadastrar(contaB, {
         nome: 'Pipoca',
         especieId: especieCao,
         responsavelId,
@@ -265,14 +260,14 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
       });
       const atendimento = await http()
         .post(`/api/v1/animals/${animal.body.id}/atendimentos`)
-        .set('Authorization', opCasAdote.autorizacao)
+        .set('Authorization', contaB.autorizacao)
         .set('Idempotency-Key', randomUUID())
         .send({ anamnese: 'Texto clínico sigiloso' })
         .expect(201);
 
       const trilha = await http()
         .get(`/api/v1/auditoria?entidade=AtendimentoClinico&entidadeId=${atendimento.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(trilha.body.itens.map((e: { acao: string }) => e.acao)).toContain(
         'ATENDIMENTO_CLINICO_CRIADO',
@@ -281,16 +276,16 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
 
       await http()
         .get('/api/v1/auditoria?entidade=Usuario')
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(400);
       await http()
         .get('/api/v1/auditoria?entidade=AtendimentoClinico')
-        .set('Authorization', opCasAdote.autorizacao)
-        .expect(403);
+        .set('Authorization', contaB.autorizacao)
+        .expect(200);
     });
 
-    it('dados clínicos de um animal não são acessíveis por operador de outra unidade', async () => {
-      const animal = await cadastrar(opCasAdote, {
+    it('dados clínicos de um animal são acessíveis a qualquer conta ativa', async () => {
+      const animal = await cadastrar(contaB, {
         nome: 'Tom',
         especieId: especieCao,
         responsavelId,
@@ -298,19 +293,19 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
       });
       await http()
         .post(`/api/v1/animals/${animal.body.id}/atendimentos`)
-        .set('Authorization', opCasAdote.autorizacao)
+        .set('Authorization', contaB.autorizacao)
         .set('Idempotency-Key', randomUUID())
         .send({ anamnese: 'x' })
         .expect(201);
 
       await http()
         .get(`/api/v1/animals/${animal.body.id}/atendimentos`)
-        .set('Authorization', opCed.autorizacao)
-        .expect(403);
+        .set('Authorization', contaC.autorizacao)
+        .expect(200);
       await http()
         .get(`/api/v1/animals/${animal.body.id}/prontuario`)
-        .set('Authorization', opCed.autorizacao)
-        .expect(403);
+        .set('Authorization', contaC.autorizacao)
+        .expect(200);
     });
   });
 });

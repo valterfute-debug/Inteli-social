@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
 import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
@@ -12,10 +11,10 @@ import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
  */
 describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
   let ambiente: Awaited<ReturnType<typeof criarAmbienteE2E>>;
-  let admin: UsuarioTeste;
-  let opCed: UsuarioTeste;
-  let opAmbas: UsuarioTeste;
-  let unidades: { ccpa: string; ced: string; casAdote: string };
+  let contaA: UsuarioTeste;
+  let contaB: UsuarioTeste;
+  let contaC: UsuarioTeste;
+  let unidades: { ccpa: string; ced: string; casAdote: string; mantenedor: string };
   let especieCao: string;
   let especieSilvestre: string;
   let responsavelId: string;
@@ -65,18 +64,16 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       ccpa: await ambiente.idUnidade('CCPA'),
       ced: await ambiente.idUnidade('CED'),
       casAdote: await ambiente.idUnidade('CasAdote'),
+      mantenedor: await ambiente.idUnidade('Mantenedor'),
     };
     especieCao = (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id;
     especieSilvestre = (
       await prisma.species.findUniqueOrThrow({ where: { name: 'Outro silvestre' } })
     ).id;
     responsavelId = (await prisma.responsible.findFirstOrThrow()).id;
-    admin = await ambiente.usuario('admin-areas', PapelUsuario.ADMIN);
-    opCed = await ambiente.usuario('op-ced-areas', PapelUsuario.OPERADOR, ['CED']);
-    opAmbas = await ambiente.usuario('op-ced-casadote-areas', PapelUsuario.OPERADOR, [
-      'CED',
-      'CasAdote',
-    ]);
+    contaA = await ambiente.usuario('contaA-areas');
+    contaB = await ambiente.usuario('op-ced-areas');
+    contaC = await ambiente.usuario('op-ced-casadote-areas');
   });
 
   afterAll(async () => {
@@ -85,38 +82,38 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
 
   describe('microchip', () => {
     it('é guardado como texto: zeros à esquerda e 20 dígitos são preservados', async () => {
-      const comZeros = await cadastrar(admin, cadastroCed('000123456789'));
+      const comZeros = await cadastrar(contaA, cadastroCed('000123456789'));
       expect(comZeros.status).toBe(201);
       expect(comZeros.body.microchip).toBe('000123456789');
 
-      const longo = await cadastrar(admin, cadastroCed('12345678901234567890'));
+      const longo = await cadastrar(contaA, cadastroCed('12345678901234567890'));
       expect(longo.status).toBe(201);
       expect(longo.body.microchip).toBe('12345678901234567890');
 
       const lido = await http()
         .get(`/api/v1/animals/${comZeros.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(lido.body.microchip).toBe('000123456789');
     });
 
     it('recusa letras e mais de 20 dígitos (400)', async () => {
-      expect((await cadastrar(admin, cadastroCed('12AB34'))).status).toBe(400);
-      expect((await cadastrar(admin, cadastroCed('1'.repeat(21)))).status).toBe(400);
+      expect((await cadastrar(contaA, cadastroCed('12AB34'))).status).toBe(400);
+      expect((await cadastrar(contaA, cadastroCed('1'.repeat(21)))).status).toBe(400);
     });
 
     it('não duplica: o mesmo microchip devolve 409 apontando o animal existente', async () => {
-      const primeiro = await cadastrar(admin, cadastroCed('555000111'));
+      const primeiro = await cadastrar(contaA, cadastroCed('555000111'));
       expect(primeiro.status).toBe(201);
 
-      const duplicado = await cadastrar(admin, cadastroCed('555000111'));
+      const duplicado = await cadastrar(contaA, cadastroCed('555000111'));
       expect(duplicado.status).toBe(409);
       expect(duplicado.body.detalhes).toMatchObject({ animalExistenteId: primeiro.body.id });
     });
 
     it('é exigido, com sexo, idade, peso e porte, no CED e no CCPA (não silvestre)', async () => {
       for (const frente of ['CED', 'CCPA']) {
-        const resposta = await cadastrar(admin, {
+        const resposta = await cadastrar(contaA, {
           especieId: especieCao,
           responsavelId,
           frente,
@@ -132,7 +129,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
 
   describe('animais silvestres', () => {
     it('identificados pelo nome: exigem nome e dispensam os demais campos', async () => {
-      const semNome = await cadastrar(admin, {
+      const semNome = await cadastrar(contaA, {
         especieId: especieSilvestre,
         responsavelId,
         frente: 'CED',
@@ -140,7 +137,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       expect(semNome.status).toBe(400);
       expect(JSON.stringify(semNome.body.mensagem)).toContain('nome');
 
-      const ok = await cadastrar(admin, {
+      const ok = await cadastrar(contaA, {
         nome: 'Tuiuiú',
         especieId: especieSilvestre,
         responsavelId,
@@ -152,16 +149,40 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
 
     it('nomes não são únicos: dois silvestres com o mesmo nome convivem', async () => {
       const corpo = { nome: 'Pacu', especieId: especieSilvestre, responsavelId, frente: 'CED' };
-      const a = await cadastrar(admin, corpo);
-      const b = await cadastrar(admin, corpo);
+      const a = await cadastrar(contaA, corpo);
+      const b = await cadastrar(contaA, corpo);
 
       expect([a.status, b.status]).toEqual([201, 201]);
       expect(a.body.id).not.toBe(b.body.id);
       expect(a.body.identificadorPublico).not.toBe(b.body.identificadorPublico);
     });
 
+    it('mantenedor é o local dos silvestres: a unidade "Mantenedor" aparece na ficha e na linha do tempo', async () => {
+      const criado = await cadastrar(contaA, {
+        nome: 'Onça do Mantenedor',
+        especieId: especieSilvestre,
+        responsavelId,
+        frente: 'CED',
+        unidadeId: unidades.mantenedor,
+      });
+      expect(criado.status).toBe(201);
+      expect(criado.body).toMatchObject({ unidadeNome: 'Mantenedor', frente: 'CED' });
+
+      const linha = await http()
+        .get(`/api/v1/animals/${criado.body.id}/movimentacoes`)
+        .set('Authorization', contaB.autorizacao)
+        .expect(200);
+      expect(linha.body.itens).toHaveLength(1);
+      expect(linha.body.itens[0]).toMatchObject({
+        frenteOrigem: null,
+        frenteDestino: 'CED',
+        unidadeOrigemNome: null,
+        unidadeDestinoNome: 'Mantenedor',
+      });
+    });
+
     it('o código NÃO proíbe microchip em silvestre (coexistência com o nome; regra pendente)', async () => {
-      const resposta = await cadastrar(admin, {
+      const resposta = await cadastrar(contaA, {
         nome: 'Jaguatirica',
         microchip: '777000999',
         especieId: especieSilvestre,
@@ -176,14 +197,14 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
 
   describe('passagem entre áreas', () => {
     it('o mesmo cadastro segue de CED para CasAdote e depois CCPA, preservando identidade e histórico', async () => {
-      const criado = await cadastrar(admin, cadastroCed('888000111', { nome: 'Bolota' }));
+      const criado = await cadastrar(contaA, cadastroCed('888000111', { nome: 'Bolota' }));
       expect(criado.status).toBe(201);
       const { id, identificadorPublico, criadoEm } = criado.body;
       expect(criado.body.frente).toBe('CED');
 
       const paraCasAdote = await http()
         .patch(`/api/v1/animals/${id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
         .expect(200);
       expect(paraCasAdote.body).toMatchObject({
@@ -198,7 +219,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
 
       const paraCcpa = await http()
         .patch(`/api/v1/animals/${id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 2, frente: 'CCPA', unidadeId: unidades.ccpa })
         .expect(200);
       expect(paraCcpa.body).toMatchObject({
@@ -211,14 +232,14 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       // Nenhum animal novo foi criado: continua um só com esse microchip.
       const mesmoChip = await http()
         .get('/api/v1/animals?microchip=888000111')
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(mesmoChip.body.total).toBe(1);
 
       // O histórico da passagem fica na trilha de auditoria (origem → destino, quem e quando).
       const trilha = await http()
         .get(`/api/v1/auditoria?entidade=Animal&entidadeId=${id}&limite=50`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       const movimentos = trilha.body.itens
         .filter((e: { acao: string }) => e.acao === 'ANIMAL_ATUALIZADO')
@@ -231,16 +252,119 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
         { de: 'CED', para: 'CASADOTE' },
         { de: 'CASADOTE', para: 'CCPA' },
       ]);
-      expect(trilha.body.itens.every((e: { usuarioId: string }) => e.usuarioId === admin.id)).toBe(
+      expect(trilha.body.itens.every((e: { usuarioId: string }) => e.usuarioId === contaA.id)).toBe(
         true,
       );
     });
 
+    it('registra a linha do tempo de áreas (entrada e passagens), consultável por qualquer conta', async () => {
+      const criado = await cadastrar(contaA, cadastroCed('888000666', { nome: 'Linha do tempo' }));
+      const id = criado.body.id;
+      await http()
+        .patch(`/api/v1/animals/${id}`)
+        .set('Authorization', contaA.autorizacao)
+        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
+        .expect(200);
+      await http()
+        .patch(`/api/v1/animals/${id}`)
+        .set('Authorization', contaB.autorizacao)
+        .send({ versao: 2, frente: 'CCPA', unidadeId: unidades.ccpa })
+        .expect(200);
+
+      const resposta = await http()
+        .get(`/api/v1/animals/${id}/movimentacoes`)
+        .set('Authorization', contaC.autorizacao)
+        .expect(200);
+
+      expect(resposta.body.total).toBe(3);
+      const caminho = resposta.body.itens
+        .map((m: { frenteOrigem: string | null; frenteDestino: string }) => [
+          m.frenteOrigem,
+          m.frenteDestino,
+        ])
+        .reverse();
+      expect(caminho).toEqual([
+        [null, 'CED'],
+        ['CED', 'CASADOTE'],
+        ['CASADOTE', 'CCPA'],
+      ]);
+      expect(resposta.body.itens[0]).toMatchObject({
+        animalId: id,
+        unidadeOrigemNome: 'CasAdote',
+        unidadeDestinoNome: 'CCPA',
+        usuarioId: contaB.id,
+      });
+      expect(resposta.body.itens[2]).toMatchObject({ unidadeOrigemId: null, usuarioId: contaA.id });
+    });
+
+    it('edição que não muda de área e edição recusada não geram movimentação', async () => {
+      const criado = await cadastrar(contaA, cadastroCed('888000777'));
+      const id = criado.body.id;
+      await http()
+        .patch(`/api/v1/animals/${id}`)
+        .set('Authorization', contaA.autorizacao)
+        .send({ versao: 1, cor: 'Preta' })
+        .expect(200);
+      // Volta para o CED sem os dados de identificação de outro animal: 400 e nada muda.
+      const semDados = await cadastrar(contaA, {
+        nome: 'Sem dados',
+        especieId: especieCao,
+        responsavelId,
+        frente: 'CASADOTE',
+      });
+      await http()
+        .patch(`/api/v1/animals/${semDados.body.id}`)
+        .set('Authorization', contaA.autorizacao)
+        .send({ versao: 1, frente: 'CED' })
+        .expect(400);
+
+      const doPrimeiro = await http()
+        .get(`/api/v1/animals/${id}/movimentacoes`)
+        .set('Authorization', contaA.autorizacao)
+        .expect(200);
+      expect(doPrimeiro.body.total).toBe(1);
+      const doSegundo = await http()
+        .get(`/api/v1/animals/${semDados.body.id}/movimentacoes`)
+        .set('Authorization', contaA.autorizacao)
+        .expect(200);
+      expect(doSegundo.body.total).toBe(1);
+    });
+
+    it('o histórico sobrevive ao arquivamento; animal inexistente: 404; sem login: 401', async () => {
+      const criado = await cadastrar(contaA, cadastroCed('888000888'));
+      const id = criado.body.id;
+      await http()
+        .delete(`/api/v1/animals/${id}`)
+        .set('Authorization', contaA.autorizacao)
+        .expect(204);
+
+      const resposta = await http()
+        .get(`/api/v1/animals/${id}/movimentacoes`)
+        .set('Authorization', contaB.autorizacao)
+        .expect(200);
+      expect(resposta.body.total).toBe(1);
+      await http()
+        .get(`/api/v1/animals/${randomUUID()}/movimentacoes`)
+        .set('Authorization', contaB.autorizacao)
+        .expect(404);
+      await http().get(`/api/v1/animals/${id}/movimentacoes`).expect(401);
+    });
+
+    it('a movimentação não pode ser alterada nem apagada pela API', async () => {
+      const criado = await cadastrar(contaA, cadastroCed('888000999'));
+      const id = criado.body.id;
+      const rota = `/api/v1/animals/${id}/movimentacoes`;
+      const tentativas = [http().post(rota), http().patch(rota), http().delete(rota)];
+      for (const tentativa of tentativas) {
+        await tentativa.set('Authorization', contaA.autorizacao).send({}).expect(404);
+      }
+    });
+
     it('trocar só a frente não muda a unidade (a unidade segue o que for enviado)', async () => {
-      const criado = await cadastrar(admin, cadastroCed('888000222', { unidadeId: unidades.ced }));
+      const criado = await cadastrar(contaA, cadastroCed('888000222', { unidadeId: unidades.ced }));
       const atualizado = await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE' })
         .expect(200);
 
@@ -248,16 +372,16 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
     });
 
     it('o CasAdote recebe animal que já tem identificação, sem repetir exigências', async () => {
-      const criado = await cadastrar(admin, cadastroCed('888000333'));
+      const criado = await cadastrar(contaA, cadastroCed('888000333'));
       const recebido = await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
         .expect(200);
       expect(recebido.body.frente).toBe('CASADOTE');
 
       // Um cadastro NOVO direto no CasAdote não exige os campos extras (RN003).
-      const direto = await cadastrar(admin, {
+      const direto = await cadastrar(contaA, {
         nome: 'Direto',
         especieId: especieCao,
         responsavelId,
@@ -267,7 +391,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
     });
 
     it('voltar para CED/CCPA sem os dados de identificação é recusado (400) e nada muda', async () => {
-      const direto = await cadastrar(admin, {
+      const direto = await cadastrar(contaA, {
         nome: 'Sem dados',
         especieId: especieCao,
         responsavelId,
@@ -275,60 +399,57 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       });
       const recusado = await http()
         .patch(`/api/v1/animals/${direto.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CED' })
         .expect(400);
       expect(JSON.stringify(recusado.body.mensagem)).toContain('microchip');
 
       const lido = await http()
         .get(`/api/v1/animals/${direto.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(lido.body).toMatchObject({ frente: 'CASADOTE', versao: 1 });
     });
 
-    it('o operador do CED não consegue enviar o animal ao CasAdote; quem tem as duas unidades consegue', async () => {
-      const criado = await cadastrar(opCed, cadastroCed('888000444'));
+    it('qualquer conta passa o animal do CED ao CasAdote e todas continuam vendo a ficha', async () => {
+      const criado = await cadastrar(contaB, cadastroCed('888000444'));
       expect(criado.status).toBe(201);
       expect(criado.body.unidadeId).toBe(unidades.ced);
 
       await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', opCed.autorizacao)
-        .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
-        .expect(403);
-
-      await http()
-        .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', opAmbas.autorizacao)
+        .set('Authorization', contaB.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
         .expect(200);
 
-      // Depois da passagem, o operador que só tem o CED deixa de enxergar o animal.
-      await http()
-        .get(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', opCed.autorizacao)
-        .expect(403);
+      // Depois da passagem, quem cadastrou e as outras contas continuam enxergando o animal.
+      for (const quem of [contaB, contaC, contaA]) {
+        const ficha = await http()
+          .get(`/api/v1/animals/${criado.body.id}`)
+          .set('Authorization', quem.autorizacao)
+          .expect(200);
+        expect(ficha.body).toMatchObject({ frente: 'CASADOTE', unidadeId: unidades.casAdote });
+      }
     });
 
     it('atendimentos continuam ligados ao mesmo animal depois da passagem', async () => {
-      const criado = await cadastrar(admin, cadastroCed('888000555'));
+      const criado = await cadastrar(contaA, cadastroCed('888000555'));
       const atendimento = await http()
         .post(`/api/v1/animals/${criado.body.id}/atendimentos`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
         .send({ anamnese: 'Admissão no CED' })
         .expect(201);
 
       await http()
         .patch(`/api/v1/animals/${criado.body.id}`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .send({ versao: 1, frente: 'CASADOTE', unidadeId: unidades.casAdote })
         .expect(200);
 
       const historico = await http()
         .get(`/api/v1/animals/${criado.body.id}/atendimentos`)
-        .set('Authorization', admin.autorizacao)
+        .set('Authorization', contaA.autorizacao)
         .expect(200);
       expect(historico.body.itens.map((i: { id: string }) => i.id)).toEqual([atendimento.body.id]);
     });

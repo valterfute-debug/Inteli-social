@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario, SituacaoFoto } from '@prisma/client';
+import { SituacaoFoto } from '@prisma/client';
 import { ManutencaoService } from '../../src/manutencao/manutencao.service';
 import { criarAmbienteE2E, storageSimulado } from './app-e2e';
 
@@ -11,7 +11,7 @@ describe('Manutenção (e2e, banco real)', () => {
 
   beforeAll(async () => {
     ambiente = await criarAmbienteE2E();
-    await ambiente.usuario('dono', PapelUsuario.ADMIN);
+    await ambiente.usuario('dono');
   });
   afterAll(async () => {
     await ambiente.encerrar();

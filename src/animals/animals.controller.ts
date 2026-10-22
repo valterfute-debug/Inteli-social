@@ -16,12 +16,13 @@ import {
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
-import { EscopoAtual } from '../auth/decoradores';
-import { EscopoAcesso } from '../auth/escopo';
+import { UsuarioAtual } from '../auth/decoradores';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { AnimalsService } from './animals.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
 import { ListarAnimaisQueryDto } from './dto/listar-animais-query.dto';
+import { ListarMovimentacoesQueryDto } from './dto/listar-movimentacoes-query.dto';
 
 @ApiTags('Animals')
 @Controller({ path: 'animals', version: '1' })
@@ -30,8 +31,8 @@ export class AnimalsController {
 
   @Get()
   @ApiOperation({ summary: 'Listar animais ativos' })
-  listar(@Query() query: ListarAnimaisQueryDto, @EscopoAtual() escopo: EscopoAcesso) {
-    return this.animalsService.listar(query, escopo);
+  listar(@Query() query: ListarAnimaisQueryDto) {
+    return this.animalsService.listar(query);
   }
 
   @Post()
@@ -43,12 +44,12 @@ export class AnimalsController {
   })
   async criar(
     @Body() dto: CriarAnimalDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Res({ passthrough: true }) resposta: Response,
   ) {
     const chave = lerChaveIdempotencia(idempotencyKey, true);
-    const { animal, reenvio } = await this.animalsService.criar(dto, escopo, chave);
+    const { animal, reenvio } = await this.animalsService.criar(dto, usuario, chave);
     // 201 na primeira vez; 200 quando é o reenvio de um cadastro já feito.
     resposta.status(reenvio ? HttpStatus.OK : HttpStatus.CREATED);
     if (reenvio) resposta.setHeader('Idempotent-Replayed', 'true');
@@ -57,8 +58,17 @@ export class AnimalsController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Consultar animal' })
-  buscarPorId(@Param('id', ParseUUIDPipe) id: string, @EscopoAtual() escopo: EscopoAcesso) {
-    return this.animalsService.buscarPorId(id, escopo);
+  buscarPorId(@Param('id', ParseUUIDPipe) id: string) {
+    return this.animalsService.buscarPorId(id);
+  }
+
+  @Get(':id/movimentacoes')
+  @ApiOperation({ summary: 'Linha do tempo de áreas e unidades do animal' })
+  listarMovimentacoes(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: ListarMovimentacoesQueryDto,
+  ) {
+    return this.animalsService.listarMovimentacoes(id, query);
   }
 
   @Patch(':id')
@@ -66,15 +76,15 @@ export class AnimalsController {
   atualizar(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: AtualizarAnimalDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
   ) {
-    return this.animalsService.atualizar(id, dto, escopo);
+    return this.animalsService.atualizar(id, dto, usuario);
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Arquivar animal' })
-  arquivar(@Param('id', ParseUUIDPipe) id: string, @EscopoAtual() escopo: EscopoAcesso) {
-    return this.animalsService.arquivar(id, escopo);
+  arquivar(@Param('id', ParseUUIDPipe) id: string, @UsuarioAtual() usuario: UsuarioAutenticado) {
+    return this.animalsService.arquivar(id, usuario);
   }
 }

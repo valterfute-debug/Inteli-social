@@ -1,6 +1,6 @@
 import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { idempotenciaFalsa } from '../../test/idempotencia-teste';
-import { ESCOPO_ADMIN } from '../../test/escopos-teste';
+import { USUARIO_TESTE } from '../../test/usuarios-teste';
 import { NotFoundException } from '@nestjs/common';
 import { TipoEventoSaude } from '@prisma/client';
 import { HealthEventsService } from './health-events.service';
@@ -52,7 +52,7 @@ describe('HealthEventsService', () => {
           tipo: TipoEventoSaude.VACINA,
           data: '2026-01-10',
         },
-        ESCOPO_ADMIN,
+        USUARIO_TESTE,
       ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
@@ -74,7 +74,7 @@ describe('HealthEventsService', () => {
         descricao: 'V10',
         data: '2026-01-10',
       },
-      ESCOPO_ADMIN,
+      USUARIO_TESTE,
     );
 
     expect(resposta.tipo).toBe(TipoEventoSaude.VACINA);
@@ -92,15 +92,11 @@ describe('HealthEventsService', () => {
       auditoriaFalsa(),
     );
 
-    const resposta = await service.listar(
-      'animal-1',
-      {
-        pagina: 1,
-        limite: 20,
-        tipo: TipoEventoSaude.VACINA,
-      },
-      ESCOPO_ADMIN,
-    );
+    const resposta = await service.listar('animal-1', {
+      pagina: 1,
+      limite: 20,
+      tipo: TipoEventoSaude.VACINA,
+    });
 
     expect(resposta.total).toBe(1);
     expect(resposta.itens[0].tipo).toBe(TipoEventoSaude.VACINA);
@@ -116,7 +112,7 @@ describe('HealthEventsService', () => {
     );
 
     await expect(
-      service.arquivar('animal-1', 'evento-inexistente', ESCOPO_ADMIN),
+      service.arquivar('animal-1', 'evento-inexistente', USUARIO_TESTE),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

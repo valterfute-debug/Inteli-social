@@ -3,7 +3,7 @@
   "info": {
     "title": "Ampara Animal — contrato do Ciclo 1",
     "version": "0.3.0",
-    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos. Autorização: além do login, a conta precisa estar liberada na API (tabela Usuario); conta não liberada ou desativada recebe 403. ADMIN acessa todas as unidades; OPERADOR só as vinculadas (papéis provisórios até aprovação da Ampara). O escopo é decidido no servidor: filtros enviados pelo cliente nunca ampliam o acesso. Toda resposta traz o cabeçalho X-Request-Id (o cliente pode enviar o seu, de 8 a 64 caracteres [A-Za-z0-9_-]); ele aparece nos logs, no corpo dos erros e na trilha de auditoria."
+    "description": "Contrato do Ciclo 1 (Sprint 3) e do prontuário do Ciclo 2. Endpoints marcados x-situacao=implementado existem no código e são conferidos por scripts/validar-openapi.cjs. Todas as rotas exigem login (Authorization: Bearer <access token do Supabase Auth>), exceto /api/health e /api/health/ready. IDs e dados dos exemplos são sintéticos. Autorização: além do login, a conta precisa estar liberada e ativa na API (tabela Usuario); conta não liberada ou desativada recebe 403. Todas as contas ativas têm as mesmas permissões, em todas as unidades: não há papéis nem escopo por unidade. Toda resposta traz o cabeçalho X-Request-Id (o cliente pode enviar o seu, de 8 a 64 caracteres [A-Za-z0-9_-]); ele aparece nos logs, no corpo dos erros e na trilha de auditoria."
   },
   "paths": {
     "/api/health": {
@@ -141,7 +141,7 @@
     "/api/v1/animals": {
       "get": {
         "summary": "Listar animais ativos",
-        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/raça/unidade/responsável e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. Restrito às unidades do usuário: o filtro unidadeId não amplia o acesso.",
+        "description": "Implementado. Lista animais ativos (não arquivados), mais recentes primeiro, com nomes de espécie/raça/unidade/responsável e URL assinada da foto (gerada em lote). Filtros combináveis; texto vazio é ignorado. O filtro unidadeId apenas filtra a lista.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -180,7 +180,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -401,7 +401,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -550,7 +550,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -662,7 +662,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -777,7 +777,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -891,7 +891,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1030,7 +1030,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1141,7 +1141,7 @@
     "/api/v1/units": {
       "get": {
         "summary": "Listar unidades",
-        "description": "Implementado. Lista só as unidades em que o usuário pode trabalhar (todas, para ADMIN).",
+        "description": "Implementado. Lista todas as unidades ativas.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1180,7 +1180,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1280,7 +1280,7 @@
     "/api/v1/locations": {
       "get": {
         "summary": "Listar localizações",
-        "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório); unidade fora do escopo do usuário: 403.",
+        "description": "Implementado. Lista localizações de uma unidade (unidadeId obrigatório). A localização física não faz mais parte do cadastro; o endpoint serve a dados legados.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1319,7 +1319,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1430,7 +1430,7 @@
     "/api/v1/responsibles": {
       "get": {
         "summary": "Listar responsáveis",
-        "description": "Implementado. Lista responsáveis ativos e não arquivados, com nome e endereço. E-mail e telefone só são devolvidos ao administrador.",
+        "description": "Implementado. Lista responsáveis ativos e não arquivados, com nome e endereço. Todas as contas ativas recebem os mesmos dados, inclusive e-mail e telefone.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1469,7 +1469,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1616,7 +1616,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -1663,7 +1663,7 @@
       ],
       "patch": {
         "summary": "Atualizar responsável",
-        "description": "Implementado. Atualiza nome, endereço, e-mail ou telefone do responsável. Administrador edita qualquer um; operador só quem ainda não tem animais ou tem animal ativo nas suas unidades (403 nos demais). O endereço pertence ao responsável e vale para todos os animais vinculados a ele.",
+        "description": "Implementado. Atualiza nome, endereço, e-mail ou telefone do responsável. Qualquer conta ativa pode editar qualquer responsável. O endereço pertence ao responsável e vale para todos os animais vinculados a ele.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -1796,7 +1796,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2262,7 +2262,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2394,7 +2394,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2537,7 +2537,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2625,7 +2625,7 @@
         "responses": {
           "200": { "description": "Página de atendimentos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaginaAtendimentosClinicos" } } } },
           "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada/desativada, ou animal fora das unidades do usuário", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
         }
@@ -2644,7 +2644,7 @@
           "201": { "description": "Atendimento registrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
           "400": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada/desativada, ou animal fora das unidades do usuário", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "409": { "description": "Animal já tem admissão, ou Idempotency-Key já usada com conteúdo diferente", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
@@ -2664,7 +2664,7 @@
         "responses": {
           "200": { "description": "Atendimento", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
           "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada/desativada, ou animal fora das unidades do usuário", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "404": { "description": "Animal ou atendimento não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
         }
@@ -2679,9 +2679,31 @@
           "200": { "description": "Atendimento atualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
           "400": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada/desativada, ou animal fora das unidades do usuário", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "404": { "description": "Animal ou atendimento não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "409": { "description": "Versão desatualizada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+        }
+      }
+    },
+    "/api/v1/animals/{id}/movimentacoes": {
+      "parameters": [
+        { "name": "id", "in": "path", "required": true, "description": "Identificador do animal", "schema": { "type": "string", "format": "uuid" } }
+      ],
+      "get": {
+        "summary": "Linha do tempo de áreas e unidades do animal",
+        "description": "Implementado. Lista as movimentações do animal, da mais recente para a mais antiga: a entrada (origem nula) e cada passagem de área (frente) ou unidade, com o usuário e o instante. Vale também para animal arquivado. Registros anteriores a esta versão não foram reconstruídos (ficam só na auditoria). Qualquer conta ativa consulta.",
+        "x-situacao": "implementado",
+        "security": [{ "bearerSupabase": [] }],
+        "parameters": [
+          { "name": "pagina", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "default": 1 } },
+          { "name": "limite", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+        ],
+        "responses": {
+          "200": { "description": "Página de movimentações", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaginaMovimentacoes" } } } },
+          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
+          "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
           "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
         }
       }
@@ -2742,7 +2764,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2816,8 +2838,8 @@
     },
     "/api/v1/me": {
       "get": {
-        "summary": "Dados, papel e unidades do usuário logado",
-        "description": "Implementado. Use para montar a tela conforme o acesso (ex.: unidades do formulário de admissão).",
+        "summary": "Dados da conta logada",
+        "description": "Implementado. Devolve id, e-mail e nome da conta logada.",
         "x-situacao": "implementado",
         "security": [
           {
@@ -2846,7 +2868,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada/desativada, ou registro fora das unidades do usuário",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -2860,7 +2882,7 @@
     },
     "/api/v1/auditoria": {
       "get": {
-        "summary": "Consultar a trilha de auditoria (somente ADMIN)",
+        "summary": "Consultar a trilha de auditoria (qualquer conta ativa)",
         "description": "Implementado. Eventos mais recentes primeiro. Filtros: entidade, entidadeId (histórico de um registro), usuarioId (ações de uma pessoa) e requisicaoId (o X-Request-Id de um relato de erro).",
         "x-situacao": "implementado",
         "security": [
@@ -2985,7 +3007,7 @@
             }
           },
           "403": {
-            "description": "Conta não liberada, ou usuário não é ADMIN",
+            "description": "Conta não liberada ou desativada",
             "content": {
               "application/json": {
                 "schema": {
@@ -3751,6 +3773,32 @@
           "total": { "type": "integer", "minimum": 0 }
         }
       },
+      "Movimentacao": {
+        "type": "object",
+        "required": ["id", "animalId", "frenteDestino", "unidadeDestinoId", "unidadeDestinoNome", "usuarioId", "criadoEm"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "animalId": { "type": "string", "format": "uuid" },
+          "frenteOrigem": { "type": "string", "nullable": true, "enum": ["CCPA", "CASADOTE", "CED"], "description": "Nula na entrada do animal" },
+          "frenteDestino": { "type": "string", "enum": ["CCPA", "CASADOTE", "CED"] },
+          "unidadeOrigemId": { "type": "string", "format": "uuid", "nullable": true },
+          "unidadeOrigemNome": { "type": "string", "nullable": true },
+          "unidadeDestinoId": { "type": "string", "format": "uuid" },
+          "unidadeDestinoNome": { "type": "string" },
+          "usuarioId": { "type": "string", "description": "Conta que registrou (id do Supabase Auth)" },
+          "criadoEm": { "type": "string", "format": "date-time" }
+        }
+      },
+      "PaginaMovimentacoes": {
+        "type": "object",
+        "required": ["itens", "pagina", "limite", "total"],
+        "properties": {
+          "itens": { "type": "array", "items": { "$ref": "#/components/schemas/Movimentacao" } },
+          "pagina": { "type": "integer", "minimum": 1 },
+          "limite": { "type": "integer", "minimum": 1, "maximum": 100 },
+          "total": { "type": "integer", "minimum": 0 }
+        }
+      },
       "PaginaCatalogo": {
         "type": "object",
         "required": [
@@ -4068,10 +4116,7 @@
       "Perfil": {
         "type": "object",
         "required": [
-          "id",
-          "papel",
-          "todasUnidades",
-          "unidades"
+          "id"
         ],
         "properties": {
           "id": {
@@ -4085,37 +4130,6 @@
           "nome": {
             "type": "string",
             "nullable": true
-          },
-          "papel": {
-            "type": "string",
-            "enum": [
-              "ADMIN",
-              "OPERADOR"
-            ],
-            "description": "Provisório até aprovação da Ampara"
-          },
-          "todasUnidades": {
-            "type": "boolean"
-          },
-          "unidades": {
-            "type": "array",
-            "description": "Unidades em que o usuário pode trabalhar (todas, para ADMIN)",
-            "items": {
-              "type": "object",
-              "required": [
-                "id",
-                "nome"
-              ],
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "format": "uuid"
-                },
-                "nome": {
-                  "type": "string"
-                }
-              }
-            }
           }
         }
       },

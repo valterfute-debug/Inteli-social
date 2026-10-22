@@ -1,5 +1,5 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ESCOPO_ADMIN, escopoOperador } from '../../test/escopos-teste';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { USUARIO_TESTE } from '../../test/usuarios-teste';
 import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
 import { CatalogosService } from './catalogos.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -55,7 +55,7 @@ describe('CatalogosService', () => {
         nome: '  Maria ',
         email: 'maria@exemplo.invalid',
       },
-      ESCOPO_ADMIN,
+      USUARIO_TESTE,
     );
 
     expect(create).toHaveBeenCalledWith({
@@ -76,7 +76,7 @@ describe('CatalogosService', () => {
       auditoriaFalsa(),
     );
 
-    await expect(service.criarResponsavel({ nome: '   ' }, ESCOPO_ADMIN)).rejects.toBeInstanceOf(
+    await expect(service.criarResponsavel({ nome: '   ' }, USUARIO_TESTE)).rejects.toBeInstanceOf(
       BadRequestException,
     );
     expect(create).not.toHaveBeenCalled();
@@ -95,7 +95,7 @@ describe('CatalogosService', () => {
     const resposta = await service.atualizarResponsavel(
       'r1',
       { endereco: 'Rua das Flores, 10' },
-      ESCOPO_ADMIN,
+      USUARIO_TESTE,
     );
 
     expect(update).toHaveBeenCalledWith({
@@ -118,15 +118,15 @@ describe('CatalogosService', () => {
       auditoriaFalsa(),
     );
 
-    await expect(service.atualizarResponsavel('x', {}, ESCOPO_ADMIN)).rejects.toBeInstanceOf(
+    await expect(service.atualizarResponsavel('x', {}, USUARIO_TESTE)).rejects.toBeInstanceOf(
       BadRequestException,
     );
     await expect(
-      service.atualizarResponsavel('x', { nome: 'Ana' }, ESCOPO_ADMIN),
+      service.atualizarResponsavel('x', { nome: 'Ana' }, USUARIO_TESTE),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  describe('privacidade dos responsáveis', () => {
+  describe('responsáveis: mesmas permissões para toda conta ativa', () => {
     const responsavel = {
       id: 'r1',
       name: 'Maria',
@@ -135,7 +135,7 @@ describe('CatalogosService', () => {
       telefone: '(11) 91234-5678',
     };
 
-    it('a listagem esconde e-mail e telefone de quem não é administrador', async () => {
+    it('a listagem traz nome, endereço e contato, sem diferença entre contas', async () => {
       const prisma = {
         responsible: {
           findMany: jest.fn().mockResolvedValue([responsavel]),
@@ -144,68 +144,44 @@ describe('CatalogosService', () => {
       } as unknown as PrismaService;
       const service = new CatalogosService(comTransacao(prisma), auditoriaFalsa());
 
-      const operador = await service.listarResponsaveis(
-        { pagina: 1, limite: 20 },
-        escopoOperador(['u1']),
-      );
-      const admin = await service.listarResponsaveis({ pagina: 1, limite: 20 }, ESCOPO_ADMIN);
+      const resposta = await service.listarResponsaveis({ pagina: 1, limite: 20 });
 
-      expect(operador.itens[0]).toEqual({
+      expect(resposta.itens[0]).toEqual({
         id: 'r1',
         nome: 'Maria',
         endereco: 'Rua das Flores, 10',
+        email: 'maria@exemplo.invalid',
+        telefone: '(11) 91234-5678',
       });
-      expect(admin.itens[0]).toMatchObject({ email: 'maria@exemplo.invalid' });
     });
 
-    function prismaDoPatch(total: number, visiveis: number) {
+    function prismaDoPatch() {
       return {
         responsible: {
           findFirst: jest.fn().mockResolvedValue(responsavel),
           update: jest.fn().mockResolvedValue({ ...responsavel, email: 'novo@exemplo.invalid' }),
         },
-        animal: { count: jest.fn().mockResolvedValueOnce(total).mockResolvedValueOnce(visiveis) },
+        // Qualquer consulta de vínculo com animais seria um resquício do escopo por unidade.
+        animal: { count: jest.fn() },
       } as unknown as PrismaService;
     }
 
-    it('operador não edita responsável que só tem animais de outras unidades (403)', async () => {
-      const prisma = prismaDoPatch(2, 0);
+    it('qualquer conta edita qualquer responsável, sem consultar vínculo com unidade', async () => {
+      const prisma = prismaDoPatch();
       const service = new CatalogosService(comTransacao(prisma), auditoriaFalsa());
 
-      await expect(
-        service.atualizarResponsavel(
-          'r1',
-          { email: 'novo@exemplo.invalid' },
-          escopoOperador(['u1']),
-        ),
-      ).rejects.toBeInstanceOf(ForbiddenException);
-      expect(prisma.responsible.update).not.toHaveBeenCalled();
-    });
+      await service.atualizarResponsavel('r1', { email: 'novo@exemplo.invalid' }, USUARIO_TESTE);
 
-    it('operador edita responsável com animal na sua unidade ou ainda sem animais', async () => {
-      for (const [total, visiveis] of [
-        [2, 1],
-        [0, 0],
-      ]) {
-        const prisma = prismaDoPatch(total, visiveis);
-        const service = new CatalogosService(comTransacao(prisma), auditoriaFalsa());
-
-        await service.atualizarResponsavel(
-          'r1',
-          { email: 'novo@exemplo.invalid' },
-          escopoOperador(['u1']),
-        );
-
-        expect(prisma.responsible.update).toHaveBeenCalledTimes(1);
-      }
+      expect(prisma.responsible.update).toHaveBeenCalledTimes(1);
+      expect(prisma.animal.count).not.toHaveBeenCalled();
     });
 
     it('a trilha de auditoria guarda só o nome dos campos, nunca e-mail ou telefone', async () => {
-      const prisma = prismaDoPatch(0, 0);
+      const prisma = prismaDoPatch();
       const auditoria = auditoriaFalsa();
       const service = new CatalogosService(comTransacao(prisma), auditoria);
 
-      await service.atualizarResponsavel('r1', { email: 'novo@exemplo.invalid' }, ESCOPO_ADMIN);
+      await service.atualizarResponsavel('r1', { email: 'novo@exemplo.invalid' }, USUARIO_TESTE);
 
       const evento = (auditoria.registrar as jest.Mock).mock.calls[0][1];
       expect(evento.camposAlterados).toEqual({ email: { antes: null, depois: null } });
@@ -215,7 +191,7 @@ describe('CatalogosService', () => {
       const service = new CatalogosService(comTransacao({} as PrismaService), auditoriaFalsa());
 
       await expect(
-        service.atualizarResponsavel('r1', { nome: '   ' }, ESCOPO_ADMIN),
+        service.atualizarResponsavel('r1', { nome: '   ' }, USUARIO_TESTE),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

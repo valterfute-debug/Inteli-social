@@ -1,6 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   formatarData,
@@ -20,13 +19,12 @@ const ALTURA_LINHA = 18;
 export class ProntuarioService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async gerarPdf(animalId: string, escopo: EscopoAcesso): Promise<Buffer> {
+  async gerarPdf(animalId: string): Promise<Buffer> {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
       include: { species: true, breed: true, unit: true, responsible: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
 
     const eventos = await this.prisma.healthEvent.findMany({
       where: { animalId, deletedAt: null },

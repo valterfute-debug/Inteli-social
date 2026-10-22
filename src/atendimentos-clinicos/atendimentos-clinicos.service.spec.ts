@@ -1,12 +1,7 @@
-import {
-  BadRequestException,
-  ConflictException,
-  ForbiddenException,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Front, Prisma, Sexo, TipoAtendimento } from '@prisma/client';
 import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
-import { ESCOPO_ADMIN, escopoOperador } from '../../test/escopos-teste';
+import { USUARIO_TESTE } from '../../test/usuarios-teste';
 import { CHAVE_TESTE, idempotenciaFalsa } from '../../test/idempotencia-teste';
 import { PrismaService } from '../prisma/prisma.service';
 import { AtendimentosClinicosService } from './atendimentos-clinicos.service';
@@ -27,7 +22,7 @@ function criarAtendimentoFalso(sobrescritas: Partial<Record<string, unknown>> = 
     exameFisico: null,
     examesComplementares: null,
     tratamento: null,
-    criadoPorId: 'admin-1',
+    criadoPorId: USUARIO_TESTE.id,
     version: 1,
     createdAt: new Date('2026-02-01T10:00:00.000Z'),
     updatedAt: new Date('2026-02-01T10:00:00.000Z'),
@@ -76,7 +71,7 @@ describe('AtendimentosClinicosService', () => {
       const { atendimento, reenvio } = await service.criar(
         ID_ANIMAL,
         { anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' },
-        ESCOPO_ADMIN,
+        USUARIO_TESTE,
         CHAVE_TESTE,
       );
 
@@ -87,7 +82,7 @@ describe('AtendimentosClinicosService', () => {
         tipo: TipoAtendimento.ADMISSAO,
         anamnese: 'Resgatado na rua',
         exameFisico: 'Temperatura 38,5',
-        criadoPorId: 'admin-1',
+        criadoPorId: USUARIO_TESTE.id,
       });
       expect(reenvio).toBe(false);
       // Identificação do animal e do responsável vem pelo relacionamento.
@@ -105,7 +100,7 @@ describe('AtendimentosClinicosService', () => {
       (prisma.atendimentoClinico.count as jest.Mock).mockResolvedValue(1);
       const service = criarServico(prisma);
 
-      await service.criar(ID_ANIMAL, { tratamento: 'Vermífugo' }, ESCOPO_ADMIN, CHAVE_TESTE);
+      await service.criar(ID_ANIMAL, { tratamento: 'Vermífugo' }, USUARIO_TESTE, CHAVE_TESTE);
 
       const { data } = (prisma.atendimentoClinico.create as jest.Mock).mock.calls[0][0];
       expect(data.tipo).toBe(TipoAtendimento.ACOMPANHAMENTO);
@@ -118,7 +113,7 @@ describe('AtendimentosClinicosService', () => {
       const service = criarServico(prisma);
 
       await expect(
-        service.criar(ID_ANIMAL, { tipo: TipoAtendimento.ADMISSAO }, ESCOPO_ADMIN, CHAVE_TESTE),
+        service.criar(ID_ANIMAL, { tipo: TipoAtendimento.ADMISSAO }, USUARIO_TESTE, CHAVE_TESTE),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.atendimentoClinico.create).not.toHaveBeenCalled();
     });
@@ -133,7 +128,7 @@ describe('AtendimentosClinicosService', () => {
       );
       const service = criarServico(prisma);
 
-      await expect(service.criar(ID_ANIMAL, {}, ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      await expect(service.criar(ID_ANIMAL, {}, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
         ConflictException,
       );
     });
@@ -143,19 +138,9 @@ describe('AtendimentosClinicosService', () => {
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
       const service = criarServico(prisma);
 
-      await expect(service.criar(ID_ANIMAL, {}, ESCOPO_ADMIN, CHAVE_TESTE)).rejects.toBeInstanceOf(
+      await expect(service.criar(ID_ANIMAL, {}, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
         NotFoundException,
       );
-      expect(prisma.atendimentoClinico.create).not.toHaveBeenCalled();
-    });
-
-    it('recusa animal de unidade fora do escopo do usuário (403)', async () => {
-      const prisma = criarPrismaFalso();
-      const service = criarServico(prisma);
-
-      await expect(
-        service.criar(ID_ANIMAL, {}, escopoOperador(['outra-unidade']), CHAVE_TESTE),
-      ).rejects.toBeInstanceOf(ForbiddenException);
       expect(prisma.atendimentoClinico.create).not.toHaveBeenCalled();
     });
   });
@@ -170,7 +155,7 @@ describe('AtendimentosClinicosService', () => {
       (prisma.atendimentoClinico as unknown as { count: jest.Mock }).count.mockResolvedValue(2);
       const service = criarServico(prisma);
 
-      const resposta = await service.listar(ID_ANIMAL, { pagina: 1, limite: 20 }, ESCOPO_ADMIN);
+      const resposta = await service.listar(ID_ANIMAL, { pagina: 1, limite: 20 });
 
       expect(prisma.atendimentoClinico.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -189,14 +174,14 @@ describe('AtendimentosClinicosService', () => {
         .mockResolvedValueOnce(null);
       const service = criarServico(prisma);
 
-      const encontrado = await service.buscar(ID_ANIMAL, ID_ATENDIMENTO, ESCOPO_ADMIN);
+      const encontrado = await service.buscar(ID_ANIMAL, ID_ATENDIMENTO);
       expect(encontrado.id).toBe(ID_ATENDIMENTO);
       expect((prisma.atendimentoClinico.findFirst as jest.Mock).mock.calls[0][0].where).toEqual({
         id: ID_ATENDIMENTO,
         animalId: ID_ANIMAL,
         deletedAt: null,
       });
-      await expect(service.buscar(ID_ANIMAL, ID_ATENDIMENTO, ESCOPO_ADMIN)).rejects.toBeInstanceOf(
+      await expect(service.buscar(ID_ANIMAL, ID_ATENDIMENTO)).rejects.toBeInstanceOf(
         NotFoundException,
       );
     });
@@ -214,7 +199,7 @@ describe('AtendimentosClinicosService', () => {
         ID_ANIMAL,
         ID_ATENDIMENTO,
         { versao: 1, tratamento: 'Antibiótico por 7 dias' },
-        ESCOPO_ADMIN,
+        USUARIO_TESTE,
       );
 
       expect(prisma.atendimentoClinico.updateMany).toHaveBeenCalledWith({
@@ -238,7 +223,7 @@ describe('AtendimentosClinicosService', () => {
         ID_ANIMAL,
         ID_ATENDIMENTO,
         { versao: 1, anamnese: 'Resgatado na rua' },
-        ESCOPO_ADMIN,
+        USUARIO_TESTE,
       );
 
       expect(resposta.versao).toBe(1);
@@ -254,7 +239,7 @@ describe('AtendimentosClinicosService', () => {
       const service = criarServico(prisma);
 
       await expect(
-        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1, tratamento: 'x' }, ESCOPO_ADMIN),
+        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1, tratamento: 'x' }, USUARIO_TESTE),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.atendimentoClinico.updateMany).not.toHaveBeenCalled();
     });
@@ -266,7 +251,7 @@ describe('AtendimentosClinicosService', () => {
       const service = criarServico(prisma);
 
       await expect(
-        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1, tratamento: 'x' }, ESCOPO_ADMIN),
+        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1, tratamento: 'x' }, USUARIO_TESTE),
       ).rejects.toBeInstanceOf(ConflictException);
     });
 
@@ -275,7 +260,7 @@ describe('AtendimentosClinicosService', () => {
       const service = criarServico(prisma);
 
       await expect(
-        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1 }, ESCOPO_ADMIN),
+        service.atualizar(ID_ANIMAL, ID_ATENDIMENTO, { versao: 1 }, USUARIO_TESTE),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
   });

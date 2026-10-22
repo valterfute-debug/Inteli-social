@@ -1,16 +1,11 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Front } from '@prisma/client';
 import {
   AcaoAuditoria,
   AuditoriaService,
   calcularCamposAlterados,
 } from '../auditoria/auditoria.service';
-import { EscopoAcesso, ehAdmin, garantirUnidade } from '../auth/escopo';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
@@ -69,12 +64,9 @@ export class CatalogosService {
     };
   }
 
-  /** Só as unidades em que o usuário pode trabalhar: é delas que sai o formulário de admissão. */
-  async listarUnidades({ pagina, limite }: PaginacaoQueryDto, escopo: EscopoAcesso) {
-    const where = {
-      deletedAt: null,
-      ...(escopo.todasUnidades ? {} : { id: { in: escopo.unidadeIds } }),
-    };
+  /** Todas as unidades ativas: qualquer conta cadastra e consulta em qualquer unidade. */
+  async listarUnidades({ pagina, limite }: PaginacaoQueryDto) {
+    const where = { deletedAt: null };
     const [itens, total] = await Promise.all([
       this.prisma.unit.findMany({
         where,
@@ -92,11 +84,7 @@ export class CatalogosService {
     };
   }
 
-  async listarLocalizacoes(
-    { pagina, limite, unidadeId }: ListarLocalizacoesQueryDto,
-    escopo: EscopoAcesso,
-  ) {
-    garantirUnidade(escopo, unidadeId);
+  async listarLocalizacoes({ pagina, limite, unidadeId }: ListarLocalizacoesQueryDto) {
     const where = { unitId: unidadeId };
     const [itens, total] = await Promise.all([
       this.prisma.location.findMany({
@@ -115,8 +103,8 @@ export class CatalogosService {
     };
   }
 
-  /** E-mail e telefone são dados pessoais de terceiros: só o administrador os vê na listagem. */
-  async listarResponsaveis({ pagina, limite }: PaginacaoQueryDto, escopo: EscopoAcesso) {
+  /** Todas as contas ativas têm as mesmas permissões: a lista traz nome, endereço e contato. */
+  async listarResponsaveis({ pagina, limite }: PaginacaoQueryDto) {
     const where = { deletedAt: null, active: true };
     const [itens, total] = await Promise.all([
       this.prisma.responsible.findMany({
@@ -127,21 +115,20 @@ export class CatalogosService {
       }),
       this.prisma.responsible.count({ where }),
     ]);
-    const comContato = ehAdmin(escopo);
     return {
-      itens: itens.map((item) => this.mapearResponsavel(item, comContato)),
+      itens: itens.map((item) => this.mapearResponsavel(item)),
       pagina,
       limite,
       total,
     };
   }
 
-  /**
-   * O endereço mora no cadastro do responsável: corrigi-lo vale para todos os seus animais.
-   * O responsável não pertence a uma unidade, então o operador só edita quem ainda não tem
-   * animal ou tem ao menos um animal ativo nas suas unidades.
-   */
-  async atualizarResponsavel(id: string, dto: AtualizarResponsavelDto, escopo: EscopoAcesso) {
+  /** O endereço mora no cadastro do responsável: corrigi-lo vale para todos os seus animais. */
+  async atualizarResponsavel(
+    id: string,
+    dto: AtualizarResponsavelDto,
+    usuario: UsuarioAutenticado,
+  ) {
     const dados = {
       name: dto.nome?.trim(),
       endereco: dto.endereco,
@@ -157,21 +144,11 @@ export class CatalogosService {
     return this.prisma.$transaction(async (tx) => {
       const atual = await tx.responsible.findFirst({ where: { id, deletedAt: null } });
       if (!atual) throw new NotFoundException('Responsável não encontrado');
-      if (!escopo.todasUnidades) {
-        const vinculo = { responsibleId: id, deletedAt: null };
-        const [total, visiveis] = await Promise.all([
-          tx.animal.count({ where: vinculo }),
-          tx.animal.count({ where: { ...vinculo, unitId: { in: escopo.unidadeIds } } }),
-        ]);
-        if (total > 0 && visiveis === 0) {
-          throw new ForbiddenException('Sem acesso a este responsável');
-        }
-      }
       const atualizado = await tx.responsible.update({ where: { id }, data: dados });
       // Só os nomes dos campos: e-mail e telefone não entram na trilha imutável.
       const alterados = calcularCamposAlterados(atual, dados);
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.RESPONSAVEL_ATUALIZADO,
         entidade: 'Responsible',
         entidadeId: id,
@@ -179,29 +156,27 @@ export class CatalogosService {
           Object.keys(alterados).map((campo) => [campo, { antes: null, depois: null }]),
         ),
       });
-      return this.mapearResponsavel(atualizado, true);
+      return this.mapearResponsavel(atualizado);
     });
   }
 
-  private mapearResponsavel(
-    responsavel: {
-      id: string;
-      name: string;
-      endereco: string | null;
-      email: string | null;
-      telefone: string | null;
-    },
-    comContato: boolean,
-  ) {
+  private mapearResponsavel(responsavel: {
+    id: string;
+    name: string;
+    endereco: string | null;
+    email: string | null;
+    telefone: string | null;
+  }) {
     return {
       id: responsavel.id,
       nome: responsavel.name,
       endereco: responsavel.endereco,
-      ...(comContato ? { email: responsavel.email, telefone: responsavel.telefone } : {}),
+      email: responsavel.email,
+      telefone: responsavel.telefone,
     };
   }
 
-  async criarResponsavel(dto: CriarResponsavelDto, escopo: EscopoAcesso) {
+  async criarResponsavel(dto: CriarResponsavelDto, usuario: UsuarioAutenticado) {
     const nome = dto.nome.trim();
     if (nome.length < 2) throw new BadRequestException('nome deve ter ao menos 2 caracteres');
     const responsavel = await this.prisma.$transaction(async (tx) => {
@@ -214,7 +189,7 @@ export class CatalogosService {
         },
       });
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.RESPONSAVEL_CRIADO,
         entidade: 'Responsible',
         entidadeId: criado.id,

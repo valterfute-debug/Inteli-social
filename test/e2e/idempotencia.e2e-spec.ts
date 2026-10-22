@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { PapelUsuario } from '@prisma/client';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
 import { UsuarioTeste, criarAmbienteE2E } from './app-e2e';
@@ -57,8 +56,8 @@ describe('Idempotência (e2e, banco real)', () => {
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
     unidadeCcpa = { unidadeId: ccpa };
-    ana = await ambiente.usuario('ana', PapelUsuario.ADMIN);
-    beto = await ambiente.usuario('beto', PapelUsuario.ADMIN);
+    ana = await ambiente.usuario('ana');
+    beto = await ambiente.usuario('beto');
   });
 
   afterAll(async () => {
@@ -345,13 +344,13 @@ describe('Idempotência (e2e, banco real)', () => {
     ).toBe(1);
   });
 
-  it('dois operadores concorrentes não conseguem assumir o mesmo ID de foto', async () => {
-    const operadorA = await ambiente.usuario('foto-op-a', PapelUsuario.OPERADOR, ['CasAdote']);
-    const operadorB = await ambiente.usuario('foto-op-b', PapelUsuario.OPERADOR, ['CasAdote']);
+  it('duas contas concorrentes não conseguem assumir o mesmo ID de foto', async () => {
+    const contaA = await ambiente.usuario('foto-op-a');
+    const contaB = await ambiente.usuario('foto-op-b');
     const id = randomUUID();
-    const operadores = [operadorA, operadorB];
+    const contas = [contaA, contaB];
     const respostas = await Promise.all(
-      operadores.map((quem) =>
+      contas.map((quem) =>
         http()
           .post('/api/v1/fotos')
           .set('Authorization', quem.autorizacao)
@@ -360,7 +359,7 @@ describe('Idempotência (e2e, banco real)', () => {
       ),
     );
     expect(respostas.map((r) => r.status).sort()).toEqual([201, 403]);
-    const vencedor = operadores[respostas.findIndex((r) => r.status === 201)];
+    const vencedor = contas[respostas.findIndex((r) => r.status === 201)];
     expect((await ambiente.prisma.foto.findUniqueOrThrow({ where: { id } })).criadoPorId).toBe(
       vencedor.id,
     );

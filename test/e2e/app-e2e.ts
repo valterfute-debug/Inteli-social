@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { PapelUsuario, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { AppModule } from '../../src/app.module';
 import { CHAVES_JWT } from '../../src/auth/verificador-token.service';
 import { configurarAplicacao } from '../../src/configurar-aplicacao';
@@ -54,15 +54,21 @@ export async function criarAmbienteE2E() {
   // abrir/fechar automaticamente o mesmo server para cada request concorrente.
   await app.listen(0, '127.0.0.1');
 
-  /** Cria a conta no "Supabase" (token) e, se `papel` vier, libera na API. */
+  /**
+   * Cria a conta no "Supabase" (token) e, salvo 'nao-liberado', libera na API. Todas as contas
+   * ativas têm as mesmas permissões: não há papel nem unidades a escolher.
+   */
   async function usuario(
     id: string,
-    papel?: PapelUsuario,
-    unidades: string[] = [],
-    ativo = true,
+    situacao: 'ativo' | 'nao-liberado' | 'desativado' = 'ativo',
   ): Promise<UsuarioTeste> {
-    if (papel)
-      await liberarUsuario(prisma, { id, papel, unidades, ativo, email: `${id}@teste.invalid` });
+    if (situacao !== 'nao-liberado') {
+      await liberarUsuario(prisma, {
+        id,
+        ativo: situacao === 'ativo',
+        email: `${id}@teste.invalid`,
+      });
+    }
     return { id, autorizacao: `Bearer ${await emissor.assinar({ sub: id })}` };
   }
 

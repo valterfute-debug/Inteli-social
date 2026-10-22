@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, TipoAtendimento } from '@prisma/client';
 import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { INCLUSAO_ATENDIMENTO, mapearAtendimentoClinico } from './atendimento-clinico.mapper';
@@ -30,33 +30,32 @@ export class AtendimentosClinicosService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  /** O prontuário herda o acesso do animal: sem animal ativo (ou fora da unidade) não há prontuário. */
-  private async garantirAnimalAcessivel(animalId: string, escopo: EscopoAcesso) {
+  /** Sem animal ativo (inexistente ou arquivado) não há prontuário. */
+  private async obterAnimalAtivo(animalId: string) {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
       select: { unitId: true, front: true, responsibleId: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
     return animal;
   }
 
   async criar(
     animalId: string,
     dto: CriarAtendimentoClinicoDto,
-    escopo: EscopoAcesso,
+    usuario: UsuarioAutenticado,
     chave: string,
   ) {
-    const animal = await this.garantirAnimalAcessivel(animalId, escopo);
+    const animal = await this.obterAnimalAtivo(animalId);
     const ctx = {
-      usuarioId: escopo.usuarioId,
+      usuarioId: usuario.id,
       chave,
       operacao: `POST /animals/${animalId}/atendimentos`,
       conteudo: dto,
     };
     const anterior = await this.idempotencia.verificarReenvio(ctx);
     if (anterior) {
-      return { atendimento: await this.buscar(animalId, anterior, escopo), reenvio: true };
+      return { atendimento: await this.buscar(animalId, anterior), reenvio: true };
     }
 
     try {
@@ -83,12 +82,12 @@ export class AtendimentosClinicosService {
               exameFisico: dto.exameFisico,
               examesComplementares: dto.examesComplementares,
               tratamento: dto.tratamento,
-              criadoPorId: escopo.usuarioId,
+              criadoPorId: usuario.id,
             },
             include: INCLUSAO_ATENDIMENTO,
           });
           await this.auditoria.registrar(tx, {
-            usuarioId: escopo.usuarioId,
+            usuarioId: usuario.id,
             acao: AcaoAuditoria.ATENDIMENTO_CLINICO_CRIADO,
             entidade: 'AtendimentoClinico',
             entidadeId: criado.id,
@@ -99,7 +98,7 @@ export class AtendimentosClinicosService {
         },
       );
       if (reenvio || !resultado) {
-        return { atendimento: await this.buscar(animalId, recursoId, escopo), reenvio: true };
+        return { atendimento: await this.buscar(animalId, recursoId), reenvio: true };
       }
       return { atendimento: mapearAtendimentoClinico(resultado), reenvio: false };
     } catch (erro) {
@@ -111,12 +110,8 @@ export class AtendimentosClinicosService {
     }
   }
 
-  async listar(
-    animalId: string,
-    { pagina, limite }: ListarAtendimentosClinicosQueryDto,
-    escopo: EscopoAcesso,
-  ) {
-    await this.garantirAnimalAcessivel(animalId, escopo);
+  async listar(animalId: string, { pagina, limite }: ListarAtendimentosClinicosQueryDto) {
+    await this.obterAnimalAtivo(animalId);
     const where = { animalId, deletedAt: null };
     const [itens, total] = await Promise.all([
       this.prisma.atendimentoClinico.findMany({
@@ -131,8 +126,8 @@ export class AtendimentosClinicosService {
     return { itens: itens.map(mapearAtendimentoClinico), pagina, limite, total };
   }
 
-  async buscar(animalId: string, id: string, escopo: EscopoAcesso) {
-    await this.garantirAnimalAcessivel(animalId, escopo);
+  async buscar(animalId: string, id: string) {
+    await this.obterAnimalAtivo(animalId);
     const atendimento = await this.prisma.atendimentoClinico.findFirst({
       where: { id, animalId, deletedAt: null },
       include: INCLUSAO_ATENDIMENTO,
@@ -145,13 +140,13 @@ export class AtendimentosClinicosService {
     animalId: string,
     id: string,
     dto: AtualizarAtendimentoClinicoDto,
-    escopo: EscopoAcesso,
+    usuario: UsuarioAutenticado,
   ) {
     const { versao, ...dados } = dto;
     if (Object.values(dados).every((valor) => valor === undefined)) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
     }
-    const animal = await this.garantirAnimalAcessivel(animalId, escopo);
+    const animal = await this.obterAnimalAtivo(animalId);
     const existente = await this.prisma.atendimentoClinico.findFirst({
       where: { id, animalId, deletedAt: null },
     });
@@ -174,7 +169,7 @@ export class AtendimentosClinicosService {
       ).map((campo) => [campo, { antes: null, depois: null }]),
     );
     // Nada mudou de fato: não gasta versão nem enche a trilha de auditoria.
-    if (Object.keys(camposAlterados).length === 0) return this.buscar(animalId, id, escopo);
+    if (Object.keys(camposAlterados).length === 0) return this.buscar(animalId, id);
 
     await this.prisma.$transaction(async (tx) => {
       const resultado = await tx.atendimentoClinico.updateMany({
@@ -184,7 +179,7 @@ export class AtendimentosClinicosService {
       // Outra edição venceu entre a leitura acima e esta escrita.
       if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.ATENDIMENTO_CLINICO_ATUALIZADO,
         entidade: 'AtendimentoClinico',
         entidadeId: id,
@@ -193,6 +188,6 @@ export class AtendimentosClinicosService {
         camposAlterados,
       });
     });
-    return this.buscar(animalId, id, escopo);
+    return this.buscar(animalId, id);
   }
 }

@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CriarEventoSaudeDto } from './dto/criar-evento-saude.dto';
@@ -16,19 +16,23 @@ export class HealthEventsService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  private async garantirAnimalAcessivel(animalId: string, escopo: EscopoAcesso) {
+  private async obterAnimalAtivo(animalId: string) {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
       select: { unitId: true, front: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
     return animal;
   }
 
   /** Com Idempotency-Key, o reenvio devolve o evento já registrado em vez de duplicá-lo. */
-  async criar(animalId: string, dto: CriarEventoSaudeDto, escopo: EscopoAcesso, chave?: string) {
-    const animal = await this.garantirAnimalAcessivel(animalId, escopo);
+  async criar(
+    animalId: string,
+    dto: CriarEventoSaudeDto,
+    usuario: UsuarioAutenticado,
+    chave?: string,
+  ) {
+    const animal = await this.obterAnimalAtivo(animalId);
     const dados = {
       animalId,
       tipo: dto.tipo,
@@ -39,7 +43,7 @@ export class HealthEventsService {
     const criarComAuditoria = async (tx: Prisma.TransactionClient) => {
       const criado = await tx.healthEvent.create({ data: dados });
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.EVENTO_SAUDE_CRIADO,
         entidade: 'HealthEvent',
         entidadeId: criado.id,
@@ -56,7 +60,7 @@ export class HealthEventsService {
 
     const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
       {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         chave,
         operacao: `POST /animals/${animalId}/health-events`,
         conteudo: dto,
@@ -68,8 +72,8 @@ export class HealthEventsService {
     return { evento: mapearEventoSaude(evento), reenvio };
   }
 
-  async listar(animalId: string, query: ListarEventosSaudeQueryDto, escopo: EscopoAcesso) {
-    await this.garantirAnimalAcessivel(animalId, escopo);
+  async listar(animalId: string, query: ListarEventosSaudeQueryDto) {
+    await this.obterAnimalAtivo(animalId);
     const { pagina, limite, tipo } = query;
     const where = {
       animalId,
@@ -90,8 +94,8 @@ export class HealthEventsService {
     return { itens: itens.map(mapearEventoSaude), pagina, limite, total };
   }
 
-  async arquivar(animalId: string, id: string, escopo: EscopoAcesso) {
-    const animal = await this.garantirAnimalAcessivel(animalId, escopo);
+  async arquivar(animalId: string, id: string, usuario: UsuarioAutenticado) {
+    const animal = await this.obterAnimalAtivo(animalId);
     await this.prisma.$transaction(async (tx) => {
       const resultado = await tx.healthEvent.updateMany({
         where: { id, animalId, deletedAt: null },
@@ -99,7 +103,7 @@ export class HealthEventsService {
       });
       if (resultado.count === 0) throw new NotFoundException('Evento de saúde não encontrado');
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.EVENTO_SAUDE_ARQUIVADO,
         entidade: 'HealthEvent',
         entidadeId: id,

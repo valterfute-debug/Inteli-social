@@ -3,7 +3,6 @@ import { Test } from '@nestjs/testing';
 // supertest exporta uma função CommonJS; esta sintaxe evita dependência de esModuleInterop no editor.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
-import { PapelUsuario } from '@prisma/client';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { CHAVES_JWT } from '../src/auth/verificador-token.service';
@@ -13,19 +12,14 @@ import { criarEmissorDeTokens } from './tokens-teste';
 
 /**
  * Sobe a aplicação inteira com as chaves do Supabase Auth trocadas por chaves locais e um
- * banco simulado que só sabe responder "este usuário é admin". Os testes com banco de
- * verdade (escopo por unidade) ficam em test/e2e.
+ * banco simulado que só sabe responder "esta conta está ativa". Os testes com banco de
+ * verdade ficam em test/e2e.
  */
 async function criarAppComAutenticacao() {
   const emissor = await criarEmissorDeTokens();
   const bancoSimulado = {
     usuario: {
-      findUnique: async () => ({
-        id: 'admin',
-        ativo: true,
-        papel: PapelUsuario.ADMIN,
-        unidades: [],
-      }),
+      findUnique: async () => ({ id: 'conta', ativo: true }),
     },
     $queryRaw: async () => {
       throw new Error('sem banco nos testes HTTP');

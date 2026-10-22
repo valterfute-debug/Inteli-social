@@ -33,11 +33,6 @@ enum SituacaoFoto {
   PENDENTE
   CONFIRMADA
 }
-// Papéis provisórios até a Ampara aprovar os perfis (issue #3, P0-2).
-enum PapelUsuario {
-  ADMIN
-  OPERADOR
-}
 model Species {
   id String @id @default(uuid())
   name String @unique
@@ -64,7 +59,8 @@ model Unit {
   horariosFuncionamento String?
   locations Location[]
   animals Animal[]
-  usuarios UsuarioUnidade[]
+  movimentacoesOrigem MovimentacaoAnimal[] @relation("MovimentacaoOrigem")
+  movimentacoesDestino MovimentacaoAnimal[] @relation("MovimentacaoDestino")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -123,6 +119,7 @@ model Animal {
   deletedAt DateTime?
   healthEvents HealthEvent[]
   atendimentos AtendimentoClinico[]
+  movimentacoes MovimentacaoAnimal[]
   @@index([name])
   @@index([speciesId])
   @@index([microchip])
@@ -158,9 +155,7 @@ model Usuario {
   id String @id
   email String?
   nome String?
-  papel PapelUsuario @default(OPERADOR)
   ativo Boolean @default(true)
-  unidades UsuarioUnidade[]
   fotos Foto[]
   chavesIdempotencia ChaveIdempotencia[]
   createdAt DateTime @default(now())
@@ -196,15 +191,6 @@ model ChaveIdempotencia {
   createdAt DateTime @default(now())
   @@id([usuarioId, chave])
   @@index([createdAt])
-}
-model UsuarioUnidade {
-  usuarioId String
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  unitId String
-  unit Unit @relation(fields: [unitId], references: [id])
-  createdAt DateTime @default(now())
-  @@id([usuarioId, unitId])
-  @@index([unitId])
 }
 model HealthEvent {
   id String @id @default(uuid())
@@ -243,4 +229,21 @@ model AtendimentoClinico {
   deletedAt DateTime?
   @@index([animalId, dataAtendimento])
   @@index([responsibleId])
+}
+// Histórico operacional de áreas (frente) e unidades do animal. Uma linha por entrada ou
+// passagem; nunca é alterada nem apagada pela API. `usuarioId` não tem FK de propósito (como na
+// auditoria): o registro sobrevive à conta. Entrada = origem nula.
+model MovimentacaoAnimal {
+  id String @id @default(uuid())
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  frenteOrigem Front?
+  frenteDestino Front
+  unidadeOrigemId String?
+  unidadeOrigem Unit? @relation("MovimentacaoOrigem", fields: [unidadeOrigemId], references: [id], onDelete: Restrict)
+  unidadeDestinoId String
+  unidadeDestino Unit @relation("MovimentacaoDestino", fields: [unidadeDestinoId], references: [id])
+  usuarioId String
+  createdAt DateTime @default(now())
+  @@index([animalId, createdAt])
 }

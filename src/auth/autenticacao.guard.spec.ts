@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { PapelUsuario } from '@prisma/client';
 import { JWTVerifyGetKey } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { SUPABASE_URL_TESTE, criarEmissorDeTokens } from '../../test/tokens-teste';
@@ -40,7 +39,7 @@ function configCom(supabaseUrl: string | undefined) {
   return { get: () => supabaseUrl } as unknown as ConfigService;
 }
 
-const USUARIO_ADMIN = { id: 'usuario-1', ativo: true, papel: PapelUsuario.ADMIN, unidades: [] };
+const USUARIO_ATIVO = { id: 'usuario-1', ativo: true };
 
 function prismaCom(usuario: unknown) {
   return {
@@ -51,7 +50,7 @@ function prismaCom(usuario: unknown) {
 function criarGuard(
   chaves: JWTVerifyGetKey | null,
   supabaseUrl: string | undefined = SUPABASE_URL_TESTE,
-  prisma: PrismaService = prismaCom(USUARIO_ADMIN),
+  prisma: PrismaService = prismaCom(USUARIO_ATIVO),
 ) {
   const verificador = new VerificadorTokenService(chaves, configCom(supabaseUrl));
   return new AutenticacaoGuard(new Reflector(), verificador, prisma);
@@ -87,35 +86,28 @@ describe('AutenticacaoGuard', () => {
 
     await expect(guard.canActivate(contexto(requisicao))).resolves.toBe(true);
     expect(requisicao.usuario).toEqual({ id: 'usuario-1', email: 'ana@teste.invalid' });
-    expect(requisicao.escopo).toMatchObject({ usuarioId: 'usuario-1', todasUnidades: true });
   });
 
-  it('carrega o escopo do operador a partir dos vínculos no banco', async () => {
-    const prisma = prismaCom({
-      id: 'usuario-2',
-      ativo: true,
-      papel: PapelUsuario.OPERADOR,
-      unidades: [{ unitId: 'unidade-a' }, { unitId: 'unidade-b' }],
-    });
+  it('toda conta ativa passa igual: o guard só confere o cadastro ativo, sem papel nem unidades', async () => {
+    const prisma = prismaCom({ id: 'usuario-2', ativo: true });
     const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prisma);
     const token = await emissor.assinar({ sub: 'usuario-2' });
     const requisicao: Partial<RequisicaoAutenticada> = {
       headers: { authorization: `Bearer ${token}` },
     };
 
-    await guard.canActivate(contexto(requisicao));
+    await expect(guard.canActivate(contexto(requisicao))).resolves.toBe(true);
 
-    expect(requisicao.escopo).toEqual({
-      usuarioId: 'usuario-2',
-      papel: PapelUsuario.OPERADOR,
-      todasUnidades: false,
-      unidadeIds: ['unidade-a', 'unidade-b'],
+    expect(requisicao.usuario).toMatchObject({ id: 'usuario-2' });
+    expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
+      where: { id: 'usuario-2' },
+      select: { ativo: true },
     });
   });
 
   it.each([
     ['sem cadastro na API', null],
-    ['desativado', { ...USUARIO_ADMIN, ativo: false }],
+    ['desativado', { ...USUARIO_ATIVO, ativo: false }],
   ])('recusa com 403 login válido de usuário %s', async (_caso, usuario) => {
     const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prismaCom(usuario));
     const token = await emissor.assinar();
