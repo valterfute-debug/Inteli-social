@@ -69,6 +69,19 @@ Esta tabela é o **índice**; o detalhe de cada DP está nas seções 2 (resolvi
 | DP-20         | Exames complementares terão anexos?                                                                                                | Hoje só texto                                                                                                                                                                                                                                                | (a) texto; (b) anexos                                                                                                                               | Texto                                                        | (b) só com requisito claro de armazenamento                    | Equipe da Ampara            |
 | DP-21         | O sistema precisa funcionar offline?                                                                                               | Planejado (`wad.md` RF07); não implementado. Há idempotência e versão como base                                                                                                                                                                              | fila local e sincronização                                                                                                                          | Online apenas                                                | Tratar como projeto próprio                                    | Equipe da Ampara            |
 
+## 3.1 Revisões da reunião de entrega da sprint (22/10/2026)
+
+A Ampara revisou estes pontos; o que está aqui **substitui** o que as tabelas acima dizem sobre eles.
+
+| ID         | Antes                                                       | Agora                                                                                                                           |
+| ---------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| DP-05      | Mantenedor = unidade "Mantenedor" (local dos silvestres)    | **Mantenedor = atuação**: frente `MANTENEDOR`. A unidade "Mantenedor" continua no catálogo como a unidade derivada dessa frente |
+| DP-08      | Unidade e frente independentes; `unidadeId` opcional na API | **Unidade removida da ficha**: não entra nem sai pela API; o servidor a deriva da frente, inclusive quando a frente muda        |
+| Prontuário | A admissão era criada só quando alguém fazia o POST         | **Todo animal tem prontuário**: a admissão nasce vazia junto com o cadastro, e o PDF segue as 6 seções do exame clínico         |
+| Região     | Não existia                                                 | Campo `regiaoResgate` e levantamento `GET /animals/regioes-resgate`                                                             |
+
+Fica em aberto: a região é texto livre. Se a Ampara quiser um levantamento sem variações de grafia, o próximo passo é um catálogo de regiões (bairros/cidades) para escolher em vez de digitar.
+
 ## 4. Notas
 
 - **Privacidade com acesso igual:** todo dado de contato fica visível a qualquer conta ativa. As proteções que continuam, independentes de perfil: acesso só com login válido e conta liberada e ativa; redação de dados pessoais e texto clínico na auditoria; respostas sem cache. Recomenda-se revisão de privacidade (LGPD) do conjunto de dados exibidos e do tempo de retenção da auditoria; não é uma decisão técnica.

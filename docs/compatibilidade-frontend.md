@@ -41,8 +41,11 @@
 - **`GET /responsibles`** traz `email` e `telefone` para toda conta (antes, só para administradores). `PATCH /responsibles/{id}` é permitido a qualquer conta.
 - **`GET /auditoria`** é aberto a qualquer conta ativa.
 - **Não enviar `localizacaoId`** (nem exibir Localização Física): a API devolve **400**. A resposta de animal não traz `localizacaoId` nem `localizacaoNome`.
-- **Unidade fora do formulário:** `unidadeId` é opcional; sem ele, vale a unidade de mesmo nome da frente (400 se não existir). Trocar só a `frente` **não** muda a unidade.
-- **`PATCH /animals`:** `especieId`, `unidadeId`, `responsavelId`, `frente` e `fotoEntradaId` não aceitam `null` (400).
+- **Unidade removida da ficha** (reunião de entrega, 22/10/2026): **não enviar `unidadeId`** em `POST`/`PATCH /animals` nem no filtro de `GET /animals` (400). A resposta do animal e a linha do tempo não trazem mais `unidadeId`/`unidadeNome`, e o PDF não imprime a unidade. O servidor deriva a unidade da frente, inclusive quando a frente muda.
+- **`PATCH /animals`:** `especieId`, `responsavelId`, `frente` e `fotoEntradaId` não aceitam `null` (400).
+- **Nova frente `MANTENEDOR`** (mantenedor como atuação). Telas que fixavam três frentes precisam aceitar a quarta.
+- **Prontuário de admissão automático:** `POST /animals` já cria o atendimento `ADMISSAO` vazio. Preencher com `PATCH …/atendimentos/{id}`; um `POST …/atendimentos` sem `tipo` agora gera `ACOMPANHAMENTO`.
+- **Novo campo `regiaoResgate`** e nova rota `GET /animals/regioes-resgate` (levantamento por região).
 - **Espécie "Onça-pintada" foi arquivada:** use "Onça" com a raça "Onça-pintada" ou "Onça-parda". Descarte IDs de espécie em cache; animais antigos tiveram `versao` incrementada (ficha em cache + `PATCH` → 409).
 - **`Idempotency-Key` obrigatório** também em `POST …/atendimentos`.
 - **Novo:** `GET /animals/{id}/movimentacoes` (linha do tempo de áreas).
@@ -53,28 +56,30 @@
 | ------------ | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Espécies     | `GET /species`              | traz `silvestre` (define a exigência de nome)                                                                                                          |
 | Raças        | `GET /breeds?especieId=`    | `especieId` obrigatório                                                                                                                                |
-| Frentes      | `GET /fronts`               | `CCPA`, `CASADOTE`, `CED`                                                                                                                              |
-| Unidades     | `GET /units`                | todas; incluem "Mantenedor" (local dos silvestres)                                                                                                     |
+| Frentes      | `GET /fronts`               | `CCPA`, `CASADOTE`, `CED`, `MANTENEDOR` (a "atuação" do animal)                                                                                        |
+| Unidades     | `GET /units`                | catálogo interno; **não** é mais campo do cadastro                                                                                                     |
 | Responsáveis | `GET /responsibles`         | `id`, `nome`, `endereco`, `email`, `telefone`                                                                                                          |
 | Enums fixos  | —                           | `Sexo`: MACHO, FEMEA · `Porte`: PEQUENO, MEDIO, GRANDE · `TipoEventoSaude`: VACINA, VERMIFUGO, CASTRACAO · `TipoAtendimento`: ADMISSAO, ACOMPANHAMENTO |
 | Localizações | `GET /locations?unidadeId=` | legado; **não** faz parte do cadastro                                                                                                                  |
 
 ## 4. Cadastro, edição e passagem entre áreas
 
-- `POST /animals` — corpo: `especieId`_, `responsavelId`_, `frente`_, `fotoEntradaId`_, `racaId`, `nome`, `microchip`, `dataEntrada`, `sexo`, `idadeAproximadaMeses`, `pesoKg`, `porte`, `cor`, `observacoes`, `unidadeId` (opcional). **`Idempotency-Key` obrigatório.** 201 (ou 200 + `Idempotent-Replayed: true` no reenvio).
-- Exigências além dos marcados com *: silvestre → `nome`; CCPA/CED não silvestre → `microchip`, `sexo`, `idadeAproximadaMeses`, `pesoKg`, `porte`; CasAdote → nenhuma (regra confirmada na reunião de validação, DP-01).
+- `POST /animals` — corpo: `especieId`_, `responsavelId`_, `frente`_, `fotoEntradaId`_, `racaId`, `nome`, `microchip`, `dataEntrada`, `sexo`, `idadeAproximadaMeses`, `pesoKg`, `porte`, `cor`, `regiaoResgate`, `observacoes`. **`Idempotency-Key` obrigatório.** 201 (ou 200 + `Idempotent-Replayed: true` no reenvio).
+- Exigências além dos marcados com *: silvestre → `nome`; CCPA/CED não silvestre → `microchip`, `sexo`, `idadeAproximadaMeses`, `pesoKg`, `porte`; CasAdote e Mantenedor → nenhuma (regra confirmada na reunião de validação, DP-01).
+- O cadastro já cria o prontuário de admissão: depois do 201, buscar `GET /animals/{id}/atendimentos` para obter o `id` da admissão e preenchê-la.
 - `PATCH /animals/{id}` — qualquer subconjunto + **`versao` obrigatório**. 409 → recarregar a ficha.
-- **Passagem entre áreas** = `PATCH` com `frente` de destino (e `unidadeId`, se a unidade também muda). Não criar novo cadastro. Tratar 400 (voltar a CED/CCPA sem os cinco campos de identificação) e 409 (versão). Qualquer direção é aceita pela API (DP-07).
-- **Linha do tempo:** `GET /animals/{id}/movimentacoes?pagina=&limite=` — itens com `frenteOrigem` (nula na entrada), `frenteDestino`, `unidadeOrigemNome`, `unidadeDestinoNome`, `usuarioId` e `criadoEm`. Funciona também para animal arquivado. Animais anteriores à migration começam sem itens.
-- A ficha traz `racaNome`, `responsavelNome`, `responsavelEndereco`, `unidadeNome`, `especieNome`, `especieSilvestre`, `fotoEntradaUrl` (link temporário: não guardar) e `versao`.
+- **Passagem entre áreas** = `PATCH` com `frente` de destino (a unidade acompanha a frente). Não criar novo cadastro. Tratar 400 (voltar a CED/CCPA sem os cinco campos de identificação) e 409 (versão). Qualquer direção é aceita pela API (DP-07).
+- **Linha do tempo:** `GET /animals/{id}/movimentacoes?pagina=&limite=` — itens com `frenteOrigem` (nula na entrada), `frenteDestino`, `usuarioId` e `criadoEm`. Funciona também para animal arquivado. Animais anteriores à migration começam sem itens.
+- A ficha traz `racaNome`, `responsavelNome`, `responsavelEndereco`, `regiaoResgate`, `especieNome`, `especieSilvestre`, `fotoEntradaUrl` (link temporário: não guardar) e `versao`.
 - **Microchip é texto**: `"000123456789"` mantém os zeros e aceita até 20 dígitos. Nunca converter para número.
 - **Idade:** `idadeAproximadaMeses` (meses, 0–600); converter anos/meses é do frontend.
-- `GET /animals` — filtros `busca`, `nome`, `identificadorPublico`, `microchip`, `especieId`, `frente`, `unidadeId`. `DELETE /animals/{id}` arquiva (204).
+- `GET /animals` — filtros `busca`, `nome`, `identificadorPublico`, `microchip`, `especieId`, `frente`, `regiaoResgate` (parte do nome, sem diferenciar maiúsculas). `DELETE /animals/{id}` arquiva (204).
+- **Região do resgate:** `regiaoResgate` é texto livre (até 120; bairro, cidade). `GET /animals/regioes-resgate` devolve `{ itens: [{ regiao, total }], totalAnimais }`, da região mais frequente para a menos frequente (`regiao: null` = não informada). Para o levantamento sair limpo, vale oferecer na tela uma lista de regiões já usadas.
 
 ## 5. Silvestres e mantenedor
 
 - `especieSilvestre: true` indica que o **nome** é obrigatório e que microchip, sexo, idade, peso e porte são dispensados; informar o microchip também é aceito (DP-02). Nomes repetidos são aceitos; não usar o nome como chave.
-- **Mantenedor = unidade "Mantenedor"** (o local onde ficam os silvestres, `wad.md` §7.5): selecionável em `unidadeId`. Não há campo nem endpoint de mantenedor como pessoa/organização (DP-06).
+- **Mantenedor = frente `MANTENEDOR`** (pedido da Ampara na reunião de entrega: "mantenedor como atuação"). Selecionável em `frente`, sem exigência adicional de campos. Não há campo nem endpoint de mantenedor como pessoa/organização (DP-06).
 
 ## 6. Foto de entrada (upload)
 
@@ -92,9 +97,9 @@
 ## 8. Prontuário clínico
 
 - `GET /animals/{animalId}/atendimentos?pagina=&limite=` — mais recente primeiro; cada item traz `animal` e `responsavel` (o da época).
-- `POST …/atendimentos` — corpo opcional: `tipo`, `dataAtendimento`, `anamnese`, `exameFisico`, `examesComplementares`, `tratamento` (até 10 000 caracteres cada). **`Idempotency-Key` obrigatório**: gerar uma vez por atendimento e reusar nos reenvios. Sem `tipo`: 1º = ADMISSAO, demais = ACOMPANHAMENTO. Segunda ADMISSAO → 409.
+- `POST …/atendimentos` — corpo opcional: `tipo`, `dataAtendimento`, `anamnese`, `exameFisico`, `examesComplementares`, `tratamento` (até 10 000 caracteres cada). **`Idempotency-Key` obrigatório**: gerar uma vez por atendimento e reusar nos reenvios. Animais cadastrados pela API já têm a ADMISSAO (criada vazia com o cadastro), então sem `tipo` o atendimento é ACOMPANHAMENTO; só animais antigos, sem admissão, recebem ADMISSAO aqui. Segunda ADMISSAO → 409.
 - `PATCH …/atendimentos/{id}` — seções/data + **`versao` obrigatório**; não aceita `tipo`. Sem mudança real → 200 sem alterar a versão.
-- `GET …/atendimentos/{id}`. Não há exclusão. `GET /animals/{id}/prontuario` → PDF com os atendimentos (sem a linha do tempo de áreas).
+- `GET …/atendimentos/{id}`. Não há exclusão. `GET /animals/{id}/prontuario` → PDF com os atendimentos (sem a linha do tempo de áreas). Cada atendimento sai nas 6 seções combinadas com a Ampara: 1. identificação do animal, 2. identificação do responsável (nome, endereço, telefone), 3. anamnese, 4. exame físico, 5. exames complementares, 6. tratamento.
 
 ## 9. Eventos de saúde (recurso distinto do atendimento)
 

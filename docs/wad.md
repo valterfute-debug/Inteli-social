@@ -193,7 +193,7 @@ O banco exige identificador, identificador público, espécie, unidade, localiza
 
 Isso descreve a implementação, não a aprovação integral da ficha pela Ampara. As anotações indicam registro completo com peso, espécie, foto, data, sexo, idade, porte e cor. É necessário conciliar essa expectativa com situações de informação desconhecida e com a avaliação clínica inicial. Não se deve preencher valores fictícios para satisfazer restrições.
 
-Mutirão, Mantenedor, Encontrei um amigo e atendimento de silvestres ainda precisam ser classificados. O enum Front permanece CCPA, CASADOTE e CED. Endereço e horário de unidade são textos opcionais, sem estrutura de agenda.
+Mutirão, Encontrei um amigo e atendimento de silvestres ainda precisam ser classificados. O enum Front é CCPA, CASADOTE, CED e MANTENEDOR (o mantenedor virou atuação na reunião de entrega de 22/10/2026). Endereço e horário de unidade são textos opcionais, sem estrutura de agenda.
 
 ### 3.1.2. Requisitos não funcionais
 
@@ -593,7 +593,17 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 - **Campos obrigatórios (CCPA e CED):** microchip (numérico), sexo (levantamento estatístico), idade aproximada, peso e porte.
 - **CasAdote:** sem exigência adicional, pois o animal já passou por CCPA ou CED. O animal que chega pelo CED e vai para o CasAdote mantém o mesmo microchip; portanto é o **mesmo registro** (transferência via PATCH), não um novo cadastro.
 - **Silvestres:** identificados pelo nome; dispensam microchip e demais campos (confirmado com a equipe).
-- **Mantenedor:** local onde ficam os silvestres, modelado como unidade do catálogo (seed), não como frente.
+- **Mantenedor:** ~~local onde ficam os silvestres, modelado como unidade do catálogo (seed), não como frente.~~ Revisto na reunião de entrega (22/10/2026): o mantenedor é uma **atuação**, ou seja, a frente `MANTENEDOR`.
+
+### Decisões da reunião de entrega da sprint (22/10/2026)
+
+- **Unidade:** removida da ficha (cadastro, resposta e PDF). O servidor a deriva da frente e a guarda só para auditoria e linha do tempo.
+- **Localização física:** removida do cadastro.
+- **Onça:** espécie "Onça" com as raças Onça-pintada e Onça-parda.
+- **Mantenedor:** atuação (frente `MANTENEDOR`), sem exigência adicional de campos.
+- **Responsável pelo acolhimento** (quem leva o animal à Ampara): campo "Responsável" na ficha, com nome e endereço do responsável.
+- **Região do resgate:** campo `regiaoResgate` na ficha e levantamento em `GET /animals/regioes-resgate`.
+- **Prontuário:** todo animal que chega tem um prontuário (exame clínico e físico) atrelado a ele, criado junto com o cadastro, com as seções 1. identificação do animal, 2. identificação do responsável, 3. anamnese, 4. exame físico, 5. exames complementares e 6. tratamento.
 
 ### Entregas do backend
 
@@ -800,7 +810,7 @@ A correção implementada é FK composta `(breedId, speciesId) → Breed(id, spe
 Animal.name, breedId, microchip, dataEntrada, sexo, idadeAproximadaMeses, pesoKg, porte e cor são opcionais. Endereço, horários da unidade e contatos do responsável também. O banco exige id, publicId, speciesId, unitId, responsibleId e front (locationId passou a ser opcional na migration `20261022120000`). Isso não certifica validação de negócio.
 PesoKg é **peso atual**, sem histórico. Meses e kg são unidades propostas. Microchip é texto, não obrigatório nem único; não substitui UUID/publicId. A API futura deve validar valores negativos e formatos. Hoje não há DTO ou serviço de admissão.
 Foto obrigatória na conclusão é requisito confirmado, ainda sem armazenamento. O contrato propõe envio, confirmação e vínculo antes da conclusão; rascunho local pode estar incompleto e deve indicar pendência. A obrigatoriedade definitiva dos demais campos e o escopo clínico inicial aguardam Ampara.
-Frente permanece enum CCPA/CASADOTE/CED. Mutirão, Mantenedor, Encontrei um amigo e silvestres aguardam classificação entre frente, unidade, localização e ação. Não existe histórico de readmissão/transferência (_legado: hoje existe a tabela `MovimentacaoAnimal`_); responsável pelo animal não equivale ao usuário ou profissional clínico.
+Frente é o enum CCPA/CASADOTE/CED/MANTENEDOR. Mutirão, Encontrei um amigo e silvestres aguardam classificação entre frente, unidade, localização e ação. Não existe histórico de readmissão/transferência (_legado: hoje existe a tabela `MovimentacaoAnimal`_); responsável pelo animal não equivale ao usuário ou profissional clínico.
 
 <a id="modelo"></a>
 
