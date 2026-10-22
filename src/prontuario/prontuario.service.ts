@@ -2,7 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
-import { formatarData, traduzirTipoEvento } from './prontuario.util';
+import {
+  formatarData,
+  formatarDataLocal,
+  quebrarTexto,
+  sanitizarParaPdf,
+  traduzirTipoAtendimento,
+  traduzirTipoEvento,
+} from './prontuario.util';
 
 const LARGURA_PAGINA = 595.28; // A4 em pontos
 const ALTURA_PAGINA = 841.89;
@@ -26,6 +33,12 @@ export class ProntuarioService {
       orderBy: { data: 'asc' },
     });
 
+    const atendimentos = await this.prisma.atendimentoClinico.findMany({
+      where: { animalId, deletedAt: null },
+      include: { responsible: true },
+      orderBy: [{ dataAtendimento: 'asc' }, { createdAt: 'asc' }],
+    });
+
     const pdf = await PDFDocument.create();
     const fonte = await pdf.embedFont(StandardFonts.Helvetica);
     const fonteNegrito = await pdf.embedFont(StandardFonts.HelveticaBold);
@@ -42,7 +55,7 @@ export class ProntuarioService {
     };
 
     const escrever = (texto: string, opcoes: { negrito?: boolean; tamanho?: number } = {}) => {
-      pagina.drawText(texto, {
+      pagina.drawText(sanitizarParaPdf(texto), {
         x: MARGEM,
         y,
         size: opcoes.tamanho ?? 11,
@@ -95,6 +108,39 @@ export class ProntuarioService {
           novaLinha();
         }
       }
+    }
+
+    novaLinha(10);
+    escrever('Atendimentos Clínicos', { negrito: true, tamanho: 14 });
+    novaLinha(22);
+
+    if (atendimentos.length === 0) {
+      escrever('Nenhum atendimento clínico registrado.');
+      novaLinha();
+    }
+    for (const atendimento of atendimentos) {
+      escrever(
+        `${formatarDataLocal(atendimento.dataAtendimento)} - ${traduzirTipoAtendimento(atendimento.tipo)}`,
+        { negrito: true },
+      );
+      novaLinha();
+      campo('Responsável', atendimento.responsible.name);
+      const secoes: Array<[string, string | null]> = [
+        ['Anamnese', atendimento.anamnese],
+        ['Exame físico', atendimento.exameFisico],
+        ['Exames complementares', atendimento.examesComplementares],
+        ['Tratamento', atendimento.tratamento],
+      ];
+      for (const [rotulo, texto] of secoes) {
+        escrever(`${rotulo}:`, { negrito: true, tamanho: 10 });
+        novaLinha(14);
+        const largura = (parte: string) => fonte.widthOfTextAtSize(parte, 10);
+        for (const linha of quebrarTexto(texto || '-', largura, LARGURA_PAGINA - 2 * MARGEM)) {
+          escrever(linha, { tamanho: 10 });
+          novaLinha(14);
+        }
+      }
+      novaLinha(10);
     }
 
     novaLinha(20);
