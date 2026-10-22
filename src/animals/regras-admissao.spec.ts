@@ -51,4 +51,37 @@ describe('validarRegrasAdmissao', () => {
       validarRegrasAdmissao({ frente: Front.CED, especieSilvestre: true, nome: 'Onça Pintada' }),
     ).toEqual([]);
   });
+
+  it('silvestre com nome e microchip: a regra não proíbe a coexistência (decisão da equipe pendente)', () => {
+    expect(
+      validarRegrasAdmissao({
+        frente: Front.CED,
+        especieSilvestre: true,
+        nome: 'Jaguatirica',
+        microchip: '000123456789',
+      }),
+    ).toEqual([]);
+  });
+
+  it('silvestre sem nome é recusado, mesmo com microchip', () => {
+    expect(
+      validarRegrasAdmissao({
+        frente: Front.CCPA,
+        especieSilvestre: true,
+        nome: '  ',
+        microchip: '000123456789',
+      }),
+    ).toEqual(['nome é obrigatório para animais silvestres']);
+  });
+
+  it('o microchip só passa como texto: zeros à esquerda não entram na regra de preenchimento', () => {
+    expect(
+      validarRegrasAdmissao({
+        frente: Front.CED,
+        especieSilvestre: false,
+        ...COMPLETO,
+        microchip: '0',
+      }),
+    ).toEqual([]);
+  });
 });

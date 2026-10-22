@@ -10,7 +10,7 @@ export const CATALOGO_INICIAL = {
   especies: [
     { nome: 'Cão', silvestre: false, racas: ['SRD (sem raça definida)'] },
     { nome: 'Gato', silvestre: false, racas: ['SRD (sem raça definida)'] },
-    { nome: 'Onça-pintada', silvestre: true, racas: [] },
+    { nome: 'Onça', silvestre: true, racas: ['Onça-pintada', 'Onça-parda'] },
     { nome: 'Outro silvestre', silvestre: true, racas: [] },
   ],
   unidades: [

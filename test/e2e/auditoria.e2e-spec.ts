@@ -15,7 +15,6 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
   let catalogo: {
     especieId: string;
     unidadeId: string;
-    localizacaoId: string;
     responsavelId: string;
   };
   let animalId: string;
@@ -51,11 +50,6 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
     catalogo = {
       especieId: (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id,
       unidadeId: casAdote,
-      localizacaoId: (
-        await prisma.location.findUniqueOrThrow({
-          where: { unitId_name: { unitId: casAdote, name: 'Canil' } },
-        })
-      ).id,
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
     admin = await ambiente.usuario('admin-auditoria', PapelUsuario.ADMIN);
@@ -92,7 +86,6 @@ describe('Auditoria e correlação (e2e, banco real)', () => {
         cor: 'Preta',
         especieId: catalogo.especieId,
         unidadeId: catalogo.unidadeId,
-        localizacaoId: catalogo.localizacaoId,
         responsavelId: catalogo.responsavelId,
         frente: 'CASADOTE',
         fotoEntradaId: await fotoConfirmada(operadora),

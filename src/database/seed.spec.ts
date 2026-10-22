@@ -21,6 +21,12 @@ describe('Seed de catálogos', () => {
     expect(CATALOGO_INICIAL.unidades.every((u) => u.localizacoes.length > 0)).toBe(true);
   });
 
+  it('cadastra a onça como uma espécie com as raças pintada e parda', () => {
+    const onca = CATALOGO_INICIAL.especies.find((e) => e.nome === 'Onça');
+    expect(onca).toMatchObject({ silvestre: true, racas: ['Onça-pintada', 'Onça-parda'] });
+    expect(CATALOGO_INICIAL.especies.map((e) => e.nome)).not.toContain('Onça-pintada');
+  });
+
   it('usa upsert sem atualização (idempotente, não sobrescreve dados)', async () => {
     const prisma = criarPrismaFalso();
     await popularCatalogos(prisma);

@@ -1,12 +1,22 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Front } from '@prisma/client';
-import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
+import {
+  AcaoAuditoria,
+  AuditoriaService,
+  calcularCamposAlterados,
+} from '../auditoria/auditoria.service';
+import { EscopoAcesso, ehAdmin, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
 import { ListarLocalizacoesQueryDto } from './dto/listar-localizacoes-query.dto';
 import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
+import { AtualizarResponsavelDto } from './dto/atualizar-responsavel.dto';
 
 const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
@@ -105,7 +115,8 @@ export class CatalogosService {
     };
   }
 
-  async listarResponsaveis({ pagina, limite }: PaginacaoQueryDto) {
+  /** E-mail e telefone são dados pessoais de terceiros: só o administrador os vê na listagem. */
+  async listarResponsaveis({ pagina, limite }: PaginacaoQueryDto, escopo: EscopoAcesso) {
     const where = { deletedAt: null, active: true };
     const [itens, total] = await Promise.all([
       this.prisma.responsible.findMany({
@@ -116,19 +127,87 @@ export class CatalogosService {
       }),
       this.prisma.responsible.count({ where }),
     ]);
+    const comContato = ehAdmin(escopo);
     return {
-      itens: itens.map((item) => ({ id: item.id, nome: item.name })),
+      itens: itens.map((item) => this.mapearResponsavel(item, comContato)),
       pagina,
       limite,
       total,
     };
   }
 
+  /**
+   * O endereço mora no cadastro do responsável: corrigi-lo vale para todos os seus animais.
+   * O responsável não pertence a uma unidade, então o operador só edita quem ainda não tem
+   * animal ou tem ao menos um animal ativo nas suas unidades.
+   */
+  async atualizarResponsavel(id: string, dto: AtualizarResponsavelDto, escopo: EscopoAcesso) {
+    const dados = {
+      name: dto.nome?.trim(),
+      endereco: dto.endereco,
+      email: dto.email,
+      telefone: dto.telefone,
+    };
+    if (Object.values(dados).every((valor) => valor === undefined)) {
+      throw new BadRequestException('Informe ao menos um campo para atualizar');
+    }
+    if (dados.name !== undefined && dados.name.length < 2) {
+      throw new BadRequestException('nome deve ter ao menos 2 caracteres');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const atual = await tx.responsible.findFirst({ where: { id, deletedAt: null } });
+      if (!atual) throw new NotFoundException('Responsável não encontrado');
+      if (!escopo.todasUnidades) {
+        const vinculo = { responsibleId: id, deletedAt: null };
+        const [total, visiveis] = await Promise.all([
+          tx.animal.count({ where: vinculo }),
+          tx.animal.count({ where: { ...vinculo, unitId: { in: escopo.unidadeIds } } }),
+        ]);
+        if (total > 0 && visiveis === 0) {
+          throw new ForbiddenException('Sem acesso a este responsável');
+        }
+      }
+      const atualizado = await tx.responsible.update({ where: { id }, data: dados });
+      // Só os nomes dos campos: e-mail e telefone não entram na trilha imutável.
+      const alterados = calcularCamposAlterados(atual, dados);
+      await this.auditoria.registrar(tx, {
+        usuarioId: escopo.usuarioId,
+        acao: AcaoAuditoria.RESPONSAVEL_ATUALIZADO,
+        entidade: 'Responsible',
+        entidadeId: id,
+        camposAlterados: Object.fromEntries(
+          Object.keys(alterados).map((campo) => [campo, { antes: null, depois: null }]),
+        ),
+      });
+      return this.mapearResponsavel(atualizado, true);
+    });
+  }
+
+  private mapearResponsavel(
+    responsavel: {
+      id: string;
+      name: string;
+      endereco: string | null;
+      email: string | null;
+      telefone: string | null;
+    },
+    comContato: boolean,
+  ) {
+    return {
+      id: responsavel.id,
+      nome: responsavel.name,
+      endereco: responsavel.endereco,
+      ...(comContato ? { email: responsavel.email, telefone: responsavel.telefone } : {}),
+    };
+  }
+
   async criarResponsavel(dto: CriarResponsavelDto, escopo: EscopoAcesso) {
+    const nome = dto.nome.trim();
+    if (nome.length < 2) throw new BadRequestException('nome deve ter ao menos 2 caracteres');
     const responsavel = await this.prisma.$transaction(async (tx) => {
       const criado = await tx.responsible.create({
         data: {
-          name: dto.nome.trim(),
+          name: nome,
           endereco: dto.endereco,
           email: dto.email,
           telefone: dto.telefone,

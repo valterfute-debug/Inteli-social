@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, SituacaoFoto } from '@prisma/client';
+import { Front, Prisma, SituacaoFoto } from '@prisma/client';
 import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
 import {
   AcaoAuditoria,
@@ -25,6 +25,13 @@ import { gerarIdentificadorPublico } from './identificador-publico.util';
 import { EstadoAdmissao, validarRegrasAdmissao } from './regras-admissao';
 
 const TENTATIVAS_MAXIMAS_IDENTIFICADOR = 3;
+
+/** Nome da unidade que corresponde a cada frente, usado quando o cadastro não informa a unidade. */
+const UNIDADE_DA_FRENTE: Record<Front, string> = {
+  CCPA: 'CCPA',
+  CED: 'CED',
+  CASADOTE: 'CasAdote',
+};
 
 @Injectable()
 export class AnimalsService {
@@ -97,7 +104,8 @@ export class AnimalsService {
     const anterior = await this.idempotencia.verificarReenvio(ctx);
     if (anterior) return { animal: await this.buscarPorId(anterior, escopo), reenvio: true };
 
-    garantirUnidade(escopo, dto.unidadeId);
+    const unidadeId = await this.resolverUnidade(dto, escopo);
+    garantirUnidade(escopo, unidadeId);
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
@@ -128,8 +136,7 @@ export class AnimalsService {
                 microchip: dto.microchip,
                 speciesId: dto.especieId,
                 breedId: dto.racaId,
-                unitId: dto.unidadeId,
-                locationId: dto.localizacaoId,
+                unitId: unidadeId,
                 responsibleId: dto.responsavelId,
                 front: dto.frente,
                 dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
@@ -183,6 +190,18 @@ export class AnimalsService {
 
   async atualizar(id: string, dto: AtualizarAnimalDto, escopo: EscopoAcesso) {
     const { versao, ...dados } = dto;
+    // O IsOptional do PartialType também aceita null; estes campos são obrigatórios e não podem ser limpos.
+    const obrigatorios = [
+      'especieId',
+      'unidadeId',
+      'responsavelId',
+      'frente',
+      'fotoEntradaId',
+    ] as const;
+    const limpos = obrigatorios.filter((campo) => dados[campo] === null);
+    if (limpos.length > 0) {
+      throw new BadRequestException(limpos.map((campo) => `${campo} não pode ser nulo`));
+    }
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
     }
@@ -228,7 +247,9 @@ export class AnimalsService {
       speciesId: dados.especieId,
       breedId: dados.racaId,
       unitId: dados.unidadeId,
-      locationId: dados.localizacaoId,
+      // A localização antiga pertence à unidade de origem: numa transferência ela é descartada.
+      locationId:
+        dados.unidadeId !== undefined && dados.unidadeId !== existente.unitId ? null : undefined,
       responsibleId: dados.responsavelId,
       front: dados.frente,
       dataEntrada: dados.dataEntrada !== undefined ? new Date(dados.dataEntrada) : undefined,
@@ -297,6 +318,24 @@ export class AnimalsService {
         frente: animal.front,
       });
     });
+  }
+
+  /**
+   * A unidade não faz parte do formulário, mas segue delimitando o acesso. Ordem: a enviada
+   * (clientes antigos e transferências), a única unidade do operador, a unidade da frente.
+   */
+  private async resolverUnidade(dto: CriarAnimalDto, escopo: EscopoAcesso) {
+    if (dto.unidadeId) return dto.unidadeId;
+    if (!escopo.todasUnidades && escopo.unidadeIds.length === 1) return escopo.unidadeIds[0];
+    const unidade = await this.prisma.unit.findFirst({
+      where: {
+        name: { equals: UNIDADE_DA_FRENTE[dto.frente], mode: 'insensitive' },
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!unidade) throw new BadRequestException('Não foi possível definir a unidade do animal');
+    return unidade.id;
   }
 
   private garantirRegrasAdmissao(estado: EstadoAdmissao) {
@@ -408,7 +447,7 @@ export class AnimalsService {
       }
       if (erro.code === 'P2003' || erro.code === 'P2025') {
         throw new BadRequestException(
-          'Referência inválida: verifique espécie, raça, unidade, localização ou responsável',
+          'Referência inválida: verifique espécie, raça (deve ser da espécie), unidade ou responsável',
         );
       }
     }

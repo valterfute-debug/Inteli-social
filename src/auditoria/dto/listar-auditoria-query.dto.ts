@@ -2,6 +2,8 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
+const ENTIDADES_AUDITADAS = ['Animal', 'HealthEvent', 'Foto', 'Responsible', 'AtendimentoClinico'];
+
 export class ListarAuditoriaQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
   @IsOptional()
@@ -18,9 +20,9 @@ export class ListarAuditoriaQueryDto {
   @Max(100)
   limite: number = 50;
 
-  @ApiPropertyOptional({ enum: ['Animal', 'HealthEvent', 'Foto', 'Responsible'] })
+  @ApiPropertyOptional({ enum: ENTIDADES_AUDITADAS })
   @IsOptional()
-  @IsIn(['Animal', 'HealthEvent', 'Foto', 'Responsible'])
+  @IsIn(ENTIDADES_AUDITADAS)
   entidade?: string;
 
   @ApiPropertyOptional({ description: 'Ex.: histórico de um animal' })

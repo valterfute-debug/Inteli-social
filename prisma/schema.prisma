@@ -25,6 +25,10 @@ enum TipoEventoSaude {
   VERMIFUGO
   CASTRACAO
 }
+enum TipoAtendimento {
+  ADMISSAO
+  ACOMPANHAMENTO
+}
 enum SituacaoFoto {
   PENDENTE
   CONFIRMADA
@@ -81,6 +85,7 @@ model Responsible {
   email String?
   telefone String?
   active Boolean @default(true)
+  atendimentos AtendimentoClinico[]
   animals Animal[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,8 +111,9 @@ model Animal {
   breed Breed? @relation(fields: [breedId, speciesId], references: [id, speciesId])
   unitId String
   unit Unit @relation(fields: [unitId], references: [id])
-  locationId String
-  location Location @relation(fields: [locationId, unitId], references: [id, unitId])
+  // Localização física deixou de ser pedida no cadastro; a coluna permanece para não perder dados antigos.
+  locationId String?
+  location Location? @relation(fields: [locationId, unitId], references: [id, unitId])
   responsibleId String
   responsible Responsible @relation(fields: [responsibleId], references: [id])
   front Front
@@ -116,6 +122,7 @@ model Animal {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
   healthEvents HealthEvent[]
+  atendimentos AtendimentoClinico[]
   @@index([name])
   @@index([speciesId])
   @@index([microchip])
@@ -212,4 +219,28 @@ model HealthEvent {
   deletedAt DateTime?
   @@index([animalId])
   @@index([animalId, tipo])
+}
+// Prontuário clínico: um registro por atendimento (admissão ou acompanhamento). Nunca é
+// sobrescrito por um novo atendimento. `responsibleId` guarda o responsável no momento do
+// atendimento, para o histórico sobreviver à troca de responsável no cadastro do animal.
+// Um único ADMISSAO ativo por animal é garantido por índice parcial (ver migration).
+model AtendimentoClinico {
+  id String @id @default(uuid())
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  responsibleId String
+  responsible Responsible @relation(fields: [responsibleId], references: [id])
+  tipo TipoAtendimento
+  dataAtendimento DateTime
+  anamnese String?
+  exameFisico String?
+  examesComplementares String?
+  tratamento String?
+  criadoPorId String
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  @@index([animalId, dataAtendimento])
+  @@index([responsibleId])
 }

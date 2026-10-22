@@ -16,10 +16,9 @@ describe('Idempotência (e2e, banco real)', () => {
   let catalogo: {
     especieId: string;
     unidadeId: string;
-    localizacaoId: string;
     responsavelId: string;
   };
-  let unidadeCcpa: { unidadeId: string; localizacaoId: string };
+  let unidadeCcpa: { unidadeId: string };
 
   const http = () => request(ambiente.app.getHttpServer());
 
@@ -55,21 +54,9 @@ describe('Idempotência (e2e, banco real)', () => {
     catalogo = {
       especieId: (await prisma.species.findUniqueOrThrow({ where: { name: 'Cão' } })).id,
       unidadeId: casAdote,
-      localizacaoId: (
-        await prisma.location.findUniqueOrThrow({
-          where: { unitId_name: { unitId: casAdote, name: 'Canil' } },
-        })
-      ).id,
       responsavelId: (await prisma.responsible.findFirstOrThrow()).id,
     };
-    unidadeCcpa = {
-      unidadeId: ccpa,
-      localizacaoId: (
-        await prisma.location.findUniqueOrThrow({
-          where: { unitId_name: { unitId: ccpa, name: 'Geral' } },
-        })
-      ).id,
-    };
+    unidadeCcpa = { unidadeId: ccpa };
     ana = await ambiente.usuario('ana', PapelUsuario.ADMIN);
     beto = await ambiente.usuario('beto', PapelUsuario.ADMIN);
   });
@@ -83,7 +70,6 @@ describe('Idempotência (e2e, banco real)', () => {
       nome: 'Luna',
       especieId: catalogo.especieId,
       unidadeId: catalogo.unidadeId,
-      localizacaoId: catalogo.localizacaoId,
       responsavelId: catalogo.responsavelId,
       frente: 'CASADOTE',
       fotoEntradaId: await fotoConfirmada(quem),
