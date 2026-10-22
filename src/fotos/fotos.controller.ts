@@ -9,8 +9,8 @@ import {
   Post,
 } from '@nestjs/common';
 import { ApiHeader, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { EscopoAtual } from '../auth/decoradores';
-import { EscopoAcesso } from '../auth/escopo';
+import { UsuarioAtual } from '../auth/decoradores';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { lerChaveIdempotencia } from '../idempotencia/idempotencia.service';
 import { SolicitarFotoDto } from './dto/solicitar-foto.dto';
 import { FotosService } from './fotos.service';
@@ -27,10 +27,10 @@ export class FotosController {
   solicitarEnvio(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Body() dto: SolicitarFotoDto,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
   ) {
     const chave = lerChaveIdempotencia(idempotencyKey, true);
-    return this.fotosService.solicitarEnvio(dto, escopo, chave);
+    return this.fotosService.solicitarEnvio(dto, usuario, chave);
   }
 
   @Post(':id/confirmacao')
@@ -40,9 +40,9 @@ export class FotosController {
   confirmar(
     @Headers('idempotency-key') idempotencyKey: string | undefined,
     @Param('id', ParseUUIDPipe) id: string,
-    @EscopoAtual() escopo: EscopoAcesso,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
   ) {
     const chave = lerChaveIdempotencia(idempotencyKey, true);
-    return this.fotosService.confirmar(id, escopo, chave);
+    return this.fotosService.confirmar(id, usuario, chave);
   }
 }

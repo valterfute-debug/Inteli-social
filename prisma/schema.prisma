@@ -25,14 +25,13 @@ enum TipoEventoSaude {
   VERMIFUGO
   CASTRACAO
 }
+enum TipoAtendimento {
+  ADMISSAO
+  ACOMPANHAMENTO
+}
 enum SituacaoFoto {
   PENDENTE
   CONFIRMADA
-}
-// Papéis provisórios até a Ampara aprovar os perfis (issue #3, P0-2).
-enum PapelUsuario {
-  ADMIN
-  OPERADOR
 }
 model Species {
   id String @id @default(uuid())
@@ -60,7 +59,8 @@ model Unit {
   horariosFuncionamento String?
   locations Location[]
   animals Animal[]
-  usuarios UsuarioUnidade[]
+  movimentacoesOrigem MovimentacaoAnimal[] @relation("MovimentacaoOrigem")
+  movimentacoesDestino MovimentacaoAnimal[] @relation("MovimentacaoDestino")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
@@ -81,6 +81,7 @@ model Responsible {
   email String?
   telefone String?
   active Boolean @default(true)
+  atendimentos AtendimentoClinico[]
   animals Animal[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -106,8 +107,9 @@ model Animal {
   breed Breed? @relation(fields: [breedId, speciesId], references: [id, speciesId])
   unitId String
   unit Unit @relation(fields: [unitId], references: [id])
-  locationId String
-  location Location @relation(fields: [locationId, unitId], references: [id, unitId])
+  // Localização física deixou de ser pedida no cadastro; a coluna permanece para não perder dados antigos.
+  locationId String?
+  location Location? @relation(fields: [locationId, unitId], references: [id, unitId])
   responsibleId String
   responsible Responsible @relation(fields: [responsibleId], references: [id])
   front Front
@@ -116,6 +118,8 @@ model Animal {
   updatedAt DateTime @updatedAt
   deletedAt DateTime?
   healthEvents HealthEvent[]
+  atendimentos AtendimentoClinico[]
+  movimentacoes MovimentacaoAnimal[]
   @@index([name])
   @@index([speciesId])
   @@index([microchip])
@@ -151,9 +155,7 @@ model Usuario {
   id String @id
   email String?
   nome String?
-  papel PapelUsuario @default(OPERADOR)
   ativo Boolean @default(true)
-  unidades UsuarioUnidade[]
   fotos Foto[]
   chavesIdempotencia ChaveIdempotencia[]
   createdAt DateTime @default(now())
@@ -190,15 +192,6 @@ model ChaveIdempotencia {
   @@id([usuarioId, chave])
   @@index([createdAt])
 }
-model UsuarioUnidade {
-  usuarioId String
-  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-  unitId String
-  unit Unit @relation(fields: [unitId], references: [id])
-  createdAt DateTime @default(now())
-  @@id([usuarioId, unitId])
-  @@index([unitId])
-}
 model HealthEvent {
   id String @id @default(uuid())
   animalId String
@@ -212,4 +205,45 @@ model HealthEvent {
   deletedAt DateTime?
   @@index([animalId])
   @@index([animalId, tipo])
+}
+// Prontuário clínico: um registro por atendimento (admissão ou acompanhamento). Nunca é
+// sobrescrito por um novo atendimento. `responsibleId` guarda o responsável no momento do
+// atendimento, para o histórico sobreviver à troca de responsável no cadastro do animal.
+// Um único ADMISSAO ativo por animal é garantido por índice parcial (ver migration).
+model AtendimentoClinico {
+  id String @id @default(uuid())
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  responsibleId String
+  responsible Responsible @relation(fields: [responsibleId], references: [id])
+  tipo TipoAtendimento
+  dataAtendimento DateTime
+  anamnese String?
+  exameFisico String?
+  examesComplementares String?
+  tratamento String?
+  criadoPorId String
+  version Int @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  @@index([animalId, dataAtendimento])
+  @@index([responsibleId])
+}
+// Histórico operacional de áreas (frente) e unidades do animal. Uma linha por entrada ou
+// passagem; nunca é alterada nem apagada pela API. `usuarioId` não tem FK de propósito (como na
+// auditoria): o registro sobrevive à conta. Entrada = origem nula.
+model MovimentacaoAnimal {
+  id String @id @default(uuid())
+  animalId String
+  animal Animal @relation(fields: [animalId], references: [id])
+  frenteOrigem Front?
+  frenteDestino Front
+  unidadeOrigemId String?
+  unidadeOrigem Unit? @relation("MovimentacaoOrigem", fields: [unidadeOrigemId], references: [id], onDelete: Restrict)
+  unidadeDestinoId String
+  unidadeDestino Unit @relation("MovimentacaoDestino", fields: [unidadeDestinoId], references: [id])
+  usuarioId String
+  createdAt DateTime @default(now())
+  @@index([animalId, createdAt])
 }

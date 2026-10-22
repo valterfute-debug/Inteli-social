@@ -26,7 +26,7 @@ jobs:
       - run: npm audit --omit=dev
 
   # Ponta a ponta com PostgreSQL descartável: aplica as migrations do zero e testa
-  # login, escopo por unidade e demais regras com requisições HTTP reais.
+  # login, acesso igual para toda conta ativa e demais regras com requisições HTTP reais.
   e2e:
     runs-on: ubuntu-24.04
     services:

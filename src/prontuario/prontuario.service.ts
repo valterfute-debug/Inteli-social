@@ -1,8 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
 import { PrismaService } from '../prisma/prisma.service';
-import { formatarData, traduzirTipoEvento } from './prontuario.util';
+import {
+  formatarData,
+  formatarDataLocal,
+  quebrarTexto,
+  sanitizarParaPdf,
+  traduzirTipoAtendimento,
+  traduzirTipoEvento,
+} from './prontuario.util';
 
 const LARGURA_PAGINA = 595.28; // A4 em pontos
 const ALTURA_PAGINA = 841.89;
@@ -13,17 +19,22 @@ const ALTURA_LINHA = 18;
 export class ProntuarioService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async gerarPdf(animalId: string, escopo: EscopoAcesso): Promise<Buffer> {
+  async gerarPdf(animalId: string): Promise<Buffer> {
     const animal = await this.prisma.animal.findFirst({
       where: { id: animalId, deletedAt: null },
-      include: { species: true, breed: true, unit: true, location: true, responsible: true },
+      include: { species: true, breed: true, unit: true, responsible: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
 
     const eventos = await this.prisma.healthEvent.findMany({
       where: { animalId, deletedAt: null },
       orderBy: { data: 'asc' },
+    });
+
+    const atendimentos = await this.prisma.atendimentoClinico.findMany({
+      where: { animalId, deletedAt: null },
+      include: { responsible: true },
+      orderBy: [{ dataAtendimento: 'asc' }, { createdAt: 'asc' }],
     });
 
     const pdf = await PDFDocument.create();
@@ -42,7 +53,7 @@ export class ProntuarioService {
     };
 
     const escrever = (texto: string, opcoes: { negrito?: boolean; tamanho?: number } = {}) => {
-      pagina.drawText(texto, {
+      pagina.drawText(sanitizarParaPdf(texto), {
         x: MARGEM,
         y,
         size: opcoes.tamanho ?? 11,
@@ -73,8 +84,8 @@ export class ProntuarioService {
     campo('Data de entrada', animal.dataEntrada ? formatarData(animal.dataEntrada) : null);
     campo('Frente', animal.front);
     campo('Unidade', animal.unit.name);
-    campo('Localização', animal.location.name);
     campo('Responsável', animal.responsible.name);
+    campo('Endereço do responsável', animal.responsible.endereco);
 
     novaLinha(10);
     escrever('Histórico de Saúde', { negrito: true, tamanho: 14 });
@@ -95,6 +106,39 @@ export class ProntuarioService {
           novaLinha();
         }
       }
+    }
+
+    novaLinha(10);
+    escrever('Atendimentos Clínicos', { negrito: true, tamanho: 14 });
+    novaLinha(22);
+
+    if (atendimentos.length === 0) {
+      escrever('Nenhum atendimento clínico registrado.');
+      novaLinha();
+    }
+    for (const atendimento of atendimentos) {
+      escrever(
+        `${formatarDataLocal(atendimento.dataAtendimento)} - ${traduzirTipoAtendimento(atendimento.tipo)}`,
+        { negrito: true },
+      );
+      novaLinha();
+      campo('Responsável', atendimento.responsible.name);
+      const secoes: Array<[string, string | null]> = [
+        ['Anamnese', atendimento.anamnese],
+        ['Exame físico', atendimento.exameFisico],
+        ['Exames complementares', atendimento.examesComplementares],
+        ['Tratamento', atendimento.tratamento],
+      ];
+      for (const [rotulo, texto] of secoes) {
+        escrever(`${rotulo}:`, { negrito: true, tamanho: 10 });
+        novaLinha(14);
+        const largura = (parte: string) => fonte.widthOfTextAtSize(parte, 10);
+        for (const linha of quebrarTexto(texto || '-', largura, LARGURA_PAGINA - 2 * MARGEM)) {
+          escrever(linha, { tamanho: 10 });
+          novaLinha(14);
+        }
+      }
+      novaLinha(10);
     }
 
     novaLinha(20);

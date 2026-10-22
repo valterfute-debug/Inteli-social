@@ -6,10 +6,8 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PapelUsuario } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { ROTA_PUBLICA } from './decoradores';
-import { EscopoAcesso } from './escopo';
 import { RequisicaoAutenticada, UsuarioAutenticado } from './tipos';
 import { VerificadorTokenService } from './verificador-token.service';
 
@@ -22,7 +20,7 @@ export function extrairToken(cabecalho: string | undefined): string | null {
 
 /**
  * Guard global: toda rota exige token do Supabase Auth (salvo @Publica()) e uma conta
- * ativa na tabela Usuario, de onde vem o escopo de unidades.
+ * ativa na tabela Usuario. Todas as contas ativas têm as mesmas permissões de negócio.
  */
 @Injectable()
 export class AutenticacaoGuard implements CanActivate {
@@ -44,25 +42,19 @@ export class AutenticacaoGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Autenticação necessária');
 
     const usuario = await this.verificador.verificar(token);
+    await this.garantirContaAtiva(usuario);
     requisicao.usuario = usuario;
-    requisicao.escopo = await this.carregarEscopo(usuario);
     return true;
   }
 
-  private async carregarEscopo(usuario: UsuarioAutenticado): Promise<EscopoAcesso> {
+  private async garantirContaAtiva(usuario: UsuarioAutenticado) {
     const registro = await this.prisma.usuario.findUnique({
       where: { id: usuario.id },
-      include: { unidades: { select: { unitId: true } } },
+      select: { ativo: true },
     });
     // Login válido no Supabase, mas sem liberação na API (ou desativado): 403, não 401.
     if (!registro || !registro.ativo) {
       throw new ForbiddenException('Conta sem acesso liberado. Peça liberação à coordenação.');
     }
-    return {
-      usuarioId: registro.id,
-      papel: registro.papel,
-      todasUnidades: registro.papel === PapelUsuario.ADMIN,
-      unidadeIds: registro.unidades.map((vinculo) => vinculo.unitId),
-    };
   }
 }

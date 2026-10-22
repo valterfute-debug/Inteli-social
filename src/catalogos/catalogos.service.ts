@@ -1,12 +1,17 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { Front } from '@prisma/client';
-import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
-import { EscopoAcesso, garantirUnidade } from '../auth/escopo';
+import {
+  AcaoAuditoria,
+  AuditoriaService,
+  calcularCamposAlterados,
+} from '../auditoria/auditoria.service';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaginacaoQueryDto } from './dto/paginacao-query.dto';
 import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
 import { ListarLocalizacoesQueryDto } from './dto/listar-localizacoes-query.dto';
 import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
+import { AtualizarResponsavelDto } from './dto/atualizar-responsavel.dto';
 
 const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
@@ -59,12 +64,9 @@ export class CatalogosService {
     };
   }
 
-  /** Só as unidades em que o usuário pode trabalhar: é delas que sai o formulário de admissão. */
-  async listarUnidades({ pagina, limite }: PaginacaoQueryDto, escopo: EscopoAcesso) {
-    const where = {
-      deletedAt: null,
-      ...(escopo.todasUnidades ? {} : { id: { in: escopo.unidadeIds } }),
-    };
+  /** Todas as unidades ativas: qualquer conta cadastra e consulta em qualquer unidade. */
+  async listarUnidades({ pagina, limite }: PaginacaoQueryDto) {
+    const where = { deletedAt: null };
     const [itens, total] = await Promise.all([
       this.prisma.unit.findMany({
         where,
@@ -82,11 +84,7 @@ export class CatalogosService {
     };
   }
 
-  async listarLocalizacoes(
-    { pagina, limite, unidadeId }: ListarLocalizacoesQueryDto,
-    escopo: EscopoAcesso,
-  ) {
-    garantirUnidade(escopo, unidadeId);
+  async listarLocalizacoes({ pagina, limite, unidadeId }: ListarLocalizacoesQueryDto) {
     const where = { unitId: unidadeId };
     const [itens, total] = await Promise.all([
       this.prisma.location.findMany({
@@ -105,6 +103,7 @@ export class CatalogosService {
     };
   }
 
+  /** Todas as contas ativas têm as mesmas permissões: a lista traz nome, endereço e contato. */
   async listarResponsaveis({ pagina, limite }: PaginacaoQueryDto) {
     const where = { deletedAt: null, active: true };
     const [itens, total] = await Promise.all([
@@ -117,25 +116,80 @@ export class CatalogosService {
       this.prisma.responsible.count({ where }),
     ]);
     return {
-      itens: itens.map((item) => ({ id: item.id, nome: item.name })),
+      itens: itens.map((item) => this.mapearResponsavel(item)),
       pagina,
       limite,
       total,
     };
   }
 
-  async criarResponsavel(dto: CriarResponsavelDto, escopo: EscopoAcesso) {
+  /** O endereço mora no cadastro do responsável: corrigi-lo vale para todos os seus animais. */
+  async atualizarResponsavel(
+    id: string,
+    dto: AtualizarResponsavelDto,
+    usuario: UsuarioAutenticado,
+  ) {
+    const dados = {
+      name: dto.nome?.trim(),
+      endereco: dto.endereco,
+      email: dto.email,
+      telefone: dto.telefone,
+    };
+    if (Object.values(dados).every((valor) => valor === undefined)) {
+      throw new BadRequestException('Informe ao menos um campo para atualizar');
+    }
+    if (dados.name !== undefined && dados.name.length < 2) {
+      throw new BadRequestException('nome deve ter ao menos 2 caracteres');
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const atual = await tx.responsible.findFirst({ where: { id, deletedAt: null } });
+      if (!atual) throw new NotFoundException('Responsável não encontrado');
+      const atualizado = await tx.responsible.update({ where: { id }, data: dados });
+      // Só os nomes dos campos: e-mail e telefone não entram na trilha imutável.
+      const alterados = calcularCamposAlterados(atual, dados);
+      await this.auditoria.registrar(tx, {
+        usuarioId: usuario.id,
+        acao: AcaoAuditoria.RESPONSAVEL_ATUALIZADO,
+        entidade: 'Responsible',
+        entidadeId: id,
+        camposAlterados: Object.fromEntries(
+          Object.keys(alterados).map((campo) => [campo, { antes: null, depois: null }]),
+        ),
+      });
+      return this.mapearResponsavel(atualizado);
+    });
+  }
+
+  private mapearResponsavel(responsavel: {
+    id: string;
+    name: string;
+    endereco: string | null;
+    email: string | null;
+    telefone: string | null;
+  }) {
+    return {
+      id: responsavel.id,
+      nome: responsavel.name,
+      endereco: responsavel.endereco,
+      email: responsavel.email,
+      telefone: responsavel.telefone,
+    };
+  }
+
+  async criarResponsavel(dto: CriarResponsavelDto, usuario: UsuarioAutenticado) {
+    const nome = dto.nome.trim();
+    if (nome.length < 2) throw new BadRequestException('nome deve ter ao menos 2 caracteres');
     const responsavel = await this.prisma.$transaction(async (tx) => {
       const criado = await tx.responsible.create({
         data: {
-          name: dto.nome.trim(),
+          name: nome,
           endereco: dto.endereco,
           email: dto.email,
           telefone: dto.telefone,
         },
       });
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.RESPONSAVEL_CRIADO,
         entidade: 'Responsible',
         entidadeId: criado.id,

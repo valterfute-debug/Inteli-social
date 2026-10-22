@@ -2,6 +2,8 @@
 
 > Atualização de 7 de outubro de 2026: a API foi publicada na conta institucional do Render e integrada ao frontend na Vercel, com login Supabase e autorização por unidade. A admissão com foto, busca e logout foram verificados com dados sintéticos nos serviços reais. Isso não representa aceite da Ampara nem comprova operação offline em aparelhos físicos ou recuperação completa do Supabase. As seções de sprints preservam o histórico; o estado mais recente está na seção 7.6.
 
+> **Atualização de 23 de outubro de 2026 — perfis removidos.** A equipe decidiu eliminar a divisão entre `ADMIN` e `OPERADOR` e, com ela, o escopo por unidade. Onde este documento (seções anteriores a esta nota) menciona ADMIN, OPERADOR, "papéis provisórios", `PapelUsuario`, `UsuarioUnidade`, "escopo por unidade", `--papel` ou `--unidade`, trata-se de **comportamento legado**, preservado apenas como histórico. Hoje toda conta liberada e ativa tem as mesmas permissões, em todas as unidades. Ver `docs/README.md`, `docs/regras-de-negocio.md` (RN010) e `docs/decisoes-pendentes.md` (DP-13 e DP-14).
+
 ## Instituto Ampara Animal — Inteli Social
 
 **Projeto:** aplicação web de prontuário e identificação animal  
@@ -166,24 +168,24 @@ A autorização de assistentes para atualizar saúde foi mencionada na reunião.
 
 ## 3.1. Requisitos, regras e rastreabilidade
 
-| ID   | Requisito/regra                                        | Estado real                                                | Evidência ou pendência                                                                     |
-| ---- | ------------------------------------------------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| RF01 | Cadastro animal                                        | Implementado (Sprint 2)                                    | POST /api/v1/animals; AnimalsService                                                       |
-| RF02 | Foto obrigatória na entrada                            | Implementado (Sprints 2 e 3)                               | Upload por URL assinada; confirmação confere o arquivo real; URL de leitura na ficha       |
-| RF03 | Consulta com filtros                                   | Implementado (Sprint 3)                                    | GET /api/v1/animals: busca livre, nome, identificador, microchip, espécie, frente, unidade |
-| RF04 | Microchip                                              | Implementado (Sprint 3)                                    | Só dígitos; obrigatório em CCPA/CED; único entre animais ativos (409)                      |
-| RF05 | Atualização e arquivamento                             | Implementado (Sprint 2)                                    | PATCH com versão (409) e DELETE lógico                                                     |
-| RF06 | Catálogos operacionais                                 | Implementado (Sprint 3)                                    | GET de catálogos, POST /responsibles e seed idempotente                                    |
-| RF07 | Offline                                                | Planejado                                                  | Não existe armazenamento local, fila ou sincronização                                      |
-| RF08 | Disponibilidade da API                                 | Implementado                                               | GET /api/health                                                                            |
-| RN01 | Raça deve corresponder à espécie                       | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(breedId, speciesId)` referencia `Breed(id, speciesId)`                 |
-| RN02 | Localização deve pertencer à unidade do animal         | Implementado na migration pendente de aplicação autorizada | FK composta `Animal(locationId, unitId)` referencia `Location(id, unitId)`                 |
-| RN03 | Repetições não podem duplicar cadastro                 | Parcial                                                    | Microchip único entre ativos; foto vinculada a um só animal                                |
-| RN04 | Conflitos devem ser detectados                         | Implementado                                               | version checada e incrementada; 409 em versão desatualizada                                |
-| RN05 | Ficha concluída exige foto                             | Implementado                                               | fotoEntradaId obrigatório e foto CONFIRMADA                                                |
-| RN06 | CCPA e CED exigem microchip, sexo, idade, peso e porte | Implementado (Sprint 3)                                    | src/animals/regras-admissao.ts, avaliado no estado final (também no PATCH)                 |
-| RN07 | CasAdote não repete exigências                         | Implementado (Sprint 3)                                    | Animal chega de CCPA/CED com o mesmo microchip: transferência via PATCH                    |
-| RN08 | Silvestre é identificado por nome                      | Implementado (Sprint 3)                                    | Species.silvestre; nome obrigatório, demais campos dispensados                             |
+| ID   | Requisito/regra                                           | Estado real                                                                                                           | Evidência ou pendência                                                                     |
+| ---- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| RF01 | Cadastro animal                                           | Implementado (Sprint 2)                                                                                               | POST /api/v1/animals; AnimalsService                                                       |
+| RF02 | Foto obrigatória na entrada                               | Implementado (Sprints 2 e 3)                                                                                          | Upload por URL assinada; confirmação confere o arquivo real; URL de leitura na ficha       |
+| RF03 | Consulta com filtros                                      | Implementado (Sprint 3)                                                                                               | GET /api/v1/animals: busca livre, nome, identificador, microchip, espécie, frente, unidade |
+| RF04 | Microchip                                                 | Implementado (Sprint 3)                                                                                               | Só dígitos; obrigatório em CCPA/CED; único entre animais ativos (409)                      |
+| RF05 | Atualização e arquivamento                                | Implementado (Sprint 2)                                                                                               | PATCH com versão (409) e DELETE lógico                                                     |
+| RF06 | Catálogos operacionais                                    | Implementado (Sprint 3)                                                                                               | GET de catálogos, POST /responsibles e seed idempotente                                    |
+| RF07 | Offline                                                   | Planejado                                                                                                             | Não existe armazenamento local, fila ou sincronização                                      |
+| RF08 | Disponibilidade da API                                    | Implementado                                                                                                          | GET /api/health                                                                            |
+| RN01 | Raça deve corresponder à espécie                          | Implementado (migration `20260914000000_integridade_cruzada` aplicada em produção segundo a seção 3 de ações manuais) | FK composta `Animal(breedId, speciesId)` referencia `Breed(id, speciesId)`                 |
+| RN02 | Localização (opcional) deve pertencer à unidade do animal | Implementado; localização deixou de ser pedida no cadastro                                                            | FK composta `Animal(locationId, unitId)` referencia `Location(id, unitId)`                 |
+| RN03 | Repetições não podem duplicar cadastro                    | Parcial                                                                                                               | Microchip único entre ativos; foto vinculada a um só animal                                |
+| RN04 | Conflitos devem ser detectados                            | Implementado                                                                                                          | version checada e incrementada; 409 em versão desatualizada                                |
+| RN05 | Ficha concluída exige foto                                | Implementado                                                                                                          | fotoEntradaId obrigatório e foto CONFIRMADA                                                |
+| RN06 | CCPA e CED exigem microchip, sexo, idade, peso e porte    | Implementado (Sprint 3)                                                                                               | src/animals/regras-admissao.ts, avaliado no estado final (também no PATCH)                 |
+| RN07 | CasAdote não repete exigências                            | Implementado (Sprint 3)                                                                                               | Animal chega de CCPA/CED com o mesmo microchip: transferência via PATCH                    |
+| RN08 | Silvestre é identificado por nome                         | Implementado (Sprint 3)                                                                                               | Species.silvestre; nome obrigatório, demais campos dispensados                             |
 
 ### 3.1.1. Obrigatoriedade e incertezas
 
@@ -305,7 +307,7 @@ Front, Sexo e Porte são enums, não tabelas. Uma tabela de frentes pode ser rea
 | speciesId            | FK Species              | Obrigatório                                             |
 | breedId              | FK Breed                | Opcional                                                |
 | unitId               | FK Unit                 | Obrigatório                                             |
-| locationId           | FK Location             | Obrigatório                                             |
+| locationId           | FK Location             | Opcional (fora do cadastro; só dados antigos)           |
 | responsibleId        | FK Responsible          | Obrigatório                                             |
 | front                | Front                   | Obrigatório                                             |
 | version              | Int, padrão 1           | Apoio ao controle de concorrência futuro                |
@@ -424,7 +426,7 @@ Política (provisória, a aprovar com a Ampara): eventos retidos por **5 anos** 
 
 **Busca com volume (issue #3, P1-2):** medida com 20 mil animais sintéticos num PostgreSQL local (30 execuções por cenário, página de 20 + contagem total): sem filtro p95 34 ms; busca por nome 26 ms; por identificador 18 ms; por microchip 20 ms; frente + unidade 13 ms; página 500 (offset 9.980) 59 ms. Todos bem abaixo da meta proposta (p95 de 300 ms na API, contando a rede até o Supabase). Ordenação estável (`createdAt desc, id`) evita repetir ou pular itens entre páginas. Decisão: manter `skip/take` e os índices atuais; reavaliar cursor e índice trigram (`pg_trgm`) se o volume passar de ~100 mil animais ou o p95 real passar da meta.
 
-Liberar uma conta: `npm run usuario:liberar -- --email <e-mail> --papel OPERADOR --unidade CasAdote` (`--papel ADMIN` para acesso total, `--desativar` para revogar). Testado ponta a ponta com PostgreSQL real em `test/e2e/escopo.e2e-spec.ts` (`npm run test:e2e`, também no CI). O acesso PostgreSQL continua por URL de banco; o Prisma não usa a publishable key.
+Liberar uma conta: `npm run usuario:liberar -- --email <e-mail>` (`--desativar` para revogar). Não há papel nem unidade: toda conta liberada tem as mesmas permissões. _(As versões anteriores deste documento citavam `--papel` e `--unidade`; foram removidos.)_
 
 Para testar pelo terminal: `npm run token` (usuário de teste do painel) e `SMOKE_TOKEN=<token> npm run smoke -- <url>`.
 
@@ -598,7 +600,7 @@ Gestão clínica, PDF e anexos pertencem ao Ciclo 2; painéis e alertas, ao Cicl
 | Entrega                                   | Implementação                                                                                                                                                                                                                     | Evidência                                                     |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | Busca e listagem                          | `busca` (nome contém, identificador contém, microchip começa com) e filtros por nome, identificador, microchip, espécie, frente e unidade; ordenação estável; texto vazio ignorado                                                | Testes unitários e cenário ponta a ponta                      |
-| Ficha pronta para exibição                | Respostas trazem `especieNome`, `especieSilvestre`, `unidadeNome`, `localizacaoNome` e `fotoEntradaUrl` (URL assinada, 1 h, gerada em lote por página)                                                                            | `animal.mapper.ts`, `SupabaseStorageService.criarUrlsLeitura` |
+| Ficha pronta para exibição                | Respostas trazem `especieNome`, `especieSilvestre`, `unidadeNome`, `racaNome`, `responsavelNome`, `responsavelEndereco` e `fotoEntradaUrl` (URL assinada, 1 h, gerada em lote por página)                                         | `animal.mapper.ts`, `SupabaseStorageService.criarUrlsLeitura` |
 | Regras por frente (pendência da Sprint 2) | `validarRegrasAdmissao` aplicada no POST e no estado final do PATCH                                                                                                                                                               | `regras-admissao.spec.ts`                                     |
 | Microchip único                           | 409 com `detalhes.animalExistenteId` para o frontend oferecer a transferência; animal arquivado libera o número (readmissão)                                                                                                      | `animals.service.spec.ts`                                     |
 | Responsáveis                              | `POST /api/v1/responsibles` (antes não havia como cadastrar tutor)                                                                                                                                                                | `catalogos.service.spec.ts`                                   |
@@ -795,10 +797,10 @@ A correção implementada é FK composta `(breedId, speciesId) → Breed(id, spe
 
 ## Campos provisórios
 
-Animal.name, breedId, microchip, dataEntrada, sexo, idadeAproximadaMeses, pesoKg, porte e cor são opcionais. Endereço, horários da unidade e contatos do responsável também. O banco exige id, publicId, speciesId, unitId, locationId, responsibleId e front. Isso não certifica validação de negócio.
+Animal.name, breedId, microchip, dataEntrada, sexo, idadeAproximadaMeses, pesoKg, porte e cor são opcionais. Endereço, horários da unidade e contatos do responsável também. O banco exige id, publicId, speciesId, unitId, responsibleId e front (locationId passou a ser opcional na migration `20261022120000`). Isso não certifica validação de negócio.
 PesoKg é **peso atual**, sem histórico. Meses e kg são unidades propostas. Microchip é texto, não obrigatório nem único; não substitui UUID/publicId. A API futura deve validar valores negativos e formatos. Hoje não há DTO ou serviço de admissão.
 Foto obrigatória na conclusão é requisito confirmado, ainda sem armazenamento. O contrato propõe envio, confirmação e vínculo antes da conclusão; rascunho local pode estar incompleto e deve indicar pendência. A obrigatoriedade definitiva dos demais campos e o escopo clínico inicial aguardam Ampara.
-Frente permanece enum CCPA/CASADOTE/CED. Mutirão, Mantenedor, Encontrei um amigo e silvestres aguardam classificação entre frente, unidade, localização e ação. Não existe histórico de readmissão/transferência; responsável pelo animal não equivale ao usuário ou profissional clínico.
+Frente permanece enum CCPA/CASADOTE/CED. Mutirão, Mantenedor, Encontrei um amigo e silvestres aguardam classificação entre frente, unidade, localização e ação. Não existe histórico de readmissão/transferência (_legado: hoje existe a tabela `MovimentacaoAnimal`_); responsável pelo animal não equivale ao usuário ou profissional clínico.
 
 <a id="modelo"></a>
 
@@ -829,7 +831,7 @@ erDiagram
     String speciesId FK
     String breedId FK
     String unitId FK
-    String locationId FK
+    String locationId FK_opcional
     String responsibleId FK
     Front front
     Int version
@@ -969,3 +971,35 @@ Veja [contrato](../contracts/openapi.json), [modelo](#modelo), [limitações de 
 O CRUD de Animal e os endpoints de catálogo (espécies, raças, unidades, localizações, responsáveis, frentes) já estão implementados. Não há upload de foto, autenticação, histórico de peso ou sincronização offline implementados: são entregas planejadas para a Sprint 2 e/ou Sprint 3. A integridade cruzada está aplicada em produção (ver [integridade e campos opcionais](#integridade)).
 
 CI está preparado com URLs fictícias e não precisa de secrets; execução GitHub pendente. Não há provedor de API definido, CD ou homologação comprovada. Produção inicia com npm run start após build; orientações de release estão no guia manual.
+
+## Ajuste do cadastro do animal (feat/ajustar-cadastro-animal)
+
+- **Unidade**: saiu do formulário. A coluna `Animal.unitId` continua obrigatória no banco (informativa; **já não delimita acesso**, ver nota de 23/10/2026). `unidadeId` virou opcional na API; sem ele, o servidor usa a única unidade do operador ou a unidade que corresponde à frente (CCPA, CED, CasAdote). Decisão pendente com a Ampara: se unidade deve deixar de existir como escopo de acesso.
+- **Localização física**: removida do cadastro e das respostas. `Animal.locationId` ficou opcional (migration aditiva), preservando o valor dos animais antigos. Ao transferir o animal para outra unidade a localização antiga é descartada. O endpoint `GET /locations` e a tabela `Location` foram mantidos.
+- **Onça**: uma espécie `Onça` (silvestre) com as raças `Onça-pintada` e `Onça-parda`. A FK composta `(breedId, speciesId)` impede associar a raça a outra espécie. A migration move os animais da antiga espécie `Onça-pintada` para a nova e arquiva a antiga (`deletedAt`), sem apagar linhas.
+- **Responsável**: reaproveita a entidade `Responsible`. O endereço pertence ao responsável (vale para todos os seus animais) e aparece na ficha como `responsavelNome` e `responsavelEndereco`. Novo `PATCH /responsibles/{id}` corrige o endereço; `GET /responsibles` passou a devolver endereço, e-mail e telefone.
+- **Mudança incompatível**: com `forbidNonWhitelisted`, clientes que ainda enviam `localizacaoId` recebem 400.
+
+### Auditoria técnica (revisão estática)
+
+- ~~`GET /responsibles` devolvia e-mail e telefone apenas ao ADMIN~~ _(legado: com a remoção dos perfis, toda conta ativa recebe nome, endereço, e-mail e telefone)_.
+- `PATCH /responsibles/{id}`: ~~limitado por perfil e unidade~~ _(legado)_; hoje qualquer conta ativa edita qualquer responsável. A auditoria registra os nomes dos campos alterados, não os valores (e-mail e telefone não vão para a trilha imutável).
+- A migration da onça incrementa `Animal.version` dos animais movidos, para clientes offline com a ficha antiga receberem 409 ao editar.
+- ~~Limitação: sem `unidadeId`, o operador de uma única unidade cadastra o animal nessa unidade~~ _(legado)_: sem `unidadeId`, vale a unidade de mesmo nome da frente.
+
+## Prontuário clínico por atendimento (feat/prontuario-clinico-animal)
+
+Modelo: `AtendimentoClinico` (N por animal). Cada atendimento tem `tipo` (`ADMISSAO` ou `ACOMPANHAMENTO`), `dataAtendimento` e as seções `anamnese`, `exameFisico`, `examesComplementares` e `tratamento`, todas texto livre e opcionais (estrutura simples e extensível; a Ampara ainda não definiu campos estruturados).
+
+Decisões:
+
+- **Histórico**: um novo atendimento é uma nova linha; nunca sobrescreve os anteriores. Não há exclusão de atendimento pela API. As FKs para `Animal` e `Responsible` são `RESTRICT`.
+- **Admissão única**: índice parcial `AtendimentoClinico_admissao_ativa_key` (um `ADMISSAO` ativo por animal). Sem `tipo` informado, o primeiro atendimento é a admissão e os seguintes são acompanhamentos.
+- **Identificação**: animal e responsável são lidos pelos relacionamentos, não copiados. `responsibleId` do atendimento guarda o responsável vigente na criação; trocar o responsável do animal depois não reescreve atendimentos antigos. O endereço exibido é o do cadastro atual do responsável (não há histórico de endereço).
+- **Fluxo**: o prontuário é criado por ação explícita (`POST /animals/{animalId}/atendimentos`), não automaticamente no cadastro, para não bloquear a admissão básica. `Idempotency-Key` é obrigatória (reenvio offline não duplica).
+- **Acesso**: igual para toda conta ativa; 404 se o animal não existe ou está arquivado.
+- **Edição**: `PATCH` com controle de versão. A auditoria registra quais seções mudaram, não o texto clínico.
+- **PDF**: `GET /animals/{id}/prontuario` passou a listar os atendimentos clínicos.
+- **Fora de escopo**: anexos/imagens de exames (o armazenamento atual é só de foto de entrada), prescrição, diagnóstico automático.
+
+Dependência: esta branch parte de `main` e não depende de `feat/ajustar-cadastro-animal`; as duas alteram `prisma/schema.prisma`, `prontuario.service.ts`, `auditoria.service.ts`, `contracts/openapi.json`, `scripts/validar-openapi.cjs` e `docs/wad.md` em trechos diferentes. Ao integrar, a segunda a entrar exige resolver conflitos simples nesses arquivos (e o ajuste do PDF, que lá deixa de mostrar a localização).

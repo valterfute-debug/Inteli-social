@@ -7,8 +7,8 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma, SituacaoFoto } from '@prisma/client';
-import { EscopoAcesso, ehAdmin, filtroPorUnidade, garantirUnidade } from '../auth/escopo';
+import { Front, Prisma, SituacaoFoto } from '@prisma/client';
+import { UsuarioAutenticado } from '../auth/tipos';
 import {
   AcaoAuditoria,
   AuditoriaService,
@@ -20,11 +20,28 @@ import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AtualizarAnimalDto } from './dto/atualizar-animal.dto';
 import { CriarAnimalDto } from './dto/criar-animal.dto';
 import { ListarAnimaisQueryDto } from './dto/listar-animais-query.dto';
+import { ListarMovimentacoesQueryDto } from './dto/listar-movimentacoes-query.dto';
 import { AnimalComRelacoes, INCLUSAO_ANIMAL, mapearAnimal } from './animal.mapper';
 import { gerarIdentificadorPublico } from './identificador-publico.util';
 import { EstadoAdmissao, validarRegrasAdmissao } from './regras-admissao';
 
 const TENTATIVAS_MAXIMAS_IDENTIFICADOR = 3;
+
+/**
+ * `observacoes` é texto livre e pode conter dado pessoal; a trilha de auditoria é imutável.
+ * Registra-se que o campo mudou, não o conteúdo.
+ */
+function ocultarTextoLivre(campos: ReturnType<typeof calcularCamposAlterados>) {
+  if (campos.observacoes) campos.observacoes = { antes: null, depois: null };
+  return campos;
+}
+
+/** Nome da unidade que corresponde a cada frente, usado quando o cadastro não informa a unidade. */
+const UNIDADE_DA_FRENTE: Record<Front, string> = {
+  CCPA: 'CCPA',
+  CED: 'CED',
+  CASADOTE: 'CasAdote',
+};
 
 @Injectable()
 export class AnimalsService {
@@ -37,12 +54,9 @@ export class AnimalsService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  async listar(query: ListarAnimaisQueryDto, escopo: EscopoAcesso) {
+  async listar(query: ListarAnimaisQueryDto) {
     const { pagina, limite } = query;
-    // Filtro do cliente E escopo do servidor: pedir outra unidade só devolve lista vazia.
-    const where: Prisma.AnimalWhereInput = {
-      AND: [this.montarFiltroListagem(query), filtroPorUnidade(escopo)],
-    };
+    const where = this.montarFiltroListagem(query);
 
     const [itens, total] = await Promise.all([
       this.prisma.animal.findMany({
@@ -92,12 +106,12 @@ export class AnimalsService {
    * Admissão idempotente. A chave é conferida ANTES das validações: um reenvio legítimo não
    * pode esbarrar no próprio animal criado na primeira vez (ex.: "microchip já cadastrado").
    */
-  async criar(dto: CriarAnimalDto, escopo: EscopoAcesso, chave: string) {
-    const ctx = { usuarioId: escopo.usuarioId, chave, operacao: 'POST /animals', conteudo: dto };
+  async criar(dto: CriarAnimalDto, usuario: UsuarioAutenticado, chave: string) {
+    const ctx = { usuarioId: usuario.id, chave, operacao: 'POST /animals', conteudo: dto };
     const anterior = await this.idempotencia.verificarReenvio(ctx);
-    if (anterior) return { animal: await this.buscarPorId(anterior, escopo), reenvio: true };
+    if (anterior) return { animal: await this.buscarPorId(anterior), reenvio: true };
 
-    garantirUnidade(escopo, dto.unidadeId);
+    const unidadeId = await this.resolverUnidade(dto);
     for (let tentativa = 1; tentativa <= TENTATIVAS_MAXIMAS_IDENTIFICADOR; tentativa++) {
       const identificadorPublico = gerarIdentificadorPublico();
       try {
@@ -117,9 +131,8 @@ export class AnimalsService {
               pesoKg: dto.pesoKg,
               porte: dto.porte,
             });
-            if (dto.microchip)
-              await this.garantirMicrochipDisponivel(dto.microchip, escopo, undefined, tx);
-            await this.garantirFotoConfirmada(dto.fotoEntradaId, escopo, tx);
+            if (dto.microchip) await this.garantirMicrochipDisponivel(dto.microchip, undefined, tx);
+            await this.garantirFotoConfirmada(dto.fotoEntradaId, usuario, tx);
             const criado = await tx.animal.create({
               data: {
                 id: randomUUID(),
@@ -128,8 +141,7 @@ export class AnimalsService {
                 microchip: dto.microchip,
                 speciesId: dto.especieId,
                 breedId: dto.racaId,
-                unitId: dto.unidadeId,
-                locationId: dto.localizacaoId,
+                unitId: unidadeId,
                 responsibleId: dto.responsavelId,
                 front: dto.frente,
                 dataEntrada: dto.dataEntrada ? new Date(dto.dataEntrada) : undefined,
@@ -143,8 +155,18 @@ export class AnimalsService {
               },
               include: INCLUSAO_ANIMAL,
             });
+            await tx.movimentacaoAnimal.create({
+              data: {
+                animalId: criado.id,
+                frenteOrigem: null,
+                frenteDestino: criado.front,
+                unidadeOrigemId: null,
+                unidadeDestinoId: criado.unitId,
+                usuarioId: usuario.id,
+              },
+            });
             await this.auditoria.registrar(tx, {
-              usuarioId: escopo.usuarioId,
+              usuarioId: usuario.id,
               acao: AcaoAuditoria.ANIMAL_CRIADO,
               entidade: 'Animal',
               entidadeId: criado.id,
@@ -156,7 +178,7 @@ export class AnimalsService {
         );
         // Outra requisição com a mesma chave confirmou primeiro: devolve o animal dela.
         if (reenvio || !resultado) {
-          return { animal: await this.buscarPorId(recursoId, escopo), reenvio: true };
+          return { animal: await this.buscarPorId(recursoId), reenvio: true };
         }
         return { animal: await this.mapearComFoto(resultado), reenvio: false };
       } catch (erro) {
@@ -171,18 +193,29 @@ export class AnimalsService {
     throw new ConflictException('Não foi possível gerar um identificador público único');
   }
 
-  async buscarPorId(id: string, escopo: EscopoAcesso) {
+  async buscarPorId(id: string) {
     const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
       include: INCLUSAO_ANIMAL,
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
     return this.mapearComFoto(animal);
   }
 
-  async atualizar(id: string, dto: AtualizarAnimalDto, escopo: EscopoAcesso) {
+  async atualizar(id: string, dto: AtualizarAnimalDto, usuario: UsuarioAutenticado) {
     const { versao, ...dados } = dto;
+    // O IsOptional do PartialType também aceita null; estes campos são obrigatórios e não podem ser limpos.
+    const obrigatorios = [
+      'especieId',
+      'unidadeId',
+      'responsavelId',
+      'frente',
+      'fotoEntradaId',
+    ] as const;
+    const limpos = obrigatorios.filter((campo) => dados[campo] === null);
+    if (limpos.length > 0) {
+      throw new BadRequestException(limpos.map((campo) => `${campo} não pode ser nulo`));
+    }
     if (Object.keys(dados).length === 0) {
       throw new BadRequestException('Informe ao menos um campo além da versão');
     }
@@ -192,9 +225,6 @@ export class AnimalsService {
       include: { species: true },
     });
     if (!existente) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, existente.unitId);
-    // Transferir para outra unidade exige acesso também à unidade de destino.
-    if (dados.unidadeId !== undefined) garantirUnidade(escopo, dados.unidadeId);
     if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
 
     // As regras valem para o estado final: numa transferência CED → CasAdote, por exemplo,
@@ -215,10 +245,10 @@ export class AnimalsService {
       porte: valorFinal(dados.porte, existente.porte),
     });
     if (dados.microchip && dados.microchip !== existente.microchip) {
-      await this.garantirMicrochipDisponivel(dados.microchip, escopo, id);
+      await this.garantirMicrochipDisponivel(dados.microchip, id);
     }
     if (dados.fotoEntradaId !== undefined) {
-      await this.garantirFotoConfirmada(dados.fotoEntradaId, escopo);
+      await this.garantirFotoConfirmada(dados.fotoEntradaId, usuario);
     }
 
     // Nomes das colunas do banco; undefined = campo não enviado (não muda).
@@ -228,7 +258,9 @@ export class AnimalsService {
       speciesId: dados.especieId,
       breedId: dados.racaId,
       unitId: dados.unidadeId,
-      locationId: dados.localizacaoId,
+      // A localização antiga pertence à unidade de origem: numa transferência ela é descartada.
+      locationId:
+        dados.unidadeId !== undefined && dados.unidadeId !== existente.unitId ? null : undefined,
       responsibleId: dados.responsavelId,
       front: dados.frente,
       dataEntrada: dados.dataEntrada !== undefined ? new Date(dados.dataEntrada) : undefined,
@@ -250,18 +282,34 @@ export class AnimalsService {
         // Outra edição venceu entre a leitura acima e esta escrita.
         if (resultado.count === 0) throw new ConflictException('Versão desatualizada');
 
+        // Passagem entre áreas (frente) ou unidades: o mesmo cadastro segue, com a linha do tempo.
+        const frenteDestino = alteracoes.front ?? existente.front;
+        const unidadeDestinoId = alteracoes.unitId ?? existente.unitId;
+        if (frenteDestino !== existente.front || unidadeDestinoId !== existente.unitId) {
+          await tx.movimentacaoAnimal.create({
+            data: {
+              animalId: id,
+              frenteOrigem: existente.front,
+              frenteDestino,
+              unidadeOrigemId: existente.unitId,
+              unidadeDestinoId,
+              usuarioId: usuario.id,
+            },
+          });
+        }
+
         await this.auditoria.registrar(tx, {
-          usuarioId: escopo.usuarioId,
+          usuarioId: usuario.id,
           acao: AcaoAuditoria.ANIMAL_ATUALIZADO,
           entidade: 'Animal',
           entidadeId: id,
           unidadeId: alteracoes.unitId ?? existente.unitId,
           frente: alteracoes.front ?? existente.front,
-          camposAlterados: calcularCamposAlterados(existente, alteracoes),
+          camposAlterados: ocultarTextoLivre(calcularCamposAlterados(existente, alteracoes)),
         });
       });
 
-      return this.buscarPorId(id, escopo);
+      return this.buscarPorId(id);
     } catch (erro) {
       if (
         erro instanceof NotFoundException ||
@@ -274,22 +322,61 @@ export class AnimalsService {
     }
   }
 
-  async arquivar(id: string, escopo: EscopoAcesso) {
+  /**
+   * Linha do tempo de áreas e unidades do animal, da mais recente para a mais antiga. Vale também
+   * para animal arquivado: o histórico não some com o arquivamento.
+   */
+  async listarMovimentacoes(animalId: string, { pagina, limite }: ListarMovimentacoesQueryDto) {
+    const animal = await this.prisma.animal.findUnique({
+      where: { id: animalId },
+      select: { id: true },
+    });
+    if (!animal) throw new NotFoundException('Animal não encontrado');
+    const where = { animalId };
+    const [itens, total] = await Promise.all([
+      this.prisma.movimentacaoAnimal.findMany({
+        where,
+        include: { unidadeOrigem: true, unidadeDestino: true },
+        skip: (pagina - 1) * limite,
+        take: limite,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+      }),
+      this.prisma.movimentacaoAnimal.count({ where }),
+    ]);
+    return {
+      itens: itens.map((m) => ({
+        id: m.id,
+        animalId: m.animalId,
+        frenteOrigem: m.frenteOrigem,
+        frenteDestino: m.frenteDestino,
+        unidadeOrigemId: m.unidadeOrigemId,
+        unidadeOrigemNome: m.unidadeOrigem ? m.unidadeOrigem.name : null,
+        unidadeDestinoId: m.unidadeDestinoId,
+        unidadeDestinoNome: m.unidadeDestino.name,
+        usuarioId: m.usuarioId,
+        criadoEm: m.createdAt.toISOString(),
+      })),
+      pagina,
+      limite,
+      total,
+    };
+  }
+
+  async arquivar(id: string, usuario: UsuarioAutenticado) {
     const animal = await this.prisma.animal.findFirst({
       where: { id, deletedAt: null },
       select: { unitId: true, front: true },
     });
     if (!animal) throw new NotFoundException('Animal não encontrado');
-    garantirUnidade(escopo, animal.unitId);
 
     await this.prisma.$transaction(async (tx) => {
       const resultado = await tx.animal.updateMany({
-        where: { id, deletedAt: null, ...filtroPorUnidade(escopo) },
+        where: { id, deletedAt: null },
         data: { deletedAt: new Date() },
       });
       if (resultado.count === 0) throw new NotFoundException('Animal não encontrado');
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.ANIMAL_ARQUIVADO,
         entidade: 'Animal',
         entidadeId: id,
@@ -297,6 +384,23 @@ export class AnimalsService {
         frente: animal.front,
       });
     });
+  }
+
+  /**
+   * A unidade não faz parte do formulário e já não delimita acesso (todas as contas ativas têm as
+   * mesmas permissões). Sem `unidadeId`, vale a unidade de mesmo nome da frente.
+   */
+  private async resolverUnidade(dto: CriarAnimalDto) {
+    if (dto.unidadeId) return dto.unidadeId;
+    const unidade = await this.prisma.unit.findFirst({
+      where: {
+        name: { equals: UNIDADE_DA_FRENTE[dto.frente], mode: 'insensitive' },
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!unidade) throw new BadRequestException('Não foi possível definir a unidade do animal');
+    return unidade.id;
   }
 
   private garantirRegrasAdmissao(estado: EstadoAdmissao) {
@@ -323,7 +427,6 @@ export class AnimalsService {
    */
   private async garantirMicrochipDisponivel(
     microchip: string,
-    escopo: EscopoAcesso,
     ignorarId?: string,
     cliente: Prisma.TransactionClient = this.prisma,
   ) {
@@ -333,14 +436,9 @@ export class AnimalsService {
         deletedAt: null,
         ...(ignorarId ? { id: { not: ignorarId } } : {}),
       },
-      select: { id: true, publicId: true, unitId: true },
+      select: { id: true, publicId: true },
     });
     if (existente) {
-      // A unicidade é global, mas a ficha existente só pode ser identificada por
-      // quem tem acesso à unidade. Não revelar IDs de outra unidade no erro.
-      if (!ehAdmin(escopo) && !escopo.unidadeIds.includes(existente.unitId)) {
-        throw new ConflictException('Microchip já cadastrado em outro animal ativo');
-      }
       throw new ConflictException({
         message: `Microchip já cadastrado no animal ${existente.publicId}`,
         detalhes: {
@@ -353,13 +451,13 @@ export class AnimalsService {
 
   private async garantirFotoConfirmada(
     fotoEntradaId: string,
-    escopo: EscopoAcesso,
+    usuario: UsuarioAutenticado,
     cliente: Prisma.TransactionClient = this.prisma,
   ) {
     const foto = await cliente.foto.findUnique({ where: { id: fotoEntradaId } });
     if (!foto) throw new BadRequestException('Foto não encontrada');
-    // Só quem enviou a foto (ou um admin) pode vinculá-la a uma ficha.
-    if (foto.criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {
+    // Só quem enviou a foto pode vinculá-la a uma ficha (evita assumir o upload de outra pessoa).
+    if (foto.criadoPorId !== usuario.id) {
       throw new ForbiddenException('Foto enviada por outro usuário');
     }
     if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
@@ -408,7 +506,7 @@ export class AnimalsService {
       }
       if (erro.code === 'P2003' || erro.code === 'P2025') {
         throw new BadRequestException(
-          'Referência inválida: verifique espécie, raça, unidade, localização ou responsável',
+          'Referência inválida: verifique espécie, raça (deve ser da espécie), unidade ou responsável',
         );
       }
     }

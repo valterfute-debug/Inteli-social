@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, SituacaoFoto } from '@prisma/client';
 import { AcaoAuditoria, AuditoriaService } from '../auditoria/auditoria.service';
-import { EscopoAcesso, ehAdmin } from '../auth/escopo';
+import { UsuarioAutenticado } from '../auth/tipos';
 import { IdempotenciaService } from '../idempotencia/idempotencia.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
@@ -35,8 +35,8 @@ export class FotosService {
    * Idempotente pelo próprio id da foto (gerado no cliente): repetir a solicitação só renova
    * o link de envio. A Idempotency-Key é registrada para acusar reuso com conteúdo diferente.
    */
-  async solicitarEnvio(dto: SolicitarFotoDto, escopo: EscopoAcesso, chave: string) {
-    const ctx = { usuarioId: escopo.usuarioId, chave, operacao: 'POST /fotos', conteudo: dto };
+  async solicitarEnvio(dto: SolicitarFotoDto, usuario: UsuarioAutenticado, chave: string) {
+    const ctx = { usuarioId: usuario.id, chave, operacao: 'POST /fotos', conteudo: dto };
     const extensao = EXTENSAO_POR_TIPO_MIDIA[dto.tipoMidia];
     const caminhoArmazenamento = `admissao/${dto.id}.${extensao}`;
     const expiraEm = new Date(Date.now() + MINUTOS_VALIDADE_ENVIO * 60 * 1000);
@@ -44,7 +44,7 @@ export class FotosService {
     const { resultado } = await this.idempotencia.executar(ctx, async (tx) => {
       await this.bloquearFoto(tx, dto.id);
       const existente = await tx.foto.findUnique({ where: { id: dto.id } });
-      if (existente) this.garantirAutor(existente.criadoPorId, escopo);
+      if (existente) this.garantirAutor(existente.criadoPorId, usuario);
       if (existente?.situacao === SituacaoFoto.CONFIRMADA) {
         throw new ConflictException('Foto já confirmada; gere um novo id para enviar outra foto');
       }
@@ -66,7 +66,7 @@ export class FotosService {
               id: dto.id,
               ...dados,
               situacao: SituacaoFoto.PENDENTE,
-              criadoPorId: escopo.usuarioId,
+              criadoPorId: usuario.id,
             },
           });
       return { recursoId: dto.id, resultado: foto };
@@ -81,14 +81,14 @@ export class FotosService {
         const atual = await tx.foto.findUnique({ where: { id: dto.id } });
         if (!atual)
           throw new ConflictException('Foto expirada; gere um novo id para enviar outra foto');
-        this.garantirAutor(atual.criadoPorId, escopo);
+        this.garantirAutor(atual.criadoPorId, usuario);
         if (atual.situacao === SituacaoFoto.CONFIRMADA) {
           throw new ConflictException('Foto já confirmada; gere um novo id para enviar outra foto');
         }
         return tx.foto.update({ where: { id: dto.id }, data: { expiraEm } });
       }));
     if (!foto) throw new ConflictException('Foto expirada; gere um novo id para enviar outra foto');
-    this.garantirAutor(foto.criadoPorId, escopo);
+    this.garantirAutor(foto.criadoPorId, usuario);
     if (foto.situacao === SituacaoFoto.CONFIRMADA) {
       throw new ConflictException('Foto já confirmada; gere um novo id para enviar outra foto');
     }
@@ -97,9 +97,9 @@ export class FotosService {
   }
 
   /** Idempotente pelo estado: confirmar de novo uma foto confirmada devolve o mesmo resultado. */
-  async confirmar(id: string, escopo: EscopoAcesso, chave: string) {
+  async confirmar(id: string, usuario: UsuarioAutenticado, chave: string) {
     const ctx = {
-      usuarioId: escopo.usuarioId,
+      usuarioId: usuario.id,
       chave,
       operacao: `POST /fotos/${id}/confirmacao`,
       conteudo: null,
@@ -108,7 +108,7 @@ export class FotosService {
     await this.idempotencia.verificarReenvio(ctx);
     const foto = await this.prisma.foto.findUnique({ where: { id } });
     if (!foto) throw new NotFoundException('Foto não encontrada');
-    this.garantirAutor(foto.criadoPorId, escopo);
+    this.garantirAutor(foto.criadoPorId, usuario);
 
     if (foto.situacao !== SituacaoFoto.CONFIRMADA) {
       this.garantirPrazoEnvio(foto.expiraEm);
@@ -126,7 +126,7 @@ export class FotosService {
       await this.bloquearFoto(tx, id);
       const atual = await tx.foto.findUnique({ where: { id } });
       if (!atual) throw new NotFoundException('Foto não encontrada');
-      this.garantirAutor(atual.criadoPorId, escopo);
+      this.garantirAutor(atual.criadoPorId, usuario);
       if (atual.situacao === SituacaoFoto.CONFIRMADA) {
         return { recursoId: id, resultado: null };
       }
@@ -141,7 +141,7 @@ export class FotosService {
       }
       await tx.foto.update({ where: { id }, data: { situacao: SituacaoFoto.CONFIRMADA } });
       await this.auditoria.registrar(tx, {
-        usuarioId: escopo.usuarioId,
+        usuarioId: usuario.id,
         acao: AcaoAuditoria.FOTO_CONFIRMADA,
         entidade: 'Foto',
         entidadeId: foto.id,
@@ -165,9 +165,9 @@ export class FotosService {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${id}, 0))`;
   }
 
-  /** Foto ainda sem animal não tem unidade: o controle é por autoria (ou admin). */
-  private garantirAutor(criadoPorId: string | null, escopo: EscopoAcesso) {
-    if (criadoPorId !== escopo.usuarioId && !ehAdmin(escopo)) {
+  /** Foto ainda sem animal: só quem a enviou pode reaproveitar o id ou vinculá-la à ficha. */
+  private garantirAutor(criadoPorId: string | null, usuario: UsuarioAutenticado) {
+    if (criadoPorId !== usuario.id) {
       throw new ForbiddenException('Foto enviada por outro usuário');
     }
   }
