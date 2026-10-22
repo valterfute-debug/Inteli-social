@@ -60,7 +60,13 @@ function criarPrismaFalso() {
       findFirst: jest.fn().mockResolvedValue({ silvestre: false }),
     },
     foto: {
-      findUnique: jest.fn().mockResolvedValue({ id: 'foto-1', situacao: SituacaoFoto.CONFIRMADA }),
+      findUnique: jest
+        .fn()
+        .mockResolvedValue({
+          id: 'foto-1',
+          criadoPorId: 'operador-1',
+          situacao: SituacaoFoto.CONFIRMADA,
+        }),
     },
   } as unknown as PrismaService;
 }
