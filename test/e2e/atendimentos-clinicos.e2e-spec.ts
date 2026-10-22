@@ -34,7 +34,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
             where: { unitId_name: { unitId: casAdote, name: 'Canil' } },
           })
         ).id,
-        responsibleId,
+        responsibleId: responsavelId,
         front: 'CASADOTE',
       },
     });
