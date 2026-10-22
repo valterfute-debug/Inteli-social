@@ -71,6 +71,38 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
     await ambiente.encerrar();
   });
 
+  describe('região do resgate', () => {
+    it('guarda a região na ficha, filtra a lista e soma no levantamento', async () => {
+      const regiao = `Bairro Fictício ${randomUUID().slice(0, 8)}`;
+      for (const grafia of [regiao, ` ${regiao.toUpperCase()} `]) {
+        const criado = await cadastrar(contaA, {
+          nome: 'Resgatado',
+          especieId: especieCao,
+          responsavelId,
+          frente: 'CASADOTE',
+          regiaoResgate: grafia,
+        });
+        expect(criado.status).toBe(201);
+      }
+
+      const lista = await http()
+        .get(`/api/v1/animals?regiaoResgate=${encodeURIComponent(regiao.toLowerCase())}`)
+        .set('Authorization', contaB.autorizacao)
+        .expect(200);
+      expect(lista.body.total).toBe(2);
+      expect(lista.body.itens[0].regiaoResgate).toBe(regiao.toUpperCase());
+
+      const levantamento = await http()
+        .get('/api/v1/animals/regioes-resgate')
+        .set('Authorization', contaC.autorizacao)
+        .expect(200);
+      const linha = levantamento.body.itens.find(
+        (item: { regiao: string | null }) => item.regiao?.toLowerCase() === regiao.toLowerCase(),
+      );
+      expect(linha.total).toBe(2);
+    });
+  });
+
   describe('cadastro de animal', () => {
     it('conta cadastra sem unidade nem localização (a unidade segue a frente); ficha traz responsável e endereço', async () => {
       const resposta = await cadastrar(contaB, {

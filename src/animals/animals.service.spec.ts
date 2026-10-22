@@ -60,6 +60,7 @@ function criarPrismaFalso() {
       count: jest.fn(),
       updateMany: jest.fn(),
       findUnique: jest.fn(),
+      groupBy: jest.fn(),
     },
     movimentacaoAnimal: {
       create: jest.fn(),
@@ -488,6 +489,79 @@ describe('AnimalsService', () => {
       const resposta = await service.listar({ pagina: 1, limite: 20 });
 
       expect(resposta.itens[0].fotoEntradaUrl).toBeNull();
+    });
+  });
+
+  describe('região do resgate', () => {
+    function montar(prisma: PrismaService) {
+      return new AnimalsService(
+        comTransacao(prisma),
+        criarStorageFalso(),
+        idempotenciaFalsa(prisma),
+        auditoriaFalsa(),
+      );
+    }
+
+    it('grava a região sem espaços nas pontas e a devolve na ficha', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.create as jest.Mock).mockResolvedValue(
+        criarAnimalFalso({ regiaoResgate: 'Jardim Ângela' }),
+      );
+
+      const { animal } = await montar(prisma).criar(
+        { ...BASE_CASADOTE, regiaoResgate: '  Jardim Ângela ' },
+        USUARIO_TESTE,
+        CHAVE_TESTE,
+      );
+
+      const { data } = (prisma.animal.create as jest.Mock).mock.calls[0][0];
+      expect(data.regiaoResgate).toBe('Jardim Ângela');
+      expect(animal.regiaoResgate).toBe('Jardim Ângela');
+    });
+
+    it('na edição, texto vazio limpa a região', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalFalso());
+      (prisma.animal.updateMany as jest.Mock).mockResolvedValue({ count: 1 });
+
+      await montar(prisma).atualizar(ID_ANIMAL, { versao: 1, regiaoResgate: '  ' }, USUARIO_TESTE);
+
+      const { data } = (prisma.animal.updateMany as jest.Mock).mock.calls[0][0];
+      expect(data.regiaoResgate).toBeNull();
+    });
+
+    it('filtra a listagem por parte do nome da região, sem diferenciar maiúsculas', () => {
+      const where = montar(criarPrismaFalso()).montarFiltroListagem({
+        pagina: 1,
+        limite: 20,
+        regiaoResgate: ' angela ',
+      });
+
+      expect(where.regiaoResgate).toEqual({ contains: 'angela', mode: 'insensitive' });
+    });
+
+    it('levantamento soma grafias iguais e ordena da região mais frequente', async () => {
+      const prisma = criarPrismaFalso();
+      (prisma.animal.groupBy as jest.Mock).mockResolvedValue([
+        { regiaoResgate: 'Centro', _count: { _all: 2 } },
+        { regiaoResgate: 'Jardim Ângela', _count: { _all: 4 } },
+        { regiaoResgate: 'centro', _count: { _all: 1 } },
+        { regiaoResgate: null, _count: { _all: 3 } },
+      ]);
+
+      const resposta = await montar(prisma).listarRegioesResgate();
+
+      expect(prisma.animal.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({ by: ['regiaoResgate'], where: { deletedAt: null } }),
+      );
+      expect(resposta).toEqual({
+        itens: [
+          { regiao: 'Jardim Ângela', total: 4 },
+          { regiao: null, total: 3 },
+          { regiao: 'Centro', total: 3 },
+        ],
+        totalAnimais: 10,
+      });
     });
   });
 

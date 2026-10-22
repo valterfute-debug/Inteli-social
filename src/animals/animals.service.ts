@@ -47,6 +47,13 @@ const UNIDADE_DA_FRENTE: Record<Front, string> = {
   MANTENEDOR: 'Mantenedor',
 };
 
+/** Tira espaços das pontas; texto vazio vira null (limpa o campo). undefined = não enviado. */
+function normalizarRegiao(regiao: string | null | undefined) {
+  if (regiao === undefined) return undefined;
+  const limpa = regiao?.trim();
+  return limpa ? limpa : null;
+}
+
 @Injectable()
 export class AnimalsService {
   private readonly logger = new Logger(AnimalsService.name);
@@ -83,7 +90,8 @@ export class AnimalsService {
   }
 
   montarFiltroListagem(query: ListarAnimaisQueryDto): Prisma.AnimalWhereInput {
-    const { busca, nome, identificadorPublico, microchip, especieId, frente } = query;
+    const { busca, nome, identificadorPublico, microchip, especieId, frente, regiaoResgate } =
+      query;
     return {
       deletedAt: null,
       ...(busca
@@ -102,6 +110,9 @@ export class AnimalsService {
       ...(microchip ? { microchip } : {}),
       ...(especieId ? { speciesId: especieId } : {}),
       ...(frente ? { front: frente } : {}),
+      ...(regiaoResgate
+        ? { regiaoResgate: { contains: regiaoResgate.trim(), mode: 'insensitive' } }
+        : {}),
     };
   }
 
@@ -153,6 +164,7 @@ export class AnimalsService {
                 pesoKg: dto.pesoKg,
                 porte: dto.porte,
                 cor: dto.cor,
+                regiaoResgate: normalizarRegiao(dto.regiaoResgate) ?? undefined,
                 observacoes: dto.observacoes,
                 fotoEntradaId: dto.fotoEntradaId,
               },
@@ -270,6 +282,7 @@ export class AnimalsService {
       pesoKg: dados.pesoKg,
       porte: dados.porte,
       cor: dados.cor,
+      regiaoResgate: normalizarRegiao(dados.regiaoResgate),
       observacoes: dados.observacoes,
       fotoEntradaId: dados.fotoEntradaId,
     };
@@ -356,6 +369,31 @@ export class AnimalsService {
       limite,
       total,
     };
+  }
+
+  /**
+   * Levantamento das regiões onde os animais ativos foram recolhidos, da mais frequente para a
+   * menos frequente. Grafias que só diferem em maiúsculas/minúsculas contam juntas; animais sem
+   * região aparecem com `regiao: null`.
+   */
+  async listarRegioesResgate() {
+    const grupos = await this.prisma.animal.groupBy({
+      by: ['regiaoResgate'],
+      where: { deletedAt: null },
+      _count: { _all: true },
+    });
+    const porChave = new Map<string, { regiao: string | null; total: number }>();
+    for (const grupo of grupos) {
+      const chave =
+        grupo.regiaoResgate === null ? '' : grupo.regiaoResgate.toLocaleLowerCase('pt-BR');
+      const atual = porChave.get(chave);
+      if (atual) atual.total += grupo._count._all;
+      else porChave.set(chave, { regiao: grupo.regiaoResgate, total: grupo._count._all });
+    }
+    const itens = [...porChave.values()].sort(
+      (a, b) => b.total - a.total || (a.regiao ?? '').localeCompare(b.regiao ?? '', 'pt-BR'),
+    );
+    return { itens, totalAnimais: itens.reduce((soma, item) => soma + item.total, 0) };
   }
 
   async arquivar(id: string, usuario: UsuarioAutenticado) {

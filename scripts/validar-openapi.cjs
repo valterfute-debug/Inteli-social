@@ -11,6 +11,7 @@ const ENDPOINTS_IMPLEMENTADOS = new Set([
   'GET /api/v1/auditoria',
   'GET /api/v1/animals',
   'POST /api/v1/animals',
+  'GET /api/v1/animals/regioes-resgate',
   'GET /api/v1/animals/{id}',
   'PATCH /api/v1/animals/{id}',
   'DELETE /api/v1/animals/{id}',

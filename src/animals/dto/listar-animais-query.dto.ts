@@ -76,4 +76,10 @@ export class ListarAnimaisQueryDto {
   @IsOptional()
   @IsEnum(Front)
   frente?: Front;
+
+  @ApiPropertyOptional({ maxLength: 120, description: 'Parte do nome da região do resgate' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  regiaoResgate?: string;
 }

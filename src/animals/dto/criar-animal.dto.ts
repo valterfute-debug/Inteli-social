@@ -96,6 +96,19 @@ export class CriarAnimalDto {
   @ApiProperty({
     required: false,
     nullable: true,
+    maxLength: 120,
+    example: 'Jardim Ângela, São Paulo',
+    description:
+      'Região onde o animal foi recolhido (bairro, cidade). Alimenta GET /animals/regioes-resgate',
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  regiaoResgate?: string;
+
+  @ApiProperty({
+    required: false,
+    nullable: true,
     maxLength: 2000,
     description: 'Ex.: mancha branca na pata dianteira',
   })

@@ -338,6 +338,16 @@
                 "MANTENEDOR"
               ]
             }
+          },
+          {
+            "name": "regiaoResgate",
+            "in": "query",
+            "required": false,
+            "description": "Parte do nome da região do resgate (sem diferenciar maiúsculas)",
+            "schema": {
+              "type": "string",
+              "maxLength": 120
+            }
           }
         ]
       },
@@ -481,6 +491,115 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/animals/regioes-resgate": {
+      "get": {
+        "summary": "Levantamento das regiões de resgate",
+        "description": "Implementado. Conta os animais ativos por região onde foram recolhidos (campo regiaoResgate), da mais frequente para a menos frequente. Grafias que só diferem em maiúsculas/minúsculas contam juntas; animais sem região aparecem com regiao nula. Qualquer conta ativa consulta.",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resultado esperado quando implementado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegioesResgate"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "description": "Filtro ou controle da requisição",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
             }
           }
         ]
@@ -1748,7 +1867,7 @@
     "/api/v1/fronts": {
       "get": {
         "summary": "Listar frentes",
-        "description": "Implementado. Lista fixa das três frentes de atuação (CCPA, CasAdote, CED).",
+        "description": "Implementado. Lista fixa das quatro frentes de atuação (CCPA, CasAdote, CED, Mantenedor).",
         "x-situacao": "implementado",
         "security": [
           {
@@ -3183,6 +3302,13 @@
             "nullable": true,
             "maxLength": 60
           },
+          "regiaoResgate": {
+            "type": "string",
+            "description": "Região onde o animal foi recolhido (bairro, cidade). Espaços nas pontas são removidos; texto vazio limpa o campo. Base de GET /api/v1/animals/regioes-resgate.",
+            "example": "Jardim Ângela, São Paulo",
+            "nullable": true,
+            "maxLength": 120
+          },
           "observacoes": {
             "type": "string",
             "description": "Ex.: mancha branca na pata dianteira",
@@ -3300,6 +3426,13 @@
             "nullable": true,
             "maxLength": 60
           },
+          "regiaoResgate": {
+            "type": "string",
+            "description": "Região onde o animal foi recolhido (bairro, cidade). Espaços nas pontas são removidos; texto vazio limpa o campo. Base de GET /api/v1/animals/regioes-resgate.",
+            "example": "Jardim Ângela, São Paulo",
+            "nullable": true,
+            "maxLength": 120
+          },
           "versao": {
             "type": "integer",
             "minimum": 1,
@@ -3319,6 +3452,53 @@
           }
         },
         "description": "Atualização parcial com controle de versão. As regras por frente são avaliadas sobre o estado final (cadastro atual + alterações): uma transferência CED para CASADOTE envia só a frente (a unidade acompanha a frente)."
+      },
+      "RegioesResgate": {
+        "type": "object",
+        "required": [
+          "itens",
+          "totalAnimais"
+        ],
+        "properties": {
+          "itens": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "regiao",
+                "total"
+              ],
+              "properties": {
+                "regiao": {
+                  "type": "string",
+                  "nullable": true,
+                  "description": "Região (nula = não informada)"
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          },
+          "totalAnimais": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "example": {
+          "itens": [
+            {
+              "regiao": "Jardim Ângela",
+              "total": 4
+            },
+            {
+              "regiao": null,
+              "total": 3
+            }
+          ],
+          "totalAnimais": 7
+        }
       },
       "Animal": {
         "type": "object",
@@ -3416,6 +3596,11 @@
           "cor": {
             "type": "string",
             "description": "Cor",
+            "nullable": true
+          },
+          "regiaoResgate": {
+            "type": "string",
+            "description": "Região onde o animal foi recolhido",
             "nullable": true
           },
           "versao": {

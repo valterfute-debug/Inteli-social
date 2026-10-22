@@ -100,6 +100,8 @@ model Animal {
   pesoKg Decimal? @db.Decimal(6, 2)
   porte Porte?
   cor String?
+  // Região onde o animal foi recolhido (bairro, cidade): base do levantamento pedido pela Ampara.
+  regiaoResgate String?
   observacoes String?
   fotoEntradaId String? @unique
   fotoEntrada Foto? @relation(fields: [fotoEntradaId], references: [id])
@@ -125,6 +127,7 @@ model Animal {
   @@index([name])
   @@index([speciesId])
   @@index([microchip])
+  @@index([regiaoResgate])
 }
 model Foto {
   id String @id @default(uuid())

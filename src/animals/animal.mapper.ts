@@ -31,6 +31,7 @@ export function mapearAnimal(animal: AnimalComRelacoes, fotoEntradaUrl: string |
     pesoKg: animal.pesoKg === null ? null : Number(animal.pesoKg),
     porte: animal.porte,
     cor: animal.cor,
+    regiaoResgate: animal.regiaoResgate,
     observacoes: animal.observacoes,
     fotoEntradaId: animal.fotoEntradaId,
     fotoEntradaUrl,

@@ -56,6 +56,13 @@ export class AnimalsController {
     return animal;
   }
 
+  // Antes de ':id': senão "regioes-resgate" seria lido como id e recusado pelo ParseUUIDPipe.
+  @Get('regioes-resgate')
+  @ApiOperation({ summary: 'Levantamento das regiões onde os animais foram recolhidos' })
+  listarRegioesResgate() {
+    return this.animalsService.listarRegioesResgate();
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Consultar animal' })
   buscarPorId(@Param('id', ParseUUIDPipe) id: string) {
