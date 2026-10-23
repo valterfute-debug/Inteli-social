@@ -33,7 +33,7 @@ O que continua protegendo os dados, **independente de perfil**: autenticação o
 2. **Carregar as opções.** Espécies `GET /species`; raças da espécie `GET /breeds?especieId=`; responsáveis `GET /responsibles`; frentes `GET /fronts`.
 3. **Espécie e raça.** A raça é opcional e precisa pertencer à espécie (o banco rejeita combinação inválida → 400). Onça: espécie "Onça", raça "Onça-pintada" ou "Onça-parda".
 4. **Responsável.** Selecionar um existente; se não existir, criar antes (Fluxo 2). O endereço mora no responsável.
-5. **Unidade.** **Não é preenchida pela pessoa** e **não decide acesso**. Sem `unidadeId`, vale a unidade de mesmo nome da frente (CCPA, CED, CasAdote); se não existir, 400. A unidade é informativa e independente da frente (RN056).
+5. **Unidade.** **Não é preenchida pela pessoa** nem aparece na ficha: o servidor a deriva da frente (RN009) e `unidadeId` enviado → 400. Não decide acesso (RN056).
 6. **Localização física.** Não existe mais no cadastro; enviar `localizacaoId` retorna 400.
 7. **Foto.** `POST /fotos` (com `Idempotency-Key`) devolve uma URL de envio; a imagem vai direto ao Storage; `POST /fotos/{id}/confirmacao` confere tipo e tamanho. Só a conta que enviou a foto pode vinculá-la.
 8. **Enviar o cadastro.** `POST /animals` com **`Idempotency-Key` obrigatório** (UUID v4, o mesmo em reenvios).
@@ -41,7 +41,7 @@ O que continua protegendo os dados, **independente de perfil**: autenticação o
 10. **Campos por frente.** Silvestre: exige **nome**, dispensa o resto. Não silvestre em **CCPA ou CED**: exige microchip, sexo, idade aproximada (em meses), peso e porte (e foto). **CasAdote**: nada além do básico. Falta de campo → 400 listando cada falta (DP-01: regra confirmada na reunião de validação).
 11. **Duplicidade.** Microchip já usado por animal ativo → 409 com o animal existente em `detalhes`, para continuar o atendimento nele em vez de duplicar a ficha.
 12. **Resultado.** 201 com a ficha e o identificador público gerado pelo servidor. A **entrada** é gravada na linha do tempo do animal (Fluxo 12). Repetir a mesma requisição com a mesma chave devolve **200** e o mesmo animal.
-13. **Consultar depois.** `GET /animals/{id}` e `GET /animals` com `busca`, `nome`, `identificadorPublico`, `microchip`, `especieId`, `frente`, `unidadeId`, paginação.
+13. **Consultar depois.** `GET /animals/{id}` e `GET /animals` com `busca`, `nome`, `identificadorPublico`, `microchip`, `especieId`, `frente`, `regiaoResgate`, paginação.
 14. **Editar / arquivar.** `PATCH /animals/{id}` com `versao`; versão antiga → 409 (recarregar). `DELETE` arquiva (não apaga).
 
 **Erros:** 400 validação, 401 sem token, 403 conta sem acesso liberado ou foto de outra conta, 404 animal inexistente, 409 versão/microchip/chave reutilizada com outro conteúdo.
@@ -160,7 +160,7 @@ Recurso **diferente** do atendimento clínico: registra um fato pontual de saúd
 2. O **nome** passa a ser obrigatório; sexo, idade, peso, porte e microchip ficam dispensados, em qualquer frente. Sem nome → 400.
 3. Dois silvestres com o mesmo nome podem existir; cada um tem `id` e identificador público próprios (DP-03).
 4. O microchip **pode** ser informado junto com o nome; a regra apenas o dispensa (DP-02).
-5. **Mantenedor** é o **local onde ficam os silvestres**, modelado como a **unidade "Mantenedor"** do catálogo (decisão da reunião de validação, `wad.md` §7.5). O vínculo é a unidade do animal (`unidadeId`); entradas e saídas dessa unidade aparecem na linha do tempo. Não há entidade nem campo próprio. Pendente: obrigatoriedade do vínculo e se o mantenedor também é uma pessoa/organização com dados (DP-06).
+5. **Mantenedor** é uma **atuação do animal**: a frente `MANTENEDOR` (pedido da reunião de entrega: "mantenedor como atuação"). Entradas e saídas dessa frente aparecem na linha do tempo. Não há entidade nem campo de mantenedor como pessoa/organização. Pendente: obrigatoriedade do vínculo e se o mantenedor também é uma pessoa/organização com dados (DP-06).
 
 ---
 
@@ -169,7 +169,7 @@ Recurso **diferente** do atendimento clínico: registra um fato pontual de saúd
 - **Ator:** qualquer conta ativa. **RF/RN:** RF042, RF046; RN002–RN004, RN047–RN049, RN055, RN056. **Situação:** a operação existe e foi testada; a **restrição de transições** não foi definida pela equipe (DP-07). A área se chama `CASADOTE` / "CasAdote" (DP-10).
 
 1. **Entrada no CED ou no CCPA:** cadastro com `frente` CED ou CCPA. Para não silvestres, exige microchip, sexo, idade, peso, porte (e foto).
-2. **Passagem:** `PATCH /animals/{id}` com `versao` e `frente` de destino (e `unidadeId`, se a unidade também muda). É o **mesmo cadastro**: `id`, identificador público, microchip, foto, eventos de saúde, atendimentos e linha do tempo permanecem; `versao` aumenta.
+2. **Passagem:** `PATCH /animals/{id}` com `versao` e `frente` de destino (a unidade acompanha a frente, sem aparecer na resposta). É o **mesmo cadastro**: `id`, identificador público, microchip, foto, eventos de saúde, atendimentos e linha do tempo permanecem; `versao` aumenta.
 3. **Registro:** a passagem é gravada em `MovimentacaoAnimal` (origem, destino, usuário, instante) na mesma transação; a auditoria registra a mesma edição.
 4. **Recebimento pelo CasAdote:** o animal chega com a identificação completa; o CasAdote não repete as exigências. Um cadastro **novo** direto no CasAdote também é aceito.
 5. **Volta para CED/CCPA:** só é aceita se o cadastro tiver os cinco campos; senão, 400 e nada muda (inclusive a linha do tempo).

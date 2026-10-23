@@ -1,12 +1,12 @@
 # Relatório de validação técnica
 
-Data da execução: 2026-10-23. Branch `feat/integrar-cadastro-e-prontuario` (worktree `Inteli-social-integracao`), partindo do commit `23c3211` (que parte de `main` `f6c79ae`). As alterações desta rodada estão descritas em `decisoes-pendentes.md` e entram em um novo commit; `main` e `origin/main` não foram alteradas.
+Data da execução: 2026-10-23, revalidada em 2026-10-24 sobre a `main` com a branch `fix/ajustes-reuniao-ampara` (commit `012e176`). A CI do PR #10 passou nesse commit, inclusive o e2e de backup no Linux. As alterações estão descritas em `decisoes-pendentes.md`.
 
 ## Resumo
 
-**Passaram por execução:** `npm ci`, `prisma generate`, `prisma validate`, lint, typecheck, build, `openapi:validate`, **189 testes unitários**, **87 testes e2e com PostgreSQL 16.9 real** (exceto o de backup), as 15 migrations do zero, a migração de **contas legadas fictícias**, três cenários de dados da migration da onça e a comparação banco × schema (`migrate diff`, sem diferença).
+**Passaram por execução:** `npm ci`, `prisma generate`, `prisma validate`, lint, typecheck, build, `openapi:validate`, **197 testes unitários**, **89 testes e2e com PostgreSQL 16.9 real** (exceto o de backup, que a CI roda no Linux), as 17 migrations do zero, a migração de **contas legadas fictícias**, três cenários de dados da migration da onça e a comparação banco × schema (`migrate diff`, sem diferença).
 
-**Reprovado, por causa do ambiente:** o e2e de backup/restauração (Windows).
+**Reprovado, por causa do ambiente:** o e2e de backup/restauração no Windows (teste escrito para Linux). Na CI (Linux) ele passou.
 
 **Não executado / não verificável aqui:** o e2e de backup em Linux/CI; qualquer teste de interface e o fluxo offline (não existem); o frontend institucional publicado (código fora deste repositório); a aplicação das migrations em um banco real (proibida e sem cópia disponível). `npm audit --omit=dev` encontrou 0 vulnerabilidades.
 
@@ -34,10 +34,10 @@ Nada foi instalado globalmente nem alterado no PATH, no registro ou em serviços
 | Schema                    | `npm run prisma:validate`                                                                | **Aprovado**                                                                                                                                                                 | 4 s     |
 | Lint                      | `npm run lint`                                                                           | **Aprovado** (0 erros)                                                                                                                                                       | 3 s     |
 | Typecheck                 | `npm run typecheck`                                                                      | **Aprovado**                                                                                                                                                                 | 3 s     |
-| Testes unitários          | `npx jest --runInBand`                                                                   | **Aprovado: 17 suítes, 189/189**                                                                                                                                             | 22 s    |
+| Testes unitários          | `npx jest --runInBand`                                                                   | **Aprovado: 17 suítes, 197/197**                                                                                                                                             | 22 s    |
 | OpenAPI                   | `npm run openapi:validate`                                                               | **Aprovado** (28 operações, lista do validador conferida)                                                                                                                    | 2 s     |
 | Build                     | `npm run build`                                                                          | **Aprovado**                                                                                                                                                                 | 12 s    |
-| e2e (sem backup)          | `jest --config jest.e2e.config.cjs --runInBand --testPathIgnorePatterns backup.e2e-spec` | **Aprovado: 8 suítes, 87/87**, banco com as 15 migrations do zero                                                                                                            | 40 s    |
+| e2e (sem backup)          | `jest --config jest.e2e.config.cjs --runInBand --testPathIgnorePatterns backup.e2e-spec` | **Aprovado: 8 suítes, 89/89**, banco com as 17 migrations do zero                                                                                                            | 40 s    |
 | e2e de backup             | `test/e2e/backup.e2e-spec.ts`                                                            | **Reprovado — ambiente** (ver abaixo)                                                                                                                                        | —       |
 | Banco × schema            | `prisma migrate diff --from-url … --to-schema-datamodel …`                               | **Aprovado**: "No difference detected" (banco novo e banco migrado de contas legadas)                                                                                        | —       |
 | Formatação                | `prettier --check --end-of-line auto` em `src`, `test`, `prisma`, `docs`                 | **Aprovado**                                                                                                                                                                 | —       |
