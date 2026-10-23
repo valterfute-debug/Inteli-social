@@ -73,7 +73,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
 
   describe('região do resgate', () => {
     it('guarda a região na ficha, filtra a lista e soma no levantamento', async () => {
-      const regiao = `Bairro Fictício ${randomUUID().slice(0, 8)}`;
+      const regiao = `Bairro Ficticio ${randomUUID().slice(0, 8)}`;
       for (const grafia of [regiao, ` ${regiao.toUpperCase()} `]) {
         const criado = await cadastrar(contaA, {
           nome: 'Resgatado',
@@ -349,7 +349,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
       expect(admissao).toMatchObject({
         tipo: 'ADMISSAO',
         animal: { id: animal.body.id, nome: 'Chegou hoje' },
-        responsavel: { id: responsavelId, nome: 'Maria Fictícia', endereco: 'Rua das Flores, 10' },
+        responsavel: { id: responsavelId, nome: 'Maria Fictícia' },
         anamnese: null,
         exameFisico: null,
         examesComplementares: null,

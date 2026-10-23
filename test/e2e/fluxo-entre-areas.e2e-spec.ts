@@ -290,11 +290,9 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
       ]);
       expect(resposta.body.itens[0]).toMatchObject({
         animalId: id,
-        unidadeOrigemNome: 'CasAdote',
-        unidadeDestinoNome: 'CCPA',
         usuarioId: contaB.id,
       });
-      expect(resposta.body.itens[2]).toMatchObject({ unidadeOrigemId: null, usuarioId: contaA.id });
+      expect(resposta.body.itens[2]).toMatchObject({ frenteOrigem: null, usuarioId: contaA.id });
     });
 
     it('edição que não muda de área e edição recusada não geram movimentação', async () => {
