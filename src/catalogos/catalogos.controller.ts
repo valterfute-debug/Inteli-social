@@ -19,6 +19,8 @@ import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
 import { ListarLocalizacoesQueryDto } from './dto/listar-localizacoes-query.dto';
 import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
 import { AtualizarResponsavelDto } from './dto/atualizar-responsavel.dto';
+import { CriarRacaDto } from './dto/criar-raca.dto';
+import { AtualizarRacaDto } from './dto/atualizar-raca.dto';
 
 @ApiTags('Catalogos')
 @Controller({ version: '1' })
@@ -35,6 +37,23 @@ export class CatalogosController {
   @ApiOperation({ summary: 'Listar raças' })
   listarRacas(@Query() query: ListarRacasQueryDto) {
     return this.catalogosService.listarRacas(query);
+  }
+
+  @Post('breeds')
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Cadastrar raça em uma espécie ativa' })
+  criarRaca(@Body() dto: CriarRacaDto, @UsuarioAtual() usuario: UsuarioAutenticado) {
+    return this.catalogosService.criarRaca(dto, usuario);
+  }
+
+  @Patch('breeds/:id')
+  @ApiOperation({ summary: 'Renomear raça para todos os animais vinculados, sem mudar a espécie' })
+  atualizarRaca(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: AtualizarRacaDto,
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+  ) {
+    return this.catalogosService.atualizarRaca(id, dto, usuario);
   }
 
   @Get('units')
