@@ -13,6 +13,8 @@ export enum AcaoAuditoria {
   FOTO_CONFIRMADA = 'FOTO_CONFIRMADA',
   RESPONSAVEL_CRIADO = 'RESPONSAVEL_CRIADO',
   RESPONSAVEL_ATUALIZADO = 'RESPONSAVEL_ATUALIZADO',
+  RACA_CRIADA = 'RACA_CRIADA',
+  RACA_ATUALIZADA = 'RACA_ATUALIZADA',
   ATENDIMENTO_CLINICO_CRIADO = 'ATENDIMENTO_CLINICO_CRIADO',
   ATENDIMENTO_CLINICO_ATUALIZADO = 'ATENDIMENTO_CLINICO_ATUALIZADO',
 }
@@ -20,7 +22,7 @@ export enum AcaoAuditoria {
 export interface DadosEventoAuditoria {
   usuarioId: string;
   acao: AcaoAuditoria;
-  entidade: 'Animal' | 'HealthEvent' | 'Foto' | 'Responsible' | 'AtendimentoClinico';
+  entidade: 'Animal' | 'HealthEvent' | 'Foto' | 'Responsible' | 'Breed' | 'AtendimentoClinico';
   entidadeId: string;
   unidadeId?: string | null;
   frente?: Front | null;

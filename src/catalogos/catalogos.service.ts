@@ -1,5 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { Front } from '@prisma/client';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { Front, Prisma } from '@prisma/client';
 import {
   AcaoAuditoria,
   AuditoriaService,
@@ -12,6 +17,8 @@ import { ListarRacasQueryDto } from './dto/listar-racas-query.dto';
 import { ListarLocalizacoesQueryDto } from './dto/listar-localizacoes-query.dto';
 import { CriarResponsavelDto } from './dto/criar-responsavel.dto';
 import { AtualizarResponsavelDto } from './dto/atualizar-responsavel.dto';
+import { CriarRacaDto } from './dto/criar-raca.dto';
+import { AtualizarRacaDto } from './dto/atualizar-raca.dto';
 
 const NOMES_FRENTES: Record<Front, string> = {
   CCPA: 'Centro de Controle de População Animal',
@@ -63,6 +70,68 @@ export class CatalogosService {
       limite,
       total,
     };
+  }
+
+  private normalizarNomeRaca(nome: string) {
+    const normalizado = nome.normalize('NFC').trim().replace(/\s+/gu, ' ');
+    if (normalizado.length < 2 || normalizado.length > 120) {
+      throw new BadRequestException('nome deve ter entre 2 e 120 caracteres');
+    }
+    return normalizado;
+  }
+
+  private async validarRaca(
+    tx: Prisma.TransactionClient,
+    especieId: string,
+    nome: string,
+    id?: string,
+  ) {
+    // Serializa as escritas da espécie, incluindo nomes com caixa diferente.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`breed:${especieId}`}, 0))`;
+    const especie = await tx.species.findFirst({ where: { id: especieId, deletedAt: null } });
+    if (!especie) throw new NotFoundException('Espécie não encontrada ou inativa');
+    const duplicada = await tx.breed.findFirst({
+      where: {
+        speciesId: especieId,
+        name: { equals: nome, mode: 'insensitive' },
+        ...(id ? { id: { not: id } } : {}),
+      },
+    });
+    if (duplicada) throw new ConflictException('Já existe uma raça com esse nome nesta espécie');
+  }
+
+  async criarRaca(dto: CriarRacaDto, usuario: UsuarioAutenticado) {
+    const nome = this.normalizarNomeRaca(dto.nome);
+    return this.prisma.$transaction(async (tx) => {
+      await this.validarRaca(tx, dto.especieId, nome);
+      const criada = await tx.breed.create({ data: { name: nome, speciesId: dto.especieId } });
+      await this.auditoria.registrar(tx, {
+        usuarioId: usuario.id,
+        acao: AcaoAuditoria.RACA_CRIADA,
+        entidade: 'Breed',
+        entidadeId: criada.id,
+      });
+      return { id: criada.id, nome: criada.name, especieId: criada.speciesId };
+    });
+  }
+
+  async atualizarRaca(id: string, dto: AtualizarRacaDto, usuario: UsuarioAutenticado) {
+    const nome = this.normalizarNomeRaca(dto.nome);
+    return this.prisma.$transaction(async (tx) => {
+      const atual = await tx.breed.findUnique({ where: { id } });
+      if (!atual) throw new NotFoundException('Raça não encontrada');
+      await this.validarRaca(tx, atual.speciesId, nome, id);
+      const anterior = await tx.breed.findUniqueOrThrow({ where: { id } });
+      const atualizada = await tx.breed.update({ where: { id }, data: { name: nome } });
+      await this.auditoria.registrar(tx, {
+        usuarioId: usuario.id,
+        acao: AcaoAuditoria.RACA_ATUALIZADA,
+        entidade: 'Breed',
+        entidadeId: id,
+        camposAlterados: calcularCamposAlterados(anterior, { name: nome }),
+      });
+      return { id: atualizada.id, nome: atualizada.name, especieId: atualizada.speciesId };
+    });
   }
 
   /** Todas as unidades ativas: qualquer conta cadastra e consulta em qualquer unidade. */

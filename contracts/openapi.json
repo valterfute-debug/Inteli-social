@@ -1246,6 +1246,128 @@
             }
           }
         ]
+      },
+      "post": {
+        "summary": "Cadastrar raça por espécie",
+        "description": "Implementado. Nome normalizado e único por espécie, sem diferenciar maiúsculas/minúsculas. Espécie ativa obrigatória e imutável na edição. A renomeação vale para todos os animais vinculados. Última gravação prevalece. Escrita e auditoria na mesma transação.",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarRaca"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Raça salva",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Raca"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/units": {
@@ -2721,100 +2843,491 @@
     },
     "/api/v1/animals/{animalId}/atendimentos": {
       "parameters": [
-        { "name": "animalId", "in": "path", "required": true, "description": "Identificador do animal", "schema": { "type": "string", "format": "uuid" } }
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do animal",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       ],
       "get": {
         "summary": "Listar o histórico clínico do animal",
         "description": "Implementado. Atendimentos ativos do animal, do mais recente ao mais antigo, com a identificação do animal e do responsável da época.",
         "x-situacao": "implementado",
-        "security": [{ "bearerSupabase": [] }],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "parameters": [
-          { "name": "pagina", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "default": 1 } },
-          { "name": "limite", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Página de atendimentos", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaginaAtendimentosClinicos" } } } },
-          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+          "200": {
+            "description": "Página de atendimentos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaAtendimentosClinicos"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Animal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
         }
       },
       "post": {
         "summary": "Registrar atendimento clínico",
         "description": "Implementado. Cria o atendimento (anamnese, exame físico, exames complementares e tratamento, todos opcionais). Animais cadastrados por POST /animals já nascem com a ADMISSAO (vazia), que se completa com PATCH; por isso aqui, sem tipo, o atendimento é ACOMPANHAMENTO. Só animais antigos, sem admissão, recebem ADMISSAO neste POST. Só existe uma admissão por animal. O responsável gravado é o vigente no cadastro do animal. Um novo atendimento nunca altera os anteriores.",
         "x-situacao": "implementado",
-        "security": [{ "bearerSupabase": [] }],
-        "parameters": [
-          { "name": "Idempotency-Key", "in": "header", "required": true, "description": "UUID v4 estável por atendimento. Mesma chave e mesmo conteúdo: devolve o atendimento já criado (200, Idempotent-Replayed: true). Mesma chave com conteúdo diferente: 409.", "schema": { "type": "string", "format": "uuid" } }
+        "security": [
+          {
+            "bearerSupabase": []
+          }
         ],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CriarAtendimentoClinico" } } } },
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "UUID v4 estável por atendimento. Mesma chave e mesmo conteúdo: devolve o atendimento já criado (200, Idempotent-Replayed: true). Mesma chave com conteúdo diferente: 409.",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CriarAtendimentoClinico"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "Reenvio: atendimento já registrado com esta Idempotency-Key", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
-          "201": { "description": "Atendimento registrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
-          "400": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "409": { "description": "Animal já tem admissão, ou Idempotency-Key já usada com conteúdo diferente", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+          "200": {
+            "description": "Reenvio: atendimento já registrado com esta Idempotency-Key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtendimentoClinico"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Atendimento registrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtendimentoClinico"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Animal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Animal já tem admissão, ou Idempotency-Key já usada com conteúdo diferente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/animals/{animalId}/atendimentos/{id}": {
       "parameters": [
-        { "name": "animalId", "in": "path", "required": true, "description": "Identificador do animal", "schema": { "type": "string", "format": "uuid" } },
-        { "name": "id", "in": "path", "required": true, "description": "Identificador do atendimento", "schema": { "type": "string", "format": "uuid" } }
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do animal",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do atendimento",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       ],
       "get": {
         "summary": "Consultar atendimento clínico",
         "description": "Implementado.",
         "x-situacao": "implementado",
-        "security": [{ "bearerSupabase": [] }],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "responses": {
-          "200": { "description": "Atendimento", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
-          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "404": { "description": "Animal ou atendimento não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+          "200": {
+            "description": "Atendimento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtendimentoClinico"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Animal ou atendimento não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
         }
       },
       "patch": {
         "summary": "Completar ou corrigir atendimento",
         "description": "Implementado. Atualiza as seções informadas verificando a versão (409 se desatualizada). O tipo e o responsável do atendimento não mudam. A auditoria registra quais seções mudaram, não o texto.",
         "x-situacao": "implementado",
-        "security": [{ "bearerSupabase": [] }],
-        "requestBody": { "required": true, "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtualizarAtendimentoClinico" } } } },
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarAtendimentoClinico"
+              }
+            }
+          }
+        },
         "responses": {
-          "200": { "description": "Atendimento atualizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AtendimentoClinico" } } } },
-          "400": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "404": { "description": "Animal ou atendimento não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "409": { "description": "Versão desatualizada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+          "200": {
+            "description": "Atendimento atualizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AtendimentoClinico"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Animal ou atendimento não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Versão desatualizada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
         }
       }
     },
     "/api/v1/animals/{id}/movimentacoes": {
       "parameters": [
-        { "name": "id", "in": "path", "required": true, "description": "Identificador do animal", "schema": { "type": "string", "format": "uuid" } }
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "description": "Identificador do animal",
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
       ],
       "get": {
         "summary": "Linha do tempo das áreas (frentes) do animal",
         "description": "Implementado. Lista as movimentações do animal, da mais recente para a mais antiga: a entrada (origem nula) e cada passagem de área (frente), com o usuário e o instante. Vale também para animal arquivado. Registros anteriores a esta versão não foram reconstruídos (ficam só na auditoria). Qualquer conta ativa consulta.",
         "x-situacao": "implementado",
-        "security": [{ "bearerSupabase": [] }],
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
         "parameters": [
-          { "name": "pagina", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "default": 1 } },
-          { "name": "limite", "in": "query", "required": false, "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 } }
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
         ],
         "responses": {
-          "200": { "description": "Página de movimentações", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PaginaMovimentacoes" } } } },
-          "401": { "description": "Sem token, token inválido ou vencido", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "403": { "description": "Conta não liberada ou desativada", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "404": { "description": "Animal não encontrado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } },
-          "500": { "description": "Erro padronizado", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Erro" } } } }
+          "200": {
+            "description": "Página de movimentações",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaMovimentacoes"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Animal não encontrado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
         }
       }
     },
@@ -3033,7 +3546,8 @@
                 "HealthEvent",
                 "Foto",
                 "Responsible",
-                "AtendimentoClinico"
+                "AtendimentoClinico",
+                "Breed"
               ]
             }
           },
@@ -3128,6 +3642,141 @@
           }
         }
       }
+    },
+    "/api/v1/breeds/{id}": {
+      "patch": {
+        "summary": "Renomear raça",
+        "description": "Implementado. Nome normalizado e único por espécie, sem diferenciar maiúsculas/minúsculas. Espécie ativa obrigatória e imutável na edição. A renomeação vale para todos os animais vinculados. Última gravação prevalece. Escrita e auditoria na mesma transação.",
+        "x-situacao": "implementado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AtualizarRaca"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Raça salva",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Raca"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sem token, token inválido ou vencido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Conta não liberada ou desativada",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Erro padronizado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Erro"
+                }
+              }
+            }
+          }
+        }
+      },
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ]
     }
   },
   "components": {
@@ -3864,95 +4513,292 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "tipo": { "type": "string", "enum": ["ADMISSAO", "ACOMPANHAMENTO"] },
-          "dataAtendimento": { "type": "string", "format": "date-time" },
-          "anamnese": { "type": "string", "maxLength": 10000, "nullable": true },
-          "exameFisico": { "type": "string", "maxLength": 10000, "nullable": true },
-          "examesComplementares": { "type": "string", "maxLength": 10000, "nullable": true },
-          "tratamento": { "type": "string", "maxLength": 10000, "nullable": true }
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ADMISSAO",
+              "ACOMPANHAMENTO"
+            ]
+          },
+          "dataAtendimento": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "anamnese": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "exameFisico": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "examesComplementares": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "tratamento": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          }
         }
       },
       "AtualizarAtendimentoClinico": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["versao"],
+        "required": [
+          "versao"
+        ],
         "properties": {
-          "versao": { "type": "integer", "minimum": 1 },
-          "dataAtendimento": { "type": "string", "format": "date-time" },
-          "anamnese": { "type": "string", "maxLength": 10000, "nullable": true },
-          "exameFisico": { "type": "string", "maxLength": 10000, "nullable": true },
-          "examesComplementares": { "type": "string", "maxLength": 10000, "nullable": true },
-          "tratamento": { "type": "string", "maxLength": 10000, "nullable": true }
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "dataAtendimento": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "anamnese": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "exameFisico": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "examesComplementares": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          },
+          "tratamento": {
+            "type": "string",
+            "maxLength": 10000,
+            "nullable": true
+          }
         }
       },
       "AtendimentoClinico": {
         "type": "object",
-        "required": ["id", "animalId", "tipo", "dataAtendimento", "animal", "responsavel", "versao"],
+        "required": [
+          "id",
+          "animalId",
+          "tipo",
+          "dataAtendimento",
+          "animal",
+          "responsavel",
+          "versao"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "animalId": { "type": "string", "format": "uuid" },
-          "tipo": { "type": "string", "enum": ["ADMISSAO", "ACOMPANHAMENTO"] },
-          "dataAtendimento": { "type": "string", "format": "date-time" },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "animalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "tipo": {
+            "type": "string",
+            "enum": [
+              "ADMISSAO",
+              "ACOMPANHAMENTO"
+            ]
+          },
+          "dataAtendimento": {
+            "type": "string",
+            "format": "date-time"
+          },
           "animal": {
             "type": "object",
             "description": "Identificação lida do cadastro do animal (não copiada)",
             "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "identificadorPublico": { "type": "string" },
-              "nome": { "type": "string", "nullable": true },
-              "especieNome": { "type": "string" },
-              "racaNome": { "type": "string", "nullable": true },
-              "sexo": { "type": "string", "nullable": true, "enum": ["MACHO", "FEMEA"] }
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "identificadorPublico": {
+                "type": "string"
+              },
+              "nome": {
+                "type": "string",
+                "nullable": true
+              },
+              "especieNome": {
+                "type": "string"
+              },
+              "racaNome": {
+                "type": "string",
+                "nullable": true
+              },
+              "sexo": {
+                "type": "string",
+                "nullable": true,
+                "enum": [
+                  "MACHO",
+                  "FEMEA"
+                ]
+              }
             }
           },
           "responsavel": {
             "type": "object",
             "description": "Responsável vigente quando o atendimento foi criado; o endereço é o do cadastro atual dele",
             "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "nome": { "type": "string" },
-              "endereco": { "type": "string", "nullable": true }
+              "id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "nome": {
+                "type": "string"
+              },
+              "endereco": {
+                "type": "string",
+                "nullable": true
+              }
             }
           },
-          "anamnese": { "type": "string", "nullable": true },
-          "exameFisico": { "type": "string", "nullable": true },
-          "examesComplementares": { "type": "string", "nullable": true },
-          "tratamento": { "type": "string", "nullable": true },
-          "versao": { "type": "integer", "minimum": 1 },
-          "criadoEm": { "type": "string", "format": "date-time" },
-          "atualizadoEm": { "type": "string", "format": "date-time" }
+          "anamnese": {
+            "type": "string",
+            "nullable": true
+          },
+          "exameFisico": {
+            "type": "string",
+            "nullable": true
+          },
+          "examesComplementares": {
+            "type": "string",
+            "nullable": true
+          },
+          "tratamento": {
+            "type": "string",
+            "nullable": true
+          },
+          "versao": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "atualizadoEm": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "PaginaAtendimentosClinicos": {
         "type": "object",
-        "required": ["itens", "pagina", "limite", "total"],
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
         "properties": {
-          "itens": { "type": "array", "items": { "$ref": "#/components/schemas/AtendimentoClinico" } },
-          "pagina": { "type": "integer", "minimum": 1 },
-          "limite": { "type": "integer", "minimum": 1, "maximum": 100 },
-          "total": { "type": "integer", "minimum": 0 }
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AtendimentoClinico"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "Movimentacao": {
         "type": "object",
-        "required": ["id", "animalId", "frenteDestino", "usuarioId", "criadoEm"],
+        "required": [
+          "id",
+          "animalId",
+          "frenteDestino",
+          "usuarioId",
+          "criadoEm"
+        ],
         "properties": {
-          "id": { "type": "string", "format": "uuid" },
-          "animalId": { "type": "string", "format": "uuid" },
-          "frenteOrigem": { "type": "string", "nullable": true, "enum": ["CCPA", "CASADOTE", "CED", "MANTENEDOR"], "description": "Nula na entrada do animal" },
-          "frenteDestino": { "type": "string", "enum": ["CCPA", "CASADOTE", "CED", "MANTENEDOR"] },
-          "usuarioId": { "type": "string", "description": "Conta que registrou (id do Supabase Auth)" },
-          "criadoEm": { "type": "string", "format": "date-time" }
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "animalId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "frenteOrigem": {
+            "type": "string",
+            "nullable": true,
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED",
+              "MANTENEDOR"
+            ],
+            "description": "Nula na entrada do animal"
+          },
+          "frenteDestino": {
+            "type": "string",
+            "enum": [
+              "CCPA",
+              "CASADOTE",
+              "CED",
+              "MANTENEDOR"
+            ]
+          },
+          "usuarioId": {
+            "type": "string",
+            "description": "Conta que registrou (id do Supabase Auth)"
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
+          }
         }
       },
       "PaginaMovimentacoes": {
         "type": "object",
-        "required": ["itens", "pagina", "limite", "total"],
+        "required": [
+          "itens",
+          "pagina",
+          "limite",
+          "total"
+        ],
         "properties": {
-          "itens": { "type": "array", "items": { "$ref": "#/components/schemas/Movimentacao" } },
-          "pagina": { "type": "integer", "minimum": 1 },
-          "limite": { "type": "integer", "minimum": 1, "maximum": 100 },
-          "total": { "type": "integer", "minimum": 0 }
+          "itens": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Movimentacao"
+            }
+          },
+          "pagina": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "limite": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          }
         }
       },
       "PaginaCatalogo": {
@@ -4366,6 +5212,62 @@
           "requisicaoId": {
             "type": "string",
             "nullable": true
+          }
+        }
+      },
+      "CriarRaca": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome",
+          "especieId"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "especieId": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "AtualizarRaca": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "nome"
+        ],
+        "properties": {
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          }
+        }
+      },
+      "Raca": {
+        "type": "object",
+        "required": [
+          "id",
+          "nome",
+          "especieId"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 120
+          },
+          "especieId": {
+            "type": "string",
+            "format": "uuid"
           }
         }
       }

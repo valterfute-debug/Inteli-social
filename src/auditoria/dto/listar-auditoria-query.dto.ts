@@ -2,7 +2,14 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
-const ENTIDADES_AUDITADAS = ['Animal', 'HealthEvent', 'Foto', 'Responsible', 'AtendimentoClinico'];
+const ENTIDADES_AUDITADAS = [
+  'Animal',
+  'HealthEvent',
+  'Foto',
+  'Responsible',
+  'Breed',
+  'AtendimentoClinico',
+];
 
 export class ListarAuditoriaQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1 })
