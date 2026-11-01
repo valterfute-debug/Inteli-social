@@ -1,4 +1,5 @@
 import { inflateSync } from 'node:zlib';
+import { PDFArray, PDFDocument, PDFRawStream, decodePDFRawStream } from 'pdf-lib';
 import { NotFoundException } from '@nestjs/common';
 import { Front, Sexo, TipoAtendimento, TipoEventoSaude } from '@prisma/client';
 import { ProntuarioService } from './prontuario.service';
@@ -113,6 +114,28 @@ describe('ProntuarioService', () => {
     expect(pdf.subarray(0, 5).toString('latin1')).toBe('%PDF-');
   });
 
+  it('continua textos clínicos longos na página seguinte sem sobrepor a primeira', async () => {
+    const prisma = criarPrismaFalso();
+    (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalComRelacoesFalso());
+    (prisma.healthEvent.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.atendimentoClinico.findMany as jest.Mock).mockResolvedValue([{
+      tipo: TipoAtendimento.ADMISSAO,
+      dataAtendimento: new Date('2026-02-01T00:00:00.000Z'),
+      responsible: { name: 'Maria' },
+      anamnese: `${'Texto clinico de exemplo. '.repeat(250)} MARCADORFINAL`,
+      exameFisico: null, examesComplementares: null, tratamento: null,
+    }]);
+    const pdf = await PDFDocument.load(await new ProntuarioService(prisma).gerarPdf('a1'));
+    const paginas = pdf.getPages().map((pagina) => {
+      const streams = pdf.context.lookup(pagina.node.Contents(), PDFArray);
+      return streams.asArray().map((ref) => Buffer.from(decodePDFRawStream((pdf.context.lookup(ref) as PDFRawStream)).decode()).toString()).join('');
+    });
+    const marcador = Buffer.from('MARCADORFINAL').toString('hex').toUpperCase();
+    expect(paginas.length).toBeGreaterThan(1);
+    expect(paginas[0]).not.toContain(marcador);
+    expect(paginas.slice(1).some((pagina) => pagina.includes(marcador))).toBe(true);
+  });
+
   it('cada atendimento segue as 6 seções do exame clínico, na ordem combinada', async () => {
     const prisma = criarPrismaFalso();
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalComRelacoesFalso());
@@ -188,3 +211,4 @@ describe('quebrarTexto', () => {
     expect(quebrarTexto('ok \u{1F436}', largura, 20)).toEqual(['ok ??']);
   });
 });
+
