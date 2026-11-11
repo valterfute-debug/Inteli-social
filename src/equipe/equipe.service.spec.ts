@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { EquipeService } from './equipe.service';
 import { createClient } from '@supabase/supabase-js';
+import { Prisma } from '@prisma/client';
 
 jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 const actor = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'equipe@example.test' };
@@ -11,6 +12,7 @@ function fixture() {
   const tx = {
     usuario: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
     eventoAuditoria: { create: jest.fn() },
+    conviteEquipe: { create: jest.fn().mockResolvedValue({ id: 'convite-1' }), update: jest.fn() },
   };
   const prisma = {
     usuario: { findMany: jest.fn(), findFirst: jest.fn() },
@@ -92,6 +94,13 @@ describe('Gestão de equipe', () => {
       data: { id: other, nome: 'Maria', email: 'maria@example.test', ativo: true },
     });
     expect(f.tx.eventoAuditoria.create).toHaveBeenCalled();
+    expect(f.tx.conviteEquipe.create.mock.invocationCallOrder[0]).toBeLessThan(
+      f.send.mock.invocationCallOrder[0],
+    );
+    expect(f.tx.conviteEquipe.update).toHaveBeenCalledWith({
+      where: { id: 'convite-1' },
+      data: { status: 'CONCLUIDO' },
+    });
   });
   it('informa quando o convite saiu e a liberação falhou', async () => {
     const f = fixture();
@@ -101,5 +110,46 @@ describe('Gestão de equipe', () => {
     await expect(f.service.convidar(actor, 'Maria', 'maria@example.test')).rejects.toThrow(
       'O convite foi enviado, mas o acesso não foi liberado',
     );
+  });
+  it('reserva a intenção antes do provedor e impede novo envio em caso de duplicação', async () => {
+    const f = fixture();
+    f.prisma.usuario.findFirst.mockResolvedValue(null);
+    f.tx.conviteEquipe.create.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError('duplicate', {
+        code: 'P2002',
+        clientVersion: 'test',
+      }),
+    );
+    await expect(f.service.convidar(actor, 'Maria', 'Maria@Example.test')).rejects.toBeInstanceOf(
+      ConflictException,
+    );
+    expect(f.send).not.toHaveBeenCalled();
+  });
+  it('preserva a solicitação ao receber erro ou resposta incerta do provedor', async () => {
+    const f = fixture();
+    f.prisma.usuario.findFirst.mockResolvedValue(null);
+    f.send.mockRejectedValue(new Error('timeout'));
+    await expect(f.service.convidar(actor, 'Maria', 'maria@example.test')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(f.tx.conviteEquipe.create).toHaveBeenCalledTimes(1);
+    expect(f.tx.conviteEquipe.update).not.toHaveBeenCalled();
+    expect(f.tx.eventoAuditoria.create).toHaveBeenCalledWith({
+      data: {
+        usuarioId: actor.id,
+        acao: 'CONVITE_SOLICITADO',
+        entidade: 'ConviteEquipe',
+        entidadeId: 'convite-1',
+      },
+    });
+  });
+  it('não contata o provedor quando a reserva falha', async () => {
+    const f = fixture();
+    f.prisma.usuario.findFirst.mockResolvedValue(null);
+    f.tx.conviteEquipe.create.mockRejectedValue(new Error('db'));
+    await expect(f.service.convidar(actor, 'Maria', 'maria@example.test')).rejects.toBeInstanceOf(
+      ServiceUnavailableException,
+    );
+    expect(f.send).not.toHaveBeenCalled();
   });
 });

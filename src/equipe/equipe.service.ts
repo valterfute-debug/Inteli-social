@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsuarioAutenticado } from '../auth/tipos';
 
@@ -84,16 +85,52 @@ export class EquipeService {
     }
     if (!url || !chave || !retorno || !retornoSeguro)
       throw new ServiceUnavailableException('Convites por e-mail ainda não estão configurados.');
+    // Reserva antes do efeito externo: tentativas concorrentes ou com resultado
+    // incerto não podem reenviar nem apagar a evidência de reconciliação.
+    let convite: { id: string };
+    try {
+      convite = await this.prisma.$transaction(async (tx) => {
+        const reserva = await tx.conviteEquipe.create({
+          data: { email: normalizado, nome: nomeSeguro, solicitadoPor: usuario.id },
+          select: { id: true },
+        });
+        await tx.eventoAuditoria.create({
+          data: {
+            usuarioId: usuario.id,
+            acao: 'CONVITE_SOLICITADO',
+            entidade: 'ConviteEquipe',
+            entidadeId: reserva.id,
+          },
+        });
+        return reserva;
+      });
+    } catch (erro) {
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002')
+        throw new ConflictException(
+          'Já existe uma solicitação para este e-mail. Confira a lista ou procure suporte antes de reenviar.',
+        );
+      throw new ServiceUnavailableException(
+        'Não foi possível preparar o convite. Tente novamente.',
+      );
+    }
     const cliente = createClient(url, chave, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { data, error } = await cliente.auth.admin.inviteUserByEmail(normalizado, {
-      data: { name: nomeSeguro },
-      redirectTo: retorno,
-    });
+    let resposta: Awaited<ReturnType<typeof cliente.auth.admin.inviteUserByEmail>>;
+    try {
+      resposta = await cliente.auth.admin.inviteUserByEmail(normalizado, {
+        data: { name: nomeSeguro, ampara_convite_id: convite.id },
+        redirectTo: retorno,
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        'Não foi possível confirmar o envio. Procure suporte antes de reenviar.',
+      );
+    }
+    const { data, error } = resposta;
     if (error || !data.user?.id)
       throw new ServiceUnavailableException(
-        'Não foi possível enviar o convite. Confirme o e-mail ou procure suporte.',
+        'Não foi possível confirmar o envio. Procure suporte antes de reenviar.',
       );
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -108,6 +145,7 @@ export class EquipeService {
             entidadeId: data.user.id,
           },
         });
+        await tx.conviteEquipe.update({ where: { id: convite.id }, data: { status: 'CONCLUIDO' } });
       });
     } catch {
       throw new ServiceUnavailableException(

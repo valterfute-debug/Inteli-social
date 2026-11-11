@@ -167,6 +167,17 @@ model Usuario {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+// Reserva durável antes de chamar o provedor externo de convites.
+model ConviteEquipe {
+  id String @id @default(uuid())
+  email String @unique
+  nome String
+  solicitadoPor String
+  status String @default("PENDENTE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 // Trilha de auditoria (issue #3, P0-4). Só recebe INSERT: um gatilho no banco recusa UPDATE
 // e DELETE dentro do prazo de retenção. Sem FK para Usuario/Animal de propósito: o histórico
 // sobrevive à remoção do que ele descreve. Nunca guarda token, chave ou link assinado.
