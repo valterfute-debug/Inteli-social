@@ -54,11 +54,19 @@ export class AutenticacaoGuard implements CanActivate {
   private async garantirContaAtiva(usuario: UsuarioAutenticado, permiteTemporaria: boolean) {
     const registro = await this.prisma.usuario.findUnique({
       where: { id: usuario.id },
-      select: { ativo: true, deveTrocarSenha: true, tokensInvalidosAntes: true },
+      select: {
+        ativo: true,
+        deveTrocarSenha: true,
+        tokensInvalidosAntes: true,
+        redefinicaoEmAndamento: true,
+      },
     });
     // Login válido no Supabase, mas sem liberação na API (ou desativado): 403, não 401.
     if (!registro || !registro.ativo) {
       throw new ForbiddenException('Conta sem acesso liberado. Peça liberação à coordenação.');
+    }
+    if (registro.redefinicaoEmAndamento) {
+      throw new ForbiddenException('Redefinição em andamento. Tente novamente em instantes.');
     }
     if (
       registro.tokensInvalidosAntes &&

@@ -35,6 +35,7 @@ describe('troca inicial de senha', () => {
     prisma.usuario.findUnique.mockResolvedValue({
       ativo: true,
       deveTrocarSenha: true,
+      redefinicaoEmAndamento: false,
       tokensInvalidosAntes: null,
     });
     update.mockResolvedValue({ error: null });
@@ -43,7 +44,13 @@ describe('troca inicial de senha', () => {
       ok: true,
     });
     expect(prisma.usuario.updateMany).toHaveBeenCalledWith({
-      where: { id: 'a', ativo: true, deveTrocarSenha: true, tokensInvalidosAntes: null },
+      where: {
+        id: 'a',
+        ativo: true,
+        deveTrocarSenha: true,
+        redefinicaoEmAndamento: false,
+        tokensInvalidosAntes: null,
+      },
       data: { deveTrocarSenha: false, tokensInvalidosAntes: expect.any(Date) },
     });
   });

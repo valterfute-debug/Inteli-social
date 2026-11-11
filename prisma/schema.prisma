@@ -164,6 +164,7 @@ model Usuario {
   gerenciaEquipe Boolean @default(false)
   deveTrocarSenha Boolean @default(false)
   tokensInvalidosAntes DateTime?
+  redefinicaoEmAndamento Boolean @default(false)
   fotos Foto[]
   chavesIdempotencia ChaveIdempotencia[]
   createdAt DateTime @default(now())

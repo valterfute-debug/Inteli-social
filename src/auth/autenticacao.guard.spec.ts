@@ -96,6 +96,20 @@ describe('AutenticacaoGuard', () => {
     ).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('bloqueia inclusive primeiro acesso enquanto a redefinição está em andamento', async () => {
+    const guard = criarGuard(
+      emissor.chaves,
+      SUPABASE_URL_TESTE,
+      prismaCom({ ...USUARIO_ATIVO, deveTrocarSenha: true, redefinicaoEmAndamento: true }),
+    );
+    const token = await emissor.assinar();
+    await expect(
+      guard.canActivate(
+        contexto({ headers: { authorization: `Bearer ${token}` } }, ControllerPrimeiroAcesso),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('libera rota marcada com @Publica() sem token', async () => {
     const guard = criarGuard(emissor.chaves);
     await expect(guard.canActivate(contexto({ headers: {} }, ControllerPublico))).resolves.toBe(
@@ -134,7 +148,12 @@ describe('AutenticacaoGuard', () => {
     expect(requisicao.usuario).toMatchObject({ id: 'usuario-2' });
     expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
       where: { id: 'usuario-2' },
-      select: { ativo: true, deveTrocarSenha: true, tokensInvalidosAntes: true },
+      select: {
+        ativo: true,
+        deveTrocarSenha: true,
+        tokensInvalidosAntes: true,
+        redefinicaoEmAndamento: true,
+      },
     });
   });
 

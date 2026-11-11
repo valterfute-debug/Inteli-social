@@ -11,7 +11,11 @@ describe('cadastro direto e redefinição', () => {
     conviteEquipe: { create: jest.fn().mockResolvedValue({ id: 'reserva' }), update: jest.fn() },
   };
   const prisma = {
-    usuario: { findFirst: jest.fn(), findUnique: jest.fn() },
+    usuario: {
+      findFirst: jest.fn(),
+      findUnique: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     $transaction: jest.fn(async (fn) => fn(tx)),
   };
   const config = {

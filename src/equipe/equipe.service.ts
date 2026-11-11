@@ -114,7 +114,7 @@ export class EquipeService {
     await this.prisma.$transaction(async (tx) => {
       await tx.usuario.update({
         where: { id },
-        data: { deveTrocarSenha: true, tokensInvalidosAntes: corte },
+        data: { deveTrocarSenha: true, tokensInvalidosAntes: corte, redefinicaoEmAndamento: true },
       });
       await tx.eventoAuditoria.create({
         data: {
@@ -130,6 +130,12 @@ export class EquipeService {
       throw new ServiceUnavailableException(
         'Não foi possível confirmar a redefinição. Procure suporte.',
       );
+    const finalizacao = await this.prisma.usuario.updateMany({
+      where: { id, redefinicaoEmAndamento: true, tokensInvalidosAntes: corte },
+      data: { redefinicaoEmAndamento: false },
+    });
+    if (finalizacao.count !== 1)
+      throw new ConflictException('A conta foi alterada durante a redefinição. Procure suporte.');
     return { ok: true };
   }
 

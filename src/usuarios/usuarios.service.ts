@@ -32,7 +32,7 @@ export class UsuariosService {
 
   async trocarSenhaInicial(usuario: UsuarioAutenticado, senha: string) {
     const registro = await this.prisma.usuario.findUnique({ where: { id: usuario.id } });
-    if (!registro?.ativo || !registro.deveTrocarSenha)
+    if (!registro?.ativo || !registro.deveTrocarSenha || registro.redefinicaoEmAndamento)
       throw new BadRequestException('Não há troca inicial pendente.');
     const temporaria = this.config.get<string>('SENHA_TEMPORARIA');
     if (!temporaria || senha === temporaria)
@@ -50,6 +50,7 @@ export class UsuariosService {
         id: usuario.id,
         ativo: true,
         deveTrocarSenha: true,
+        redefinicaoEmAndamento: false,
         tokensInvalidosAntes: registro.tokensInvalidosAntes,
       },
       data: {
