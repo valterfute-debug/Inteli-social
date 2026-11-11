@@ -382,6 +382,22 @@ export async function copiarStorage(options: {
   }
   return { objetos: resultado, baixados, reutilizados, bytes };
 }
+/** Backups anteriores à migração continuam restauráveis; anexos confirmados novos não podem faltar. */
+export async function validarAnexosNoBackup(
+  banco: BancoBackup,
+  caminhos: Set<string>,
+): Promise<void> {
+  const [tabela] = await banco.$queryRawUnsafe<Array<{ existe: boolean }>>(
+    `SELECT to_regclass('public."AnexoClinico"') IS NOT NULL AS existe`,
+  );
+  if (!tabela.existe) return;
+  const anexos = await banco.$queryRawUnsafe<Array<{ caminho: string }>>(
+    `SELECT "caminhoArmazenamento" AS caminho FROM public."AnexoClinico" WHERE confirmado AND NOT cancelado`,
+  );
+  if (anexos.some((anexo) => !caminhos.has(anexo.caminho)))
+    throw new Error('Anexo clínico confirmado ausente no backup');
+}
+
 export async function verificarBancoRestaurado(
   banco: BancoBackup,
   m: ManifestoBackup,
@@ -406,6 +422,7 @@ export async function verificarBancoRestaurado(
   const fotos = new Set(m.objetos.map((o) => o.caminho));
   if (fichas.some((f) => !f.caminho || f.situacao !== 'CONFIRMADA' || !fotos.has(f.caminho)))
     throw new Error('Ficha aponta para foto inválida ou ausente no backup');
+  await validarAnexosNoBackup(banco, fotos);
 }
 export function dadosArquivo(arquivo: string): { tamanhoBytes: number; sha256: string } {
   return { tamanhoBytes: statSync(arquivo).size, sha256: sha256(readFileSync(arquivo)) };

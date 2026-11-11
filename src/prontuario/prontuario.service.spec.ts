@@ -42,6 +42,44 @@ function criarPrismaFalso() {
 }
 
 describe('ProntuarioService', () => {
+  it('exporta as seis medidas, observações e inventário de anexos sem links temporários', async () => {
+    const prisma = criarPrismaFalso();
+    (prisma.animal.findFirst as jest.Mock).mockResolvedValue(criarAnimalComRelacoesFalso());
+    (prisma.healthEvent.findMany as jest.Mock).mockResolvedValue([]);
+    (prisma.atendimentoClinico.findMany as jest.Mock).mockResolvedValue([
+      {
+        tipo: TipoAtendimento.ACOMPANHAMENTO,
+        dataAtendimento: new Date(),
+        responsible: { name: 'Pessoa sintética' },
+        frequenciaRespiratoria: 20,
+        frequenciaCardiaca: 90,
+        tpc: 1.5,
+        mucosa: 'Rosada',
+        linfonodos: 'Descrição sintética',
+        temperatura: 38.5,
+        exameFisico: 'Observação anterior preservada',
+        anexos: [
+          { id: 'id-pdf', nome: 'hemograma.pdf', tipoMidia: 'application/pdf', tamanhoBytes: 1234 },
+        ],
+      },
+    ]);
+    const pdf = await new ProntuarioService(prisma).gerarPdf('animal');
+    const text = textoDasPaginas(pdf).toUpperCase();
+    for (const value of [
+      'Frequência respiratória: 20 movimentos/min',
+      'Frequência cardíaca: 90 batimentos/min',
+      'TPC: 1.5 s',
+      'Mucosa: Rosada',
+      'Linfonodos: Descrição sintética',
+      'Temperatura: 38.5 °C',
+      'Observação anterior preservada',
+      'hemograma.pdf',
+    ]) {
+      expect(text).toContain(Buffer.from(value, 'latin1').toString('hex').toUpperCase());
+    }
+    expect(text).not.toContain(Buffer.from('https://', 'latin1').toString('hex').toUpperCase());
+  });
+
   it('rejeita geração de PDF para animal inexistente com 404', async () => {
     const prisma = criarPrismaFalso();
     (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
@@ -96,6 +134,7 @@ describe('ProntuarioService', () => {
         dataAtendimento: new Date('2026-02-01T00:00:00.000Z'),
         responsible: { name: 'Maria' },
         anamnese: `Resgatado na rua.\nSem histórico vacinal. ${'Apático e desidratado. '.repeat(80)}`,
+        anexos: [],
         exameFisico: 'Temperatura 38,5 °C',
         examesComplementares: null,
         tratamento: 'Hidratação \u{1F436}',
@@ -124,6 +163,7 @@ describe('ProntuarioService', () => {
         dataAtendimento: new Date('2026-02-01T00:00:00.000Z'),
         responsible: { name: 'Maria', endereco: 'Rua das Flores, 10', telefone: null },
         anamnese: 'a',
+        anexos: [],
         exameFisico: 'b',
         examesComplementares: 'c',
         tratamento: 'd',

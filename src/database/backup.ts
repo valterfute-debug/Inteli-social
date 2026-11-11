@@ -15,6 +15,7 @@ import {
   ManifestoBackup,
   serializarManifesto,
   validarManifesto,
+  validarAnexosNoBackup,
 } from './backup-core';
 
 /** Only reads the source. Auth password hashes/tokens and the manifest are sensitive. Encrypt before offsite upload. */
@@ -67,6 +68,7 @@ async function executar() {
           fichas.some((f) => !f.caminho || f.situacao !== 'CONFIRMADA' || !caminhos.has(f.caminho))
         )
           throw new Error('Ficha sem foto disponível no snapshot');
+        await validarAnexosNoBackup(tx, caminhos);
         executarPg(
           process.env.PG_DUMP ?? 'pg_dump',
           [

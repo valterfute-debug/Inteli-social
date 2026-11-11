@@ -33,7 +33,10 @@ export class ProntuarioService {
 
     const atendimentos = await this.prisma.atendimentoClinico.findMany({
       where: { animalId, deletedAt: null },
-      include: { responsible: true },
+      include: {
+        responsible: true,
+        anexos: { where: { confirmado: true }, orderBy: { createdAt: 'asc' } },
+      },
       orderBy: [{ dataAtendimento: 'asc' }, { createdAt: 'asc' }],
     });
 
@@ -137,8 +140,42 @@ export class ProntuarioService {
             .join(' - '),
         ],
         ['3. Anamnese', atendimento.anamnese],
-        ['4. Exame físico', atendimento.exameFisico],
-        ['5. Exames complementares', atendimento.examesComplementares],
+        [
+          '4. Exame físico',
+          [
+            atendimento.frequenciaRespiratoria == null
+              ? null
+              : `Frequência respiratória: ${atendimento.frequenciaRespiratoria} movimentos/min`,
+            atendimento.frequenciaCardiaca == null
+              ? null
+              : `Frequência cardíaca: ${atendimento.frequenciaCardiaca} batimentos/min`,
+            atendimento.tpc == null ? null : `TPC: ${atendimento.tpc} s`,
+            atendimento.mucosa == null ? null : `Mucosa: ${atendimento.mucosa}`,
+            atendimento.linfonodos == null ? null : `Linfonodos: ${atendimento.linfonodos}`,
+            atendimento.temperatura == null ? null : `Temperatura: ${atendimento.temperatura} °C`,
+            atendimento.frequenciaRespiratoria == null
+              ? 'Parâmetros estruturados não registrados neste atendimento.'
+              : null,
+            atendimento.exameFisico,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        ],
+        [
+          '5. Exames complementares',
+          [
+            atendimento.examesComplementares,
+            ...atendimento.anexos.map(
+              (anexo) =>
+                `Anexo: ${anexo.nome} (${anexo.tipoMidia}, ${anexo.tamanhoBytes} bytes; ID ${anexo.id})`,
+            ),
+            atendimento.anexos.length
+              ? 'Arquivos disponíveis no prontuário autenticado. Conteúdo dos anexos não incorporado ao PDF.'
+              : null,
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        ],
         ['6. Tratamento', atendimento.tratamento],
       ];
       for (const [rotulo, texto] of secoes) {

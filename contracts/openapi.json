@@ -3777,6 +3777,366 @@
           }
         }
       ]
+    },
+    "/api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "atendimentoId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "AnexosClinicos"
+        ],
+        "summary": "Listar confirmados e pendentes do próprio autor",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "itens": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AnexoClinico"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados, tipo, assinatura ou limite inválido"
+          },
+          "401": {
+            "description": "Sem autenticação"
+          },
+          "403": {
+            "description": "Somente o autor pode modificar um envio pendente"
+          },
+          "404": {
+            "description": "Animal, atendimento ou anexo não encontrado"
+          },
+          "409": {
+            "description": "Estado conflitante, arquivo pendente, prazo expirado ou bucket não privado"
+          }
+        },
+        "x-situacao": "implementado"
+      },
+      "post": {
+        "tags": [
+          "AnexosClinicos"
+        ],
+        "summary": "Preparar ou renovar envio idempotente pelo ID do anexo",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/AnexoClinico"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "urlEnvio": {
+                          "type": "string",
+                          "format": "uri"
+                        },
+                        "expiraEm": {
+                          "type": "string",
+                          "format": "date-time"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados, tipo, assinatura ou limite inválido"
+          },
+          "401": {
+            "description": "Sem autenticação"
+          },
+          "403": {
+            "description": "Somente o autor pode modificar um envio pendente"
+          },
+          "404": {
+            "description": "Animal, atendimento ou anexo não encontrado"
+          },
+          "409": {
+            "description": "Estado conflitante, arquivo pendente, prazo expirado ou bucket não privado"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SolicitarAnexoClinico"
+              }
+            }
+          }
+        },
+        "x-situacao": "implementado"
+      }
+    },
+    "/api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}/confirmacao": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "atendimentoId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "post": {
+        "tags": [
+          "AnexosClinicos"
+        ],
+        "summary": "Confirmar tipo, tamanho e assinatura do arquivo; repetição retorna o mesmo anexo",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnexoClinico"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados, tipo, assinatura ou limite inválido"
+          },
+          "401": {
+            "description": "Sem autenticação"
+          },
+          "403": {
+            "description": "Somente o autor pode modificar um envio pendente"
+          },
+          "404": {
+            "description": "Animal, atendimento ou anexo não encontrado"
+          },
+          "409": {
+            "description": "Estado conflitante, arquivo pendente, prazo expirado ou bucket não privado"
+          }
+        },
+        "x-situacao": "implementado"
+      }
+    },
+    "/api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}/leitura": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "atendimentoId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "get": {
+        "tags": [
+          "AnexosClinicos"
+        ],
+        "summary": "Gerar link temporário autenticado para anexo confirmado",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "format": "uri"
+                    },
+                    "expiraEm": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados, tipo, assinatura ou limite inválido"
+          },
+          "401": {
+            "description": "Sem autenticação"
+          },
+          "403": {
+            "description": "Somente o autor pode modificar um envio pendente"
+          },
+          "404": {
+            "description": "Animal, atendimento ou anexo não encontrado"
+          },
+          "409": {
+            "description": "Estado conflitante, arquivo pendente, prazo expirado ou bucket não privado"
+          }
+        },
+        "x-situacao": "implementado"
+      }
+    },
+    "/api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}": {
+      "parameters": [
+        {
+          "name": "animalId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "atendimentoId",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "schema": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      ],
+      "delete": {
+        "tags": [
+          "AnexosClinicos"
+        ],
+        "summary": "Descartar somente envio pendente do próprio autor, com remoção durável do Storage",
+        "security": [
+          {
+            "bearerSupabase": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removido": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dados, tipo, assinatura ou limite inválido"
+          },
+          "401": {
+            "description": "Sem autenticação"
+          },
+          "403": {
+            "description": "Somente o autor pode modificar um envio pendente"
+          },
+          "404": {
+            "description": "Animal, atendimento ou anexo não encontrado"
+          },
+          "409": {
+            "description": "Estado conflitante, arquivo pendente, prazo expirado ou bucket não privado"
+          }
+        },
+        "x-situacao": "implementado"
+      }
     }
   },
   "components": {
@@ -4543,8 +4903,48 @@
             "type": "string",
             "maxLength": 10000,
             "nullable": true
+          },
+          "frequenciaRespiratoria": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Movimentos por minuto; medida observada, sem faixa de normalidade."
+          },
+          "frequenciaCardiaca": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Batimentos por minuto."
+          },
+          "tpc": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tempo de preenchimento capilar em segundos."
+          },
+          "mucosa": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "linfonodos": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "temperatura": {
+            "type": "number",
+            "description": "Temperatura em graus Celsius; número finito."
           }
-        }
+        },
+        "required": [
+          "frequenciaRespiratoria",
+          "frequenciaCardiaca",
+          "tpc",
+          "mucosa",
+          "linfonodos",
+          "temperatura"
+        ],
+        "description": "Seis parâmetros obrigatórios em novas escritas clínicas. A admissão automática interna nasce vazia. Registros históricos são preservados."
       },
       "AtualizarAtendimentoClinico": {
         "type": "object",
@@ -4580,8 +4980,40 @@
             "type": "string",
             "maxLength": 10000,
             "nullable": true
+          },
+          "frequenciaRespiratoria": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Movimentos por minuto; medida observada, sem faixa de normalidade."
+          },
+          "frequenciaCardiaca": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Batimentos por minuto."
+          },
+          "tpc": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tempo de preenchimento capilar em segundos."
+          },
+          "mucosa": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "linfonodos": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          },
+          "temperatura": {
+            "type": "number",
+            "description": "Temperatura em graus Celsius; número finito."
           }
-        }
+        },
+        "description": "Valida o conjunto final dos seis parâmetros ao alterar o exame físico. Legados podem editar outras seções sem inventar medidas. versao obrigatória; conflito retorna 409."
       },
       "AtendimentoClinico": {
         "type": "object",
@@ -4690,6 +5122,43 @@
           "atualizadoEm": {
             "type": "string",
             "format": "date-time"
+          },
+          "frequenciaRespiratoria": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Movimentos por minuto; medida observada, sem faixa de normalidade.",
+            "nullable": true
+          },
+          "frequenciaCardiaca": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2147483647,
+            "description": "Batimentos por minuto.",
+            "nullable": true
+          },
+          "tpc": {
+            "type": "number",
+            "minimum": 0,
+            "description": "Tempo de preenchimento capilar em segundos.",
+            "nullable": true
+          },
+          "mucosa": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "nullable": true
+          },
+          "linfonodos": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "nullable": true
+          },
+          "temperatura": {
+            "type": "number",
+            "description": "Temperatura em graus Celsius; número finito.",
+            "nullable": true
           }
         }
       },
@@ -5268,6 +5737,95 @@
           "especieId": {
             "type": "string",
             "format": "uuid"
+          }
+        }
+      },
+      "SolicitarAnexoClinico": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "nome",
+          "tipoMidia",
+          "tamanhoBytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "tipoMidia": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "application/pdf",
+              "application/msword",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "video/mp4",
+              "video/webm",
+              "video/quicktime"
+            ]
+          },
+          "tamanhoBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20971520
+          }
+        },
+        "description": "ID estável por arquivo; mesmo ID e metadados permitem renovar link. Bytes enviados diretamente ao Storage privado. Até 10 anexos e 100 MiB por atendimento, incluindo pendentes não descartados."
+      },
+      "AnexoClinico": {
+        "type": "object",
+        "required": [
+          "id",
+          "nome",
+          "tipoMidia",
+          "tamanhoBytes",
+          "confirmado",
+          "criadoEm"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nome": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 180
+          },
+          "tipoMidia": {
+            "type": "string",
+            "enum": [
+              "image/jpeg",
+              "image/png",
+              "image/webp",
+              "application/pdf",
+              "application/msword",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "video/mp4",
+              "video/webm",
+              "video/quicktime"
+            ]
+          },
+          "tamanhoBytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 20971520
+          },
+          "confirmado": {
+            "type": "boolean"
+          },
+          "criadoEm": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

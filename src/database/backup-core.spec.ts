@@ -79,9 +79,13 @@ function bancoValido(
     photo?: unknown;
     users?: unknown;
     count?: bigint;
+    attachmentExists?: boolean;
+    attachments?: unknown;
   } = {},
 ): BancoBackup {
   return banco((sql) => {
+    if (sql.includes('to_regclass')) return [{ existe: overrides.attachmentExists ?? false }];
+    if (sql.includes('FROM public.\"AnexoClinico\"')) return overrides.attachments ?? [];
     if (sql.includes('c.relkind'))
       return [
         { esquema: 'auth', tabela: 'users' },
@@ -355,6 +359,18 @@ describe('backup recuperável', () => {
   });
   it('restore confere contagens, UUID/hash Auth, FKs e existência da foto', async () => {
     await expect(verificarBancoRestaurado(bancoValido(), manifesto())).resolves.toBeUndefined();
+    await expect(
+      verificarBancoRestaurado(
+        bancoValido({ attachmentExists: true, attachments: [{ caminho: 'exames/ausente.pdf' }] }),
+        manifesto(),
+      ),
+    ).rejects.toThrow('Anexo clínico confirmado ausente');
+    await expect(
+      verificarBancoRestaurado(
+        bancoValido({ attachmentExists: true, attachments: [] }),
+        manifesto(),
+      ),
+    ).resolves.toBeUndefined();
     await expect(verificarBancoRestaurado(bancoValido({ count: 2n }), manifesto())).rejects.toThrow(
       'Contagens',
     );

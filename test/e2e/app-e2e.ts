@@ -15,6 +15,8 @@ export const storageSimulado = {
     urlEnvio: `https://storage.invalid/envio/${caminho}`,
   }),
   obterMetadados: async () => ({ tamanhoBytes: 1000, tipoMidia: 'image/jpeg' }),
+  obterInicioArquivo: async () => Buffer.from([255, 216, 255]),
+  validadeLeituraSegundos: () => 900,
   removerArquivo: async () => undefined,
   situacaoBucket: async () => 'privado' as const,
   criarUrlsLeitura: async (caminhos: string[]) =>

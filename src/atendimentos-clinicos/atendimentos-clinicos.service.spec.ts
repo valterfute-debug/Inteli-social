@@ -1,3 +1,4 @@
+import { EXAME_TESTE } from '../../test/exame-fisico-teste';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { Front, Prisma, Sexo, TipoAtendimento } from '@prisma/client';
 import { auditoriaFalsa, comTransacao } from '../../test/auditoria-teste';
@@ -70,7 +71,7 @@ describe('AtendimentosClinicosService', () => {
 
       const { atendimento, reenvio } = await service.criar(
         ID_ANIMAL,
-        { anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' },
+        { ...EXAME_TESTE, anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' },
         USUARIO_TESTE,
         CHAVE_TESTE,
       );
@@ -100,7 +101,12 @@ describe('AtendimentosClinicosService', () => {
       (prisma.atendimentoClinico.count as jest.Mock).mockResolvedValue(1);
       const service = criarServico(prisma);
 
-      await service.criar(ID_ANIMAL, { tratamento: 'Vermífugo' }, USUARIO_TESTE, CHAVE_TESTE);
+      await service.criar(
+        ID_ANIMAL,
+        { ...EXAME_TESTE, tratamento: 'Vermífugo' },
+        USUARIO_TESTE,
+        CHAVE_TESTE,
+      );
 
       const { data } = (prisma.atendimentoClinico.create as jest.Mock).mock.calls[0][0];
       expect(data.tipo).toBe(TipoAtendimento.ACOMPANHAMENTO);
@@ -113,7 +119,12 @@ describe('AtendimentosClinicosService', () => {
       const service = criarServico(prisma);
 
       await expect(
-        service.criar(ID_ANIMAL, { tipo: TipoAtendimento.ADMISSAO }, USUARIO_TESTE, CHAVE_TESTE),
+        service.criar(
+          ID_ANIMAL,
+          { ...EXAME_TESTE, tipo: TipoAtendimento.ADMISSAO },
+          USUARIO_TESTE,
+          CHAVE_TESTE,
+        ),
       ).rejects.toBeInstanceOf(ConflictException);
       expect(prisma.atendimentoClinico.create).not.toHaveBeenCalled();
     });
@@ -128,9 +139,9 @@ describe('AtendimentosClinicosService', () => {
       );
       const service = criarServico(prisma);
 
-      await expect(service.criar(ID_ANIMAL, {}, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
-        ConflictException,
-      );
+      await expect(
+        service.criar(ID_ANIMAL, { ...EXAME_TESTE }, USUARIO_TESTE, CHAVE_TESTE),
+      ).rejects.toBeInstanceOf(ConflictException);
     });
 
     it('não cria prontuário para animal inexistente (404)', async () => {
@@ -138,9 +149,9 @@ describe('AtendimentosClinicosService', () => {
       (prisma.animal.findFirst as jest.Mock).mockResolvedValue(null);
       const service = criarServico(prisma);
 
-      await expect(service.criar(ID_ANIMAL, {}, USUARIO_TESTE, CHAVE_TESTE)).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
+      await expect(
+        service.criar(ID_ANIMAL, { ...EXAME_TESTE }, USUARIO_TESTE, CHAVE_TESTE),
+      ).rejects.toBeInstanceOf(NotFoundException);
       expect(prisma.atendimentoClinico.create).not.toHaveBeenCalled();
     });
   });
