@@ -42,6 +42,7 @@ export class VerificadorTokenService {
       return {
         id: payload.sub,
         email: typeof payload.email === 'string' ? payload.email : null,
+        ...(typeof payload.iat === 'number' ? { emitidoEm: payload.iat } : {}),
       };
     } catch (erro) {
       if (erro instanceof UnauthorizedException) throw erro;

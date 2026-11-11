@@ -84,6 +84,18 @@ describe('AutenticacaoGuard', () => {
     );
   });
 
+  it('rejeita sessão emitida antes da redefinição de senha', async () => {
+    const prisma = prismaCom({
+      ...USUARIO_ATIVO,
+      tokensInvalidosAntes: new Date(Date.now() + 60_000),
+    });
+    const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prisma);
+    const token = await emissor.assinar();
+    await expect(
+      guard.canActivate(contexto({ headers: { authorization: `Bearer ${token}` } })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
   it('libera rota marcada com @Publica() sem token', async () => {
     const guard = criarGuard(emissor.chaves);
     await expect(guard.canActivate(contexto({ headers: {} }, ControllerPublico))).resolves.toBe(
@@ -106,7 +118,7 @@ describe('AutenticacaoGuard', () => {
     };
 
     await expect(guard.canActivate(contexto(requisicao))).resolves.toBe(true);
-    expect(requisicao.usuario).toEqual({ id: 'usuario-1', email: 'ana@teste.invalid' });
+    expect(requisicao.usuario).toMatchObject({ id: 'usuario-1', email: 'ana@teste.invalid' });
   });
 
   it('toda conta ativa passa igual: o guard só confere o cadastro ativo, sem papel nem unidades', async () => {
@@ -122,7 +134,7 @@ describe('AutenticacaoGuard', () => {
     expect(requisicao.usuario).toMatchObject({ id: 'usuario-2' });
     expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
       where: { id: 'usuario-2' },
-      select: { ativo: true, deveTrocarSenha: true },
+      select: { ativo: true, deveTrocarSenha: true, tokensInvalidosAntes: true },
     });
   });
 
