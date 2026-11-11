@@ -161,8 +161,23 @@ model Usuario {
   email String?
   nome String?
   ativo Boolean @default(true)
+  gerenciaEquipe Boolean @default(false)
+  deveTrocarSenha Boolean @default(false)
+  tokensInvalidosAntes DateTime?
+  redefinicaoEmAndamento Boolean @default(false)
   fotos Foto[]
   chavesIdempotencia ChaveIdempotencia[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Reserva durável antes de chamar o provedor externo de convites.
+model ConviteEquipe {
+  id String @id @default(uuid())
+  email String @unique
+  nome String
+  solicitadoPor String
+  status String @default("PENDENTE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

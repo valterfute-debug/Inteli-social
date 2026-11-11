@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
-import { ROTA_PUBLICA } from './decoradores';
+import { PERMITE_SENHA_TEMPORARIA, ROTA_PUBLICA } from './decoradores';
 import { RequisicaoAutenticada, UsuarioAutenticado } from './tipos';
 import { VerificadorTokenService } from './verificador-token.service';
 
@@ -20,7 +20,7 @@ export function extrairToken(cabecalho: string | undefined): string | null {
 
 /**
  * Guard global: toda rota exige token do Supabase Auth (salvo @Publica()) e uma conta
- * ativa na tabela Usuario. Todas as contas ativas têm as mesmas permissões de negócio.
+ * ativa na tabela Usuario. A gestão de equipe tem autorização específica no servidor.
  */
 @Injectable()
 export class AutenticacaoGuard implements CanActivate {
@@ -42,19 +42,40 @@ export class AutenticacaoGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Autenticação necessária');
 
     const usuario = await this.verificador.verificar(token);
-    await this.garantirContaAtiva(usuario);
+    const permiteTemporaria = this.reflector.getAllAndOverride<boolean>(PERMITE_SENHA_TEMPORARIA, [
+      contexto.getHandler(),
+      contexto.getClass(),
+    ]);
+    await this.garantirContaAtiva(usuario, permiteTemporaria === true);
     requisicao.usuario = usuario;
     return true;
   }
 
-  private async garantirContaAtiva(usuario: UsuarioAutenticado) {
+  private async garantirContaAtiva(usuario: UsuarioAutenticado, permiteTemporaria: boolean) {
     const registro = await this.prisma.usuario.findUnique({
       where: { id: usuario.id },
-      select: { ativo: true },
+      select: {
+        ativo: true,
+        deveTrocarSenha: true,
+        tokensInvalidosAntes: true,
+        redefinicaoEmAndamento: true,
+      },
     });
     // Login válido no Supabase, mas sem liberação na API (ou desativado): 403, não 401.
     if (!registro || !registro.ativo) {
       throw new ForbiddenException('Conta sem acesso liberado. Peça liberação à coordenação.');
+    }
+    if (registro.redefinicaoEmAndamento) {
+      throw new ForbiddenException('Redefinição em andamento. Tente novamente em instantes.');
+    }
+    if (
+      registro.tokensInvalidosAntes &&
+      (!usuario.emitidoEm || usuario.emitidoEm * 1000 < registro.tokensInvalidosAntes.getTime())
+    ) {
+      throw new UnauthorizedException('Sessão encerrada. Entre novamente.');
+    }
+    if (registro.deveTrocarSenha && !permiteTemporaria) {
+      throw new ForbiddenException('Troque sua senha temporária para continuar.');
     }
   }
 }

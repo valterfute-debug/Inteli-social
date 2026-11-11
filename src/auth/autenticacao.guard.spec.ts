@@ -10,11 +10,16 @@ import { JWTVerifyGetKey } from 'jose';
 import { PrismaService } from '../prisma/prisma.service';
 import { SUPABASE_URL_TESTE, criarEmissorDeTokens } from '../../test/tokens-teste';
 import { AutenticacaoGuard, extrairToken } from './autenticacao.guard';
-import { Publica } from './decoradores';
+import { PermiteSenhaTemporaria, Publica } from './decoradores';
 import { RequisicaoAutenticada } from './tipos';
 import { VerificadorTokenService } from './verificador-token.service';
 
 class ControllerProtegido {
+  rota() {}
+}
+
+@PermiteSenhaTemporaria()
+class ControllerPrimeiroAcesso {
   rota() {}
 }
 
@@ -63,6 +68,48 @@ describe('AutenticacaoGuard', () => {
     emissor = await criarEmissorDeTokens();
   });
 
+  it('restringe conta com senha temporária às rotas autorizadas', async () => {
+    const guard = criarGuard(
+      emissor.chaves,
+      SUPABASE_URL_TESTE,
+      prismaCom({ ...USUARIO_ATIVO, deveTrocarSenha: true }),
+    );
+    const token = await emissor.assinar();
+    const requisicao = { headers: { authorization: `Bearer ${token}` } };
+    await expect(guard.canActivate(contexto(requisicao))).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    await expect(guard.canActivate(contexto(requisicao, ControllerPrimeiroAcesso))).resolves.toBe(
+      true,
+    );
+  });
+
+  it('rejeita sessão emitida antes da redefinição de senha', async () => {
+    const prisma = prismaCom({
+      ...USUARIO_ATIVO,
+      tokensInvalidosAntes: new Date(Date.now() + 60_000),
+    });
+    const guard = criarGuard(emissor.chaves, SUPABASE_URL_TESTE, prisma);
+    const token = await emissor.assinar();
+    await expect(
+      guard.canActivate(contexto({ headers: { authorization: `Bearer ${token}` } })),
+    ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  it('bloqueia inclusive primeiro acesso enquanto a redefinição está em andamento', async () => {
+    const guard = criarGuard(
+      emissor.chaves,
+      SUPABASE_URL_TESTE,
+      prismaCom({ ...USUARIO_ATIVO, deveTrocarSenha: true, redefinicaoEmAndamento: true }),
+    );
+    const token = await emissor.assinar();
+    await expect(
+      guard.canActivate(
+        contexto({ headers: { authorization: `Bearer ${token}` } }, ControllerPrimeiroAcesso),
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('libera rota marcada com @Publica() sem token', async () => {
     const guard = criarGuard(emissor.chaves);
     await expect(guard.canActivate(contexto({ headers: {} }, ControllerPublico))).resolves.toBe(
@@ -85,7 +132,7 @@ describe('AutenticacaoGuard', () => {
     };
 
     await expect(guard.canActivate(contexto(requisicao))).resolves.toBe(true);
-    expect(requisicao.usuario).toEqual({ id: 'usuario-1', email: 'ana@teste.invalid' });
+    expect(requisicao.usuario).toMatchObject({ id: 'usuario-1', email: 'ana@teste.invalid' });
   });
 
   it('toda conta ativa passa igual: o guard só confere o cadastro ativo, sem papel nem unidades', async () => {
@@ -101,7 +148,12 @@ describe('AutenticacaoGuard', () => {
     expect(requisicao.usuario).toMatchObject({ id: 'usuario-2' });
     expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
       where: { id: 'usuario-2' },
-      select: { ativo: true },
+      select: {
+        ativo: true,
+        deveTrocarSenha: true,
+        tokensInvalidosAntes: true,
+        redefinicaoEmAndamento: true,
+      },
     });
   });
 
