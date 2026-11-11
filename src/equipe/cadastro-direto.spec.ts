@@ -38,6 +38,7 @@ describe('cadastro direto e redefinição', () => {
   );
   beforeEach(() => {
     jest.clearAllMocks();
+    tx.usuario.updateMany.mockResolvedValue({ count: 1 });
     (createClient as jest.Mock).mockReturnValue({
       auth: { admin: { createUser: create, updateUserById: update } },
     });
@@ -69,5 +70,19 @@ describe('cadastro direto e redefinição', () => {
     expect(tx.usuario.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       update.mock.invocationCallOrder[0],
     );
+  });
+  it('não redefine no provedor se outra alteração já reservou a conta', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'other', ativo: true });
+    tx.usuario.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.redefinirSenha(actor, 'other')).rejects.toThrow(
+      'Outra alteração de senha',
+    );
+    expect(update).not.toHaveBeenCalled();
+  });
+  it('mantém a conta bloqueada quando o provedor retorna erro', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({ id: 'other', ativo: true });
+    update.mockResolvedValue({ error: { message: 'falha sintética' } });
+    await expect(service.redefinirSenha(actor, 'other')).rejects.toThrow('Procure suporte');
+    expect(prisma.usuario.updateMany).not.toHaveBeenCalled();
   });
 });
