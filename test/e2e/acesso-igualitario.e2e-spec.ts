@@ -85,7 +85,13 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         .set('Authorization', ana.autorizacao)
         .expect(200);
 
-      expect(resposta.body).toEqual({ id: 'ana', email: 'ana@teste.invalid', nome: null });
+      expect(resposta.body).toEqual({
+        id: 'ana',
+        email: 'ana@teste.invalid',
+        nome: null,
+        gerenciaEquipe: false,
+        deveTrocarSenha: false,
+      });
     });
 
     it('o banco não guarda mais papel nem vínculo conta × unidade', async () => {

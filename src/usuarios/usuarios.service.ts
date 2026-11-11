@@ -54,7 +54,7 @@ export class UsuariosService {
       },
       data: {
         deveTrocarSenha: false,
-        tokensInvalidosAntes: new Date(Math.ceil(Date.now() / 1000) * 1000),
+        tokensInvalidosAntes: new Date((Math.floor(Date.now() / 1000) + 1) * 1000),
       },
     });
     if (resultado.count !== 1)

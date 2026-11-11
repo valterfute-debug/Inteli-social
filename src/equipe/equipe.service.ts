@@ -110,7 +110,7 @@ export class EquipeService {
     });
     if (!pessoa) throw new NotFoundException('Pessoa não encontrada.');
     if (!pessoa.ativo) throw new ForbiddenException('Reative o acesso antes de redefinir a senha.');
-    const corte = new Date(Math.ceil(Date.now() / 1000) * 1000);
+    const corte = new Date((Math.floor(Date.now() / 1000) + 1) * 1000);
     await this.prisma.$transaction(async (tx) => {
       await tx.usuario.update({
         where: { id },
