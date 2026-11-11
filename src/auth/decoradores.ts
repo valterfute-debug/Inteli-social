@@ -7,6 +7,8 @@ import {
 import { RequisicaoAutenticada, UsuarioAutenticado } from './tipos';
 
 export const ROTA_PUBLICA = 'rotaPublica';
+export const PERMITE_SENHA_TEMPORARIA = 'permiteSenhaTemporaria';
+export const PermiteSenhaTemporaria = () => SetMetadata(PERMITE_SENHA_TEMPORARIA, true);
 
 /** Libera a rota do login. Usar só em rotas sem dados (ex.: health check do Render). */
 export const Publica = () => SetMetadata(ROTA_PUBLICA, true);

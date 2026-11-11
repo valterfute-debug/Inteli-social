@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
-import { UsuarioAtual } from '../auth/decoradores';
+import { PermiteSenhaTemporaria, UsuarioAtual } from '../auth/decoradores';
 import { UsuarioAutenticado } from '../auth/tipos';
 import { UsuariosService } from './usuarios.service';
 
@@ -10,6 +10,7 @@ export class UsuariosController {
   constructor(private readonly usuariosService: UsuariosService) {}
 
   @Get()
+  @PermiteSenhaTemporaria()
   @ApiOperation({ summary: 'Dados da conta logada' })
   eu(@UsuarioAtual() usuario: UsuarioAutenticado) {
     return this.usuariosService.obterPerfil(usuario);

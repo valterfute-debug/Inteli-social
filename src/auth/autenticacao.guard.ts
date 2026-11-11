@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../prisma/prisma.service';
-import { ROTA_PUBLICA } from './decoradores';
+import { PERMITE_SENHA_TEMPORARIA, ROTA_PUBLICA } from './decoradores';
 import { RequisicaoAutenticada, UsuarioAutenticado } from './tipos';
 import { VerificadorTokenService } from './verificador-token.service';
 
@@ -42,19 +42,26 @@ export class AutenticacaoGuard implements CanActivate {
     if (!token) throw new UnauthorizedException('Autenticação necessária');
 
     const usuario = await this.verificador.verificar(token);
-    await this.garantirContaAtiva(usuario);
+    const permiteTemporaria = this.reflector.getAllAndOverride<boolean>(PERMITE_SENHA_TEMPORARIA, [
+      contexto.getHandler(),
+      contexto.getClass(),
+    ]);
+    await this.garantirContaAtiva(usuario, permiteTemporaria === true);
     requisicao.usuario = usuario;
     return true;
   }
 
-  private async garantirContaAtiva(usuario: UsuarioAutenticado) {
+  private async garantirContaAtiva(usuario: UsuarioAutenticado, permiteTemporaria: boolean) {
     const registro = await this.prisma.usuario.findUnique({
       where: { id: usuario.id },
-      select: { ativo: true },
+      select: { ativo: true, deveTrocarSenha: true },
     });
     // Login válido no Supabase, mas sem liberação na API (ou desativado): 403, não 401.
     if (!registro || !registro.ativo) {
       throw new ForbiddenException('Conta sem acesso liberado. Peça liberação à coordenação.');
+    }
+    if (registro.deveTrocarSenha && !permiteTemporaria) {
+      throw new ForbiddenException('Troque sua senha temporária para continuar.');
     }
   }
 }
