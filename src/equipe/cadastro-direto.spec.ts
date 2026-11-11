@@ -6,7 +6,11 @@ jest.mock('@supabase/supabase-js', () => ({ createClient: jest.fn() }));
 describe('cadastro direto e redefinição', () => {
   const actor = { id: 'admin', email: 'admin@example.test' };
   const tx = {
-    usuario: { create: jest.fn(), update: jest.fn() },
+    usuario: {
+      create: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    },
     eventoAuditoria: { create: jest.fn() },
     conviteEquipe: { create: jest.fn().mockResolvedValue({ id: 'reserva' }), update: jest.fn() },
   };
@@ -54,7 +58,7 @@ describe('cadastro direto e redefinição', () => {
     prisma.usuario.findUnique.mockResolvedValue({ id: 'other', ativo: true });
     update.mockResolvedValue({ error: null });
     await expect(service.redefinirSenha(actor, 'other')).resolves.toEqual({ ok: true });
-    expect(tx.usuario.update).toHaveBeenCalledWith(
+    expect(tx.usuario.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           deveTrocarSenha: true,
@@ -62,7 +66,7 @@ describe('cadastro direto e redefinição', () => {
         }),
       }),
     );
-    expect(tx.usuario.update.mock.invocationCallOrder[0]).toBeLessThan(
+    expect(tx.usuario.updateMany.mock.invocationCallOrder[0]).toBeLessThan(
       update.mock.invocationCallOrder[0],
     );
   });

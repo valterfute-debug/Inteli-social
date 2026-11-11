@@ -48,10 +48,27 @@ describe('troca inicial de senha', () => {
         id: 'a',
         ativo: true,
         deveTrocarSenha: true,
-        redefinicaoEmAndamento: false,
+        redefinicaoEmAndamento: true,
         tokensInvalidosAntes: null,
       },
-      data: { deveTrocarSenha: false, tokensInvalidosAntes: expect.any(Date) },
+      data: {
+        deveTrocarSenha: false,
+        redefinicaoEmAndamento: false,
+        tokensInvalidosAntes: expect.any(Date),
+      },
     });
+  });
+  it('não altera o provedor quando outra operação reservou a conta', async () => {
+    prisma.usuario.findUnique.mockResolvedValue({
+      ativo: true,
+      deveTrocarSenha: true,
+      redefinicaoEmAndamento: false,
+      tokensInvalidosAntes: null,
+    });
+    prisma.usuario.updateMany.mockResolvedValue({ count: 0 });
+    await expect(service.trocarSenhaInicial(usuario, 'nova-senha-segura')).rejects.toThrow(
+      'Outra alteração de senha',
+    );
+    expect(update).not.toHaveBeenCalled();
   });
 });

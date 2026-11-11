@@ -112,10 +112,12 @@ export class EquipeService {
     if (!pessoa.ativo) throw new ForbiddenException('Reative o acesso antes de redefinir a senha.');
     const corte = new Date((Math.floor(Date.now() / 1000) + 1) * 1000);
     await this.prisma.$transaction(async (tx) => {
-      await tx.usuario.update({
-        where: { id },
+      const bloqueio = await tx.usuario.updateMany({
+        where: { id, ativo: true, redefinicaoEmAndamento: false },
         data: { deveTrocarSenha: true, tokensInvalidosAntes: corte, redefinicaoEmAndamento: true },
       });
+      if (bloqueio.count !== 1)
+        throw new ConflictException('Outra alteração de senha está em andamento.');
       await tx.eventoAuditoria.create({
         data: {
           usuarioId: usuario.id,

@@ -43,9 +43,7 @@ export class UsuariosService {
     const cliente = createClient(url, key, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    const { error } = await cliente.auth.admin.updateUserById(usuario.id, { password: senha });
-    if (error) throw new ServiceUnavailableException('Não foi possível alterar a senha.');
-    const resultado = await this.prisma.usuario.updateMany({
+    const reserva = await this.prisma.usuario.updateMany({
       where: {
         id: usuario.id,
         ativo: true,
@@ -53,8 +51,26 @@ export class UsuariosService {
         redefinicaoEmAndamento: false,
         tokensInvalidosAntes: registro.tokensInvalidosAntes,
       },
+      data: { redefinicaoEmAndamento: true },
+    });
+    if (reserva.count !== 1)
+      throw new ConflictException('Outra alteração de senha está em andamento.');
+    const { error } = await cliente.auth.admin.updateUserById(usuario.id, { password: senha });
+    if (error)
+      throw new ServiceUnavailableException(
+        'Não foi possível confirmar a alteração. Procure suporte.',
+      );
+    const resultado = await this.prisma.usuario.updateMany({
+      where: {
+        id: usuario.id,
+        ativo: true,
+        deveTrocarSenha: true,
+        redefinicaoEmAndamento: true,
+        tokensInvalidosAntes: registro.tokensInvalidosAntes,
+      },
       data: {
         deveTrocarSenha: false,
+        redefinicaoEmAndamento: false,
         tokensInvalidosAntes: new Date((Math.floor(Date.now() / 1000) + 1) * 1000),
       },
     });
