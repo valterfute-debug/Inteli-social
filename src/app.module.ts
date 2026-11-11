@@ -44,6 +44,7 @@ import { ManutencaoModule } from './manutencao/manutencao.module';
           then: Joi.required(),
           otherwise: Joi.optional(),
         }),
+        SENHA_TEMPORARIA: Joi.string().min(8).max(72).optional(),
         SUPABASE_STORAGE_BUCKET: Joi.string().optional(),
         FOTO_URL_VALIDADE_SEGUNDOS: Joi.number().integer().min(60).max(3600).default(900),
         CORS_ORIGINS: Joi.string().optional(),

@@ -52,7 +52,10 @@ export class UsuariosService {
         deveTrocarSenha: true,
         tokensInvalidosAntes: registro.tokensInvalidosAntes,
       },
-      data: { deveTrocarSenha: false },
+      data: {
+        deveTrocarSenha: false,
+        tokensInvalidosAntes: new Date(Math.ceil(Date.now() / 1000) * 1000),
+      },
     });
     if (resultado.count !== 1)
       throw new ConflictException('A conta foi alterada. Entre novamente.');

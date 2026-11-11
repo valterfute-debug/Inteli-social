@@ -44,7 +44,7 @@ describe('troca inicial de senha', () => {
     });
     expect(prisma.usuario.updateMany).toHaveBeenCalledWith({
       where: { id: 'a', ativo: true, deveTrocarSenha: true, tokensInvalidosAntes: null },
-      data: { deveTrocarSenha: false },
+      data: { deveTrocarSenha: false, tokensInvalidosAntes: expect.any(Date) },
     });
   });
 });

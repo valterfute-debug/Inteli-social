@@ -13,6 +13,10 @@ import { UsuarioAtual } from '../auth/decoradores';
 import { UsuarioAutenticado } from '../auth/tipos';
 import { AlterarAcessoDto } from './dto/alterar-acesso.dto';
 import { ConvidarDto } from './dto/convidar.dto';
+import { IsEmail, MaxLength } from 'class-validator';
+class CadastrarContaDto {
+  @IsEmail() @MaxLength(254) email!: string;
+}
 import { EquipeService } from './equipe.service';
 import { GerenciaEquipeGuard } from './gerencia-equipe.guard';
 
@@ -25,6 +29,17 @@ export class EquipeController {
   @ApiOperation({ summary: 'Listar contas da equipe' })
   listar() {
     return this.equipe.listar();
+  }
+  @Post('contas')
+  cadastrar(@UsuarioAtual() usuario: UsuarioAutenticado, @Body() dto: CadastrarContaDto) {
+    return this.equipe.cadastrar(usuario, dto.email);
+  }
+  @Post(':id/redefinir-senha')
+  redefinirSenha(
+    @UsuarioAtual() usuario: UsuarioAutenticado,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
+    return this.equipe.redefinirSenha(usuario, id);
   }
   @Post('convites')
   @ApiOperation({ summary: 'Convidar uma pessoa por e-mail' })

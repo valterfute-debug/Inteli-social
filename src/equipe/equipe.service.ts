@@ -28,6 +28,111 @@ export class EquipeService {
     return { itens: pessoas.slice(0, 200), temMais: pessoas.length > 200 };
   }
 
+  private acessoInicial() {
+    const url = this.config.get<string>('SUPABASE_URL');
+    const key = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    const senha = this.config.get<string>('SENHA_TEMPORARIA');
+    if (!url || !key || !senha)
+      throw new ServiceUnavailableException('Cadastro de acesso não configurado.');
+    return {
+      senha,
+      cliente: createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }),
+    };
+  }
+
+  async cadastrar(usuario: UsuarioAutenticado, email: string) {
+    const normalizado = email.trim().toLowerCase();
+    const { senha, cliente } = this.acessoInicial();
+    const existente = await this.prisma.usuario.findFirst({
+      where: { email: { equals: normalizado, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existente) throw new ConflictException('Já existe uma conta para este e-mail.');
+    let reserva: { id: string };
+    try {
+      reserva = await this.prisma.$transaction(async (tx) => {
+        const item = await tx.conviteEquipe.create({
+          data: { email: normalizado, nome: normalizado, solicitadoPor: usuario.id },
+          select: { id: true },
+        });
+        await tx.eventoAuditoria.create({
+          data: {
+            usuarioId: usuario.id,
+            acao: 'CONTA_SOLICITADA',
+            entidade: 'ConviteEquipe',
+            entidadeId: item.id,
+          },
+        });
+        return item;
+      });
+    } catch (erro) {
+      if (erro instanceof Prisma.PrismaClientKnownRequestError && erro.code === 'P2002')
+        throw new ConflictException('Já existe uma solicitação para este e-mail. Procure suporte.');
+      throw new ServiceUnavailableException('Não foi possível preparar o cadastro.');
+    }
+    const { data, error } = await cliente.auth.admin.createUser({
+      email: normalizado,
+      password: senha,
+      email_confirm: true,
+    });
+    if (error || !data.user?.id)
+      throw new ServiceUnavailableException('Não foi possível criar a conta.');
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.usuario.create({
+          data: { id: data.user.id, email: normalizado, ativo: true, deveTrocarSenha: true },
+        });
+        await tx.eventoAuditoria.create({
+          data: {
+            usuarioId: usuario.id,
+            acao: 'CONTA_CRIADA',
+            entidade: 'Usuario',
+            entidadeId: data.user.id,
+          },
+        });
+        await tx.conviteEquipe.update({ where: { id: reserva.id }, data: { status: 'CONCLUIDO' } });
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        'Conta criada no provedor, mas não liberada. Procure suporte.',
+      );
+    }
+    return { id: data.user.id, email: normalizado, ativo: true, deveTrocarSenha: true };
+  }
+
+  async redefinirSenha(usuario: UsuarioAutenticado, id: string) {
+    if (id === usuario.id)
+      throw new ForbiddenException('Não é possível redefinir a própria senha por aqui.');
+    const { senha, cliente } = this.acessoInicial();
+    const pessoa = await this.prisma.usuario.findUnique({
+      where: { id },
+      select: { id: true, ativo: true },
+    });
+    if (!pessoa) throw new NotFoundException('Pessoa não encontrada.');
+    if (!pessoa.ativo) throw new ForbiddenException('Reative o acesso antes de redefinir a senha.');
+    const corte = new Date(Math.ceil(Date.now() / 1000) * 1000);
+    await this.prisma.$transaction(async (tx) => {
+      await tx.usuario.update({
+        where: { id },
+        data: { deveTrocarSenha: true, tokensInvalidosAntes: corte },
+      });
+      await tx.eventoAuditoria.create({
+        data: {
+          usuarioId: usuario.id,
+          acao: 'SENHA_REDEFINICAO_SOLICITADA',
+          entidade: 'Usuario',
+          entidadeId: id,
+        },
+      });
+    });
+    const { error } = await cliente.auth.admin.updateUserById(id, { password: senha });
+    if (error)
+      throw new ServiceUnavailableException(
+        'Não foi possível confirmar a redefinição. Procure suporte.',
+      );
+    return { ok: true };
+  }
+
   async alterar(usuario: UsuarioAutenticado, id: string, ativo: boolean) {
     if (id === usuario.id && !ativo)
       throw new ForbiddenException('Não é possível desativar seu próprio acesso.');

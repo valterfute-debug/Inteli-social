@@ -67,6 +67,15 @@ describe('Gestão de equipe via HTTP', () => {
       .send({ nome: 'Pessoa', email: 'pessoa@example.test' })
       .expect(403);
     await request(app.getHttpServer())
+      .post('/api/v1/equipe/contas')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ email: 'pessoa@example.test' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .post(`/api/v1/equipe/${a}/redefinir-senha`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(403);
+    await request(app.getHttpServer())
       .patch(`/api/v1/equipe/${a}/acesso`)
       .set('Authorization', `Bearer ${tokenB}`)
       .send({ ativo: false })
