@@ -12,7 +12,6 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsuarioAtual } from '../auth/decoradores';
 import { UsuarioAutenticado } from '../auth/tipos';
 import { AlterarAcessoDto } from './dto/alterar-acesso.dto';
-import { ConvidarDto } from './dto/convidar.dto';
 import { IsEmail, MaxLength } from 'class-validator';
 class CadastrarContaDto {
   @IsEmail() @MaxLength(254) email!: string;
@@ -40,11 +39,6 @@ export class EquipeController {
     @Param('id', new ParseUUIDPipe()) id: string,
   ) {
     return this.equipe.redefinirSenha(usuario, id);
-  }
-  @Post('convites')
-  @ApiOperation({ summary: 'Convidar uma pessoa por e-mail' })
-  convidar(@UsuarioAtual() usuario: UsuarioAutenticado, @Body() dto: ConvidarDto) {
-    return this.equipe.convidar(usuario, dto.nome, dto.email);
   }
   @Patch(':id/acesso')
   @ApiOperation({ summary: 'Ativar ou desativar acesso' })
