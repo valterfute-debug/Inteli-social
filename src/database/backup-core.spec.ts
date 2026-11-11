@@ -85,7 +85,7 @@ function bancoValido(
 ): BancoBackup {
   return banco((sql) => {
     if (sql.includes('to_regclass')) return [{ existe: overrides.attachmentExists ?? false }];
-    if (sql.includes('FROM public.\"AnexoClinico\"')) return overrides.attachments ?? [];
+    if (sql.includes('FROM public."AnexoClinico"')) return overrides.attachments ?? [];
     if (sql.includes('c.relkind'))
       return [
         { esquema: 'auth', tabela: 'users' },
