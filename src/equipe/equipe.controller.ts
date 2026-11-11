@@ -1,12 +1,23 @@
-import { Body, Controller, Get, Param, Patch, ParseUUIDPipe, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  ParseUUIDPipe,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { UsuarioAtual } from '../auth/decoradores';
 import { UsuarioAutenticado } from '../auth/tipos';
 import { AlterarAcessoDto } from './dto/alterar-acesso.dto';
 import { ConvidarDto } from './dto/convidar.dto';
 import { EquipeService } from './equipe.service';
+import { GerenciaEquipeGuard } from './gerencia-equipe.guard';
 
 @ApiTags('Equipe')
+@UseGuards(GerenciaEquipeGuard)
 @Controller({ path: 'equipe', version: '1' })
 export class EquipeController {
   constructor(private readonly equipe: EquipeService) {}

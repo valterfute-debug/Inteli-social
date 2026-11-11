@@ -1,6 +1,8 @@
 # Gestão de acessos
 
-Contas autenticadas e ativas podem listar a equipe, convidar por e-mail e ativar ou desativar outra conta. O guard global verifica o token e a situação ativa em toda requisição. Não há papéis ou permissão administrativa separada. Para evitar bloqueio acidental, uma pessoa não pode desativar a própria conta. Cada alteração é registrada na auditoria sem senha ou token.
+Somente contas autenticadas, ativas e com `gerenciaEquipe` habilitado podem listar a equipe, convidar por e-mail e ativar ou desativar outra conta. O guard consulta essa permissão no banco em cada requisição, além da validação global da conta. Todos mantêm acesso às demais funções da plataforma. Para evitar bloqueio acidental, uma pessoa não pode desativar a própria conta. Cada alteração é registrada na auditoria sem senha ou token.
+
+Após aplicar a migration, todas as contas começam sem permissão de gestão. A primeira conta administradora deve ser escolhida pela Ampara e habilitada por uma operação controlada no banco; nenhuma promoção é automática. Novos convites não concedem essa permissão. A interface para transferir ou conceder administração ainda não está implementada.
 
 ## Configuração do convite por e-mail
 

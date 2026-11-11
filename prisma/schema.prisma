@@ -161,6 +161,7 @@ model Usuario {
   email String?
   nome String?
   ativo Boolean @default(true)
+  gerenciaEquipe Boolean @default(false)
   fotos Foto[]
   chavesIdempotencia ChaveIdempotencia[]
   createdAt DateTime @default(now())

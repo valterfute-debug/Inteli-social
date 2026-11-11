@@ -15,8 +15,8 @@ describe('Gestão de equipe via HTTP', () => {
   let tokenA: string;
   let tokenB: string;
   const rows = new Map([
-    [a, { id: a, nome: 'Pessoa A', email: 'a@example.test', ativo: true }],
-    [b, { id: b, nome: 'Pessoa B', email: 'b@example.test', ativo: true }],
+    [a, { id: a, nome: 'Pessoa A', email: 'a@example.test', ativo: true, gerenciaEquipe: true }],
+    [b, { id: b, nome: 'Pessoa B', email: 'b@example.test', ativo: true, gerenciaEquipe: false }],
   ]);
   beforeAll(async () => {
     const emissor = await criarEmissorDeTokens();
@@ -51,7 +51,7 @@ describe('Gestão de equipe via HTTP', () => {
   afterAll(async () => {
     await app.close();
   });
-  it('rejeita pessoas sem login e aceita ambas as contas ativas', async () => {
+  it('exige administrador em todas as rotas de gestão', async () => {
     await request(app.getHttpServer()).get('/api/v1/equipe').expect(401);
     await request(app.getHttpServer())
       .get('/api/v1/equipe')
@@ -60,7 +60,24 @@ describe('Gestão de equipe via HTTP', () => {
     await request(app.getHttpServer())
       .get('/api/v1/equipe')
       .set('Authorization', `Bearer ${tokenB}`)
-      .expect(200);
+      .expect(403);
+    await request(app.getHttpServer())
+      .post('/api/v1/equipe/convites')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ nome: 'Pessoa', email: 'pessoa@example.test' })
+      .expect(403);
+    await request(app.getHttpServer())
+      .patch(`/api/v1/equipe/${a}/acesso`)
+      .set('Authorization', `Bearer ${tokenB}`)
+      .send({ ativo: false })
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/v1/me')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body.gerenciaEquipe).toBe(false);
+      });
   });
   it('valida o corpo, desativa, bloqueia a conta imediatamente e permite reativar', async () => {
     await request(app.getHttpServer())
@@ -85,6 +102,22 @@ describe('Gestão de equipe via HTTP', () => {
     await request(app.getHttpServer())
       .get('/api/v1/equipe')
       .set('Authorization', `Bearer ${tokenB}`)
+      .expect(403);
+    await request(app.getHttpServer())
+      .get('/api/v1/me')
+      .set('Authorization', `Bearer ${tokenB}`)
+      .expect(200);
+  });
+  it('revoga acesso de gestão imediatamente ao mudar a permissão no servidor', async () => {
+    rows.get(a)!.gerenciaEquipe = false;
+    await request(app.getHttpServer())
+      .get('/api/v1/equipe')
+      .set('Authorization', `Bearer ${tokenA}`)
+      .expect(403);
+    rows.get(a)!.gerenciaEquipe = true;
+    await request(app.getHttpServer())
+      .get('/api/v1/equipe')
+      .set('Authorization', `Bearer ${tokenA}`)
       .expect(200);
   });
 });

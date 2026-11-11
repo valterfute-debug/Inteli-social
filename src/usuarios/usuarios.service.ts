@@ -10,6 +10,11 @@ export class UsuariosService {
     const registro = await this.prisma.usuario.findUnique({ where: { id: usuario.id } });
     if (!registro) throw new NotFoundException('Usuário não encontrado');
 
-    return { id: registro.id, email: registro.email, nome: registro.nome };
+    return {
+      id: registro.id,
+      email: registro.email,
+      nome: registro.nome,
+      gerenciaEquipe: registro.gerenciaEquipe,
+    };
   }
 }

@@ -20,7 +20,7 @@ export function extrairToken(cabecalho: string | undefined): string | null {
 
 /**
  * Guard global: toda rota exige token do Supabase Auth (salvo @Publica()) e uma conta
- * ativa na tabela Usuario. Todas as contas ativas têm as mesmas permissões de negócio.
+ * ativa na tabela Usuario. A gestão de equipe tem autorização específica no servidor.
  */
 @Injectable()
 export class AutenticacaoGuard implements CanActivate {
