@@ -73,6 +73,7 @@ function criarPrismaFalso() {
     unit: { findFirst: jest.fn().mockResolvedValue({ id: 'unidade-1' }) },
     species: {
       findFirst: jest.fn().mockResolvedValue({ silvestre: false }),
+      findMany: jest.fn(),
     },
     foto: {
       findUnique: jest.fn().mockResolvedValue({
@@ -83,6 +84,23 @@ function criarPrismaFalso() {
     },
   } as unknown as PrismaService;
 }
+
+describe('resumo de animais', () => {
+  it('conta animais ativos em todas as páginas e inclui dados não informados', async () => {
+    const prisma = criarPrismaFalso();
+    const group = prisma.animal.groupBy as jest.Mock;
+    group.mockResolvedValueOnce([{ speciesId: 'c', _count: { _all: 3 } }]);
+    group.mockResolvedValueOnce([{ sexo: null, _count: { _all: 1 } }, { sexo: 'FEMEA', _count: { _all: 2 } }]);
+    group.mockResolvedValueOnce([{ idadeAproximadaMeses: null, _count: { _all: 3 } }]);
+    group.mockResolvedValueOnce([{ front: 'CASADOTE', _count: { _all: 3 } }]);
+    (prisma.animal.count as jest.Mock).mockResolvedValue(2);
+    (prisma.species.findMany as jest.Mock).mockResolvedValue([{ id: 'c', name: 'Cão' }]);
+    const service = new AnimalsService(prisma, criarStorageFalso(), idempotenciaFalsa(prisma), auditoriaFalsa());
+    expect(await service.resumo()).toEqual({ total: 3, especies: [{ nome: 'Cão', total: 3 }], sexos: [{ sexo: null, total: 1 }, { sexo: 'FEMEA', total: 2 }], idades: [{ meses: null, total: 3 }], frentes: [{ frente: 'CASADOTE', total: 3 }], prontuariosPendentes: 2 });
+    expect(group).toHaveBeenCalledTimes(4);
+    expect(group.mock.calls.every(([query]) => query.where.deletedAt === null)).toBe(true);
+  });
+});
 
 function criarStorageFalso() {
   return {

@@ -26,6 +26,7 @@ export class UsuariosService {
       email: registro.email,
       nome: registro.nome,
       gerenciaEquipe: registro.gerenciaEquipe,
+      administradorMaster: registro.administradorMaster,
       deveTrocarSenha: registro.deveTrocarSenha,
     };
   }

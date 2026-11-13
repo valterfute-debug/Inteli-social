@@ -2,5 +2,9 @@ import { Module } from '@nestjs/common';
 import { EquipeController } from './equipe.controller';
 import { EquipeService } from './equipe.service';
 import { GerenciaEquipeGuard } from './gerencia-equipe.guard';
-@Module({ controllers: [EquipeController], providers: [EquipeService, GerenciaEquipeGuard] })
+import { ConviteQrController } from './convite-qr.controller';
+@Module({
+  controllers: [EquipeController, ConviteQrController],
+  providers: [EquipeService, GerenciaEquipeGuard],
+})
 export class EquipeModule {}

@@ -5,6 +5,12 @@ const fs = require('node:fs');
 // Isso obriga quem mexer no contrato a também atualizar esta lista, evitando que
 // alguém declare um endpoint pronto sem o código existir de fato.
 const ENDPOINTS_IMPLEMENTADOS = new Set([
+  'GET /api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos',
+  'POST /api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos',
+  'POST /api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}/confirmacao',
+  'GET /api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}/leitura',
+  'DELETE /api/v1/animals/{animalId}/atendimentos/{atendimentoId}/anexos/{id}',
+
   'GET /api/health',
   'GET /api/health/ready',
   'GET /api/v1/me',

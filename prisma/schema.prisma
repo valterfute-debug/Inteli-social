@@ -162,6 +162,7 @@ model Usuario {
   nome String?
   ativo Boolean @default(true)
   gerenciaEquipe Boolean @default(false)
+  administradorMaster Boolean @default(false)
   deveTrocarSenha Boolean @default(false)
   tokensInvalidosAntes DateTime?
   redefinicaoEmAndamento Boolean @default(false)
@@ -180,6 +181,18 @@ model ConviteEquipe {
   status String @default("PENDENTE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ConviteQr {
+  id String @id @default(uuid())
+  tokenHash String @unique
+  criadoPorId String
+  expiraEm DateTime
+  estado String @default("DISPONIVEL")
+  emailReservado String?
+  criadoEm DateTime @default(now())
+  utilizadoEm DateTime?
+  @@index([expiraEm])
 }
 // Trilha de auditoria (issue #3, P0-4). Só recebe INSERT: um gatilho no banco recusa UPDATE
 // e DELETE dentro do prazo de retenção. Sem FK para Usuario/Animal de propósito: o histórico
@@ -240,6 +253,13 @@ model AtendimentoClinico {
   dataAtendimento DateTime
   anamnese String?
   exameFisico String?
+  frequenciaRespiratoria Int?
+  frequenciaCardiaca Int?
+  tpc Float?
+  mucosa String?
+  linfonodos String?
+  temperatura Float?
+  anexos AnexoClinico[]
   examesComplementares String?
   tratamento String?
   criadoPorId String
@@ -266,4 +286,22 @@ model MovimentacaoAnimal {
   usuarioId String
   createdAt DateTime @default(now())
   @@index([animalId, createdAt])
+}
+
+// Arquivo privado vinculado a um atendimento; nunca reutiliza Foto de entrada.
+model AnexoClinico {
+  id String @id
+  atendimentoId String
+  atendimento AtendimentoClinico @relation(fields: [atendimentoId], references: [id], onDelete: Restrict)
+  nome String
+  tipoMidia String
+  tamanhoBytes Int
+  caminhoArmazenamento String @unique
+  criadoPorId String
+  confirmado Boolean @default(false)
+  cancelado Boolean @default(false)
+  expiraEm DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([atendimentoId, createdAt])
 }

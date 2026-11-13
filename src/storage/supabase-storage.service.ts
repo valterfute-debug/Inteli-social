@@ -93,9 +93,44 @@ export class SupabaseStorageService {
     };
   }
 
+  /** L� somente o in�cio para valida��o de assinatura, sem trazer v�deos inteiros � API. */
+  async obterInicioArquivo(caminho: string): Promise<Uint8Array> {
+    const urls = await this.criarUrlsLeitura([caminho]);
+    const url = urls.get(caminho);
+    if (!url) throw new InternalServerErrorException('Falha ao verificar o conte�do do anexo');
+    const resposta = await fetch(url, {
+      headers: { Range: 'bytes=0-511' },
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!resposta.ok || !resposta.body)
+      throw new InternalServerErrorException('Falha ao ler o conte�do do anexo');
+    const leitor = resposta.body.getReader();
+    const partes: Uint8Array[] = [];
+    let total = 0;
+    try {
+      while (total < 512) {
+        const { value, done } = await leitor.read();
+        if (done) break;
+        const parte = value.subarray(0, 512 - total);
+        partes.push(parte);
+        total += parte.length;
+      }
+    } finally {
+      await leitor.cancel();
+    }
+    return Buffer.concat(partes);
+  }
+
   async removerArquivo(caminho: string): Promise<void> {
     const { error } = await this.obterCliente().storage.from(this.obterBucket()).remove([caminho]);
     if (error) throw new InternalServerErrorException('Falha ao remover arquivo do armazenamento');
+  }
+
+  async baixarFoto(caminho: string): Promise<Buffer> {
+    const { data, error } = await this.obterCliente().storage.from(this.obterBucket()).download(caminho);
+    if (error || !data) throw new InternalServerErrorException('Não foi possível carregar a foto do animal');
+    if (data.size > 8 * 1024 * 1024) throw new InternalServerErrorException('A foto excede o tamanho permitido');
+    return Buffer.from(await data.arrayBuffer());
   }
 
   /**

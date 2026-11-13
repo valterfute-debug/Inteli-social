@@ -27,6 +27,16 @@ import { EstadoAdmissao, validarRegrasAdmissao } from './regras-admissao';
 
 const TENTATIVAS_MAXIMAS_IDENTIFICADOR = 3;
 
+const ADMISSAO_INCOMPLETA: Prisma.AnimalWhereInput = {
+  OR: [
+    { atendimentos: { none: { tipo: TipoAtendimento.ADMISSAO, deletedAt: null } } },
+    { atendimentos: { some: { tipo: TipoAtendimento.ADMISSAO, deletedAt: null, OR: [
+      { frequenciaRespiratoria: null }, { frequenciaCardiaca: null }, { tpc: null },
+      { mucosa: null }, { mucosa: '' }, { linfonodos: null }, { linfonodos: '' }, { temperatura: null },
+    ] } } },
+  ],
+};
+
 /**
  * `observacoes` é texto livre e pode conter dado pessoal; a trilha de auditoria é imutável.
  * Registra-se que o campo mudou, não o conteúdo.
@@ -65,9 +75,31 @@ export class AnimalsService {
     private readonly auditoria: AuditoriaService,
   ) {}
 
-  async listar(query: ListarAnimaisQueryDto) {
+  async resumo() {
+    const where = { deletedAt: null };
+    const [porEspecie, porSexo, porIdade, especies, porFrente, prontuariosPendentes] = await Promise.all([
+      this.prisma.animal.groupBy({ by: ['speciesId'], where, _count: { _all: true } }),
+      this.prisma.animal.groupBy({ by: ['sexo'], where, _count: { _all: true } }),
+      this.prisma.animal.groupBy({ by: ['idadeAproximadaMeses'], where, _count: { _all: true } }),
+      this.prisma.species.findMany({ select: { id: true, name: true } }),
+      this.prisma.animal.groupBy({ by: ['front'], where, _count: { _all: true } }),
+      this.prisma.animal.count({ where: { ...where, ...ADMISSAO_INCOMPLETA } }),
+    ]);
+    const nomes = new Map(especies.map((e) => [e.id, e.name]));
+    return {
+      total: porEspecie.reduce((soma, item) => soma + item._count._all, 0),
+      especies: porEspecie.map((item) => ({ nome: nomes.get(item.speciesId) ?? 'Não informada', total: item._count._all })),
+      sexos: porSexo.map((item) => ({ sexo: item.sexo, total: item._count._all })),
+      idades: porIdade.map((item) => ({ meses: item.idadeAproximadaMeses, total: item._count._all })),
+      frentes: porFrente.map((item) => ({ frente: item.front, total: item._count._all })),
+      prontuariosPendentes,
+    };
+  }
+
+  async listar(query: ListarAnimaisQueryDto, pendentes = false) {
     const { pagina, limite } = query;
-    const where = this.montarFiltroListagem(query);
+    const base = this.montarFiltroListagem(query);
+    const where = pendentes ? { AND: [base, ADMISSAO_INCOMPLETA] } : base;
 
     const [itens, total] = await Promise.all([
       this.prisma.animal.findMany({

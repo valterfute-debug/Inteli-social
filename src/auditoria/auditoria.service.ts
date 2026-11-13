@@ -5,6 +5,7 @@ import { requisicaoAtualId } from '../requisicao/contexto-requisicao';
 import { ListarAuditoriaQueryDto } from './dto/listar-auditoria-query.dto';
 
 export enum AcaoAuditoria {
+  ANEXO_CONFIRMADO = 'ANEXO_CONFIRMADO',
   ANIMAL_CRIADO = 'ANIMAL_CRIADO',
   ANIMAL_ATUALIZADO = 'ANIMAL_ATUALIZADO',
   ANIMAL_ARQUIVADO = 'ANIMAL_ARQUIVADO',
@@ -22,7 +23,14 @@ export enum AcaoAuditoria {
 export interface DadosEventoAuditoria {
   usuarioId: string;
   acao: AcaoAuditoria;
-  entidade: 'Animal' | 'HealthEvent' | 'Foto' | 'Responsible' | 'Breed' | 'AtendimentoClinico';
+  entidade:
+    | 'Animal'
+    | 'HealthEvent'
+    | 'Foto'
+    | 'Responsible'
+    | 'Breed'
+    | 'AtendimentoClinico'
+    | 'AnexoClinico';
   entidadeId: string;
   unidadeId?: string | null;
   frente?: Front | null;

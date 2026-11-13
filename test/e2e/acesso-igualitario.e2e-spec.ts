@@ -1,3 +1,4 @@
+import { EXAME_TESTE } from '../exame-fisico-teste';
 import { randomUUID } from 'node:crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
@@ -224,7 +225,7 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         .post(`/api/v1/animals/${animalId}/atendimentos`)
         .set('Authorization', beto.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'Retorno' })
+        .send({ ...EXAME_TESTE, anamnese: 'Retorno' })
         .expect(201);
 
       const eventos = await http()

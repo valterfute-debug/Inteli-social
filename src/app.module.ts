@@ -1,3 +1,4 @@
+import { AnexosModule } from './anexos/anexos.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -74,6 +75,7 @@ import { ManutencaoModule } from './manutencao/manutencao.module';
     AtendimentosClinicosModule,
     StorageModule,
     FotosModule,
+    AnexosModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
