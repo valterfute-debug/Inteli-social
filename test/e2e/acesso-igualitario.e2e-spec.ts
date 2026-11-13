@@ -91,6 +91,7 @@ describe('Acesso igual para toda conta ativa (e2e, banco real)', () => {
         email: 'ana@teste.invalid',
         nome: null,
         gerenciaEquipe: false,
+        administradorMaster: false,
         deveTrocarSenha: false,
       });
     });
