@@ -1,3 +1,4 @@
+import { CAMPOS_EXAME_FISICO, validarExameFisico } from './exame-fisico';
 import {
   BadRequestException,
   ConflictException,
@@ -20,6 +21,7 @@ const CAMPOS_ALTERAVEIS = [
   'exameFisico',
   'examesComplementares',
   'tratamento',
+  ...CAMPOS_EXAME_FISICO,
 ] as const;
 
 @Injectable()
@@ -58,6 +60,7 @@ export class AtendimentosClinicosService {
       return { atendimento: await this.buscar(animalId, anterior), reenvio: true };
     }
 
+    validarExameFisico(dto);
     try {
       const { recursoId, resultado, reenvio } = await this.idempotencia.executar(
         ctx,
@@ -80,6 +83,13 @@ export class AtendimentosClinicosService {
               dataAtendimento: dto.dataAtendimento ? new Date(dto.dataAtendimento) : new Date(),
               anamnese: dto.anamnese,
               exameFisico: dto.exameFisico,
+              frequenciaRespiratoria: dto.frequenciaRespiratoria,
+              frequenciaCardiaca: dto.frequenciaCardiaca,
+              tpc: dto.tpc,
+              mucosa: dto.mucosa,
+              linfonodos: dto.linfonodos,
+              temperatura: dto.temperatura,
+
               examesComplementares: dto.examesComplementares,
               tratamento: dto.tratamento,
               criadoPorId: usuario.id,
@@ -153,10 +163,22 @@ export class AtendimentosClinicosService {
     if (!existente) throw new NotFoundException('Atendimento clínico não encontrado');
     if (existente.version !== versao) throw new ConflictException('Versão desatualizada');
 
+    if (
+      dados.exameFisico !== undefined ||
+      CAMPOS_EXAME_FISICO.some((campo) => dados[campo] !== undefined)
+    )
+      validarExameFisico({ ...existente, ...dados });
     const alteracoes = {
       dataAtendimento: dados.dataAtendimento ? new Date(dados.dataAtendimento) : undefined,
       anamnese: dados.anamnese,
       exameFisico: dados.exameFisico,
+      frequenciaRespiratoria: dados.frequenciaRespiratoria,
+      frequenciaCardiaca: dados.frequenciaCardiaca,
+      tpc: dados.tpc,
+      mucosa: dados.mucosa,
+      linfonodos: dados.linfonodos,
+      temperatura: dados.temperatura,
+
       examesComplementares: dados.examesComplementares,
       tratamento: dados.tratamento,
     };

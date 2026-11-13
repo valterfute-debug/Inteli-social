@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { copyFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, mkdirSync, openSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-export const LIMITE_BACKUP_BYTES = 60 * 1024 * 1024;
+export const LIMITE_BACKUP_BYTES = 256 * 1024 * 1024;
 const RESERVA_MANIFESTO_BYTES = 1024 * 1024;
 export interface BancoBackup {
   $queryRawUnsafe<T = unknown>(query: string, ...values: unknown[]): Promise<T>;
@@ -320,8 +320,8 @@ export function serializarManifesto(manifesto: ManifestoBackup): string {
 }
 export function verificarArquivos(pasta: string, manifesto: ManifestoBackup): void {
   for (const arquivo of [manifesto.banco, ...manifesto.objetos]) {
-    const conteudo = readFileSync(join(pasta, arquivo.arquivo));
-    if (conteudo.length !== arquivo.tamanhoBytes || sha256(conteudo) !== arquivo.sha256)
+    const conteudo = dadosArquivo(join(pasta, arquivo.arquivo));
+    if (conteudo.tamanhoBytes !== arquivo.tamanhoBytes || conteudo.sha256 !== arquivo.sha256)
       throw new Error('Integridade de arquivo do backup inválida');
   }
 }
@@ -360,11 +360,13 @@ export async function copiarStorage(options: {
       anterior.tamanhoBytes === objeto.tamanhoBytes
     ) {
       try {
-        const existente = readFileSync(join(options.anterior!.pasta, anterior.arquivo));
-        if (existente.length === objeto.tamanhoBytes && sha256(existente) === anterior.sha256) {
+        const existente = dadosArquivo(join(options.anterior!.pasta, anterior.arquivo));
+        if (existente.tamanhoBytes === objeto.tamanhoBytes && existente.sha256 === anterior.sha256) {
           copyFileSync(join(options.anterior!.pasta, anterior.arquivo), destino);
-          conteudo = existente;
           reutilizados++;
+          bytes += existente.tamanhoBytes;
+          resultado.push({ ...objeto, arquivo, sha256: existente.sha256 });
+          continue;
         }
       } catch {
         /* Missing/corrupt previous copy is fetched again, never silently trusted. */
@@ -382,6 +384,22 @@ export async function copiarStorage(options: {
   }
   return { objetos: resultado, baixados, reutilizados, bytes };
 }
+/** Backups anteriores à migração continuam restauráveis; anexos confirmados novos não podem faltar. */
+export async function validarAnexosNoBackup(
+  banco: BancoBackup,
+  caminhos: Set<string>,
+): Promise<void> {
+  const [tabela] = await banco.$queryRawUnsafe<Array<{ existe: boolean }>>(
+    `SELECT to_regclass('public."AnexoClinico"') IS NOT NULL AS existe`,
+  );
+  if (!tabela.existe) return;
+  const anexos = await banco.$queryRawUnsafe<Array<{ caminho: string }>>(
+    `SELECT "caminhoArmazenamento" AS caminho FROM public."AnexoClinico" WHERE confirmado AND NOT cancelado`,
+  );
+  if (anexos.some((anexo) => !caminhos.has(anexo.caminho)))
+    throw new Error('Anexo clínico confirmado ausente no backup');
+}
+
 export async function verificarBancoRestaurado(
   banco: BancoBackup,
   m: ManifestoBackup,
@@ -406,7 +424,21 @@ export async function verificarBancoRestaurado(
   const fotos = new Set(m.objetos.map((o) => o.caminho));
   if (fichas.some((f) => !f.caminho || f.situacao !== 'CONFIRMADA' || !fotos.has(f.caminho)))
     throw new Error('Ficha aponta para foto inválida ou ausente no backup');
+  await validarAnexosNoBackup(banco, fotos);
 }
 export function dadosArquivo(arquivo: string): { tamanhoBytes: number; sha256: string } {
-  return { tamanhoBytes: statSync(arquivo).size, sha256: sha256(readFileSync(arquivo)) };
+  const fd = openSync(arquivo, 'r');
+  const hash = createHash('sha256');
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+  let total = 0;
+  try {
+    for (;;) {
+      const n = readSync(fd, buffer, 0, buffer.length, null);
+      if (!n) break;
+      total += n;
+      hash.update(buffer.subarray(0, n));
+    }
+    if (total !== statSync(arquivo).size) throw new Error('Arquivo alterado durante leitura');
+    return { tamanhoBytes: total, sha256: hash.digest('hex') };
+  } finally { closeSync(fd); }
 }

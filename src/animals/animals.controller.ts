@@ -63,6 +63,18 @@ export class AnimalsController {
     return this.animalsService.listarRegioesResgate();
   }
 
+  @Get('resumo')
+  @ApiOperation({ summary: 'Resumo dos animais ativos para o painel' })
+  resumo() {
+    return this.animalsService.resumo();
+  }
+
+  @Get('prontuarios-pendentes')
+  @ApiOperation({ summary: 'Listar animais com admissão clínica incompleta' })
+  listarProntuariosPendentes(@Query() query: ListarAnimaisQueryDto) {
+    return this.animalsService.listar(query, true);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Consultar animal' })
   buscarPorId(@Param('id', ParseUUIDPipe) id: string) {

@@ -71,6 +71,15 @@ describe('cadastro direto e redefinição', () => {
       update.mock.invocationCallOrder[0],
     );
   });
+  it('impede administrador comum de redefinir a senha de outro administrador', async () => {
+    prisma.usuario.findUnique
+      .mockResolvedValueOnce({ id: 'other', ativo: true, gerenciaEquipe: true })
+      .mockResolvedValueOnce({ ativo: true, administradorMaster: false });
+    await expect(service.redefinirSenha(actor, 'other')).rejects.toThrow(
+      'Apenas administradores master',
+    );
+    expect(update).not.toHaveBeenCalled();
+  });
   it('não redefine no provedor se outra alteração já reservou a conta', async () => {
     prisma.usuario.findUnique.mockResolvedValue({ id: 'other', ativo: true });
     tx.usuario.updateMany.mockResolvedValue({ count: 0 });

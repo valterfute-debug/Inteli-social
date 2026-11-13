@@ -1,3 +1,4 @@
+import { EXAME_TESTE } from '../exame-fisico-teste';
 import { randomUUID } from 'node:crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
@@ -55,7 +56,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
 
   it('registra a admissão ligada ao animal, com animal e responsável consultáveis', async () => {
     const chave = randomUUID();
-    const corpo = { anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' };
+    const corpo = { ...EXAME_TESTE, anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' };
     const criado = await http()
       .post(rota())
       .set('Authorization', contaA.autorizacao)
@@ -87,14 +88,14 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       .post(rota())
       .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({ tipo: 'ADMISSAO' })
+      .send({ ...EXAME_TESTE, tipo: 'ADMISSAO' })
       .expect(409);
 
     const acompanhamento = await http()
       .post(rota())
       .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({ tratamento: 'Vermífugo' })
+      .send({ ...EXAME_TESTE, tratamento: 'Vermífugo' })
       .expect(201);
     expect(acompanhamento.body.tipo).toBe('ACOMPANHAMENTO');
 
@@ -120,7 +121,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       .post(rota())
       .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({ anamnese: 'Retorno' })
+      .send({ ...EXAME_TESTE, anamnese: 'Retorno' })
       .expect(201);
     expect(depois.body.responsavel.id).toBe(novo.id);
   });
@@ -133,7 +134,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     const atualizado = await http()
       .patch(`${rota()}/${primeiro.id}`)
       .set('Authorization', contaA.autorizacao)
-      .send({ versao: 1, examesComplementares: 'Hemograma normal' })
+      .send({ ...EXAME_TESTE, versao: 1, examesComplementares: 'Hemograma normal' })
       .expect(200);
     expect(atualizado.body).toMatchObject({
       versao: 2,
@@ -144,7 +145,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
     await http()
       .patch(`${rota()}/${primeiro.id}`)
       .set('Authorization', contaA.autorizacao)
-      .send({ versao: 1, tratamento: 'x' })
+      .send({ ...EXAME_TESTE, versao: 1, tratamento: 'x' })
       .expect(409);
   });
 
@@ -160,7 +161,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       .post(rota(randomUUID()))
       .set('Authorization', contaA.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({})
+      .send({ ...EXAME_TESTE })
       .expect(404);
   });
 
@@ -170,12 +171,16 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
       .post(rota())
       .set('Authorization', contaB.autorizacao)
       .set('Idempotency-Key', randomUUID())
-      .send({ tratamento: 'Registrado por outra conta' })
+      .send({ ...EXAME_TESTE, tratamento: 'Registrado por outra conta' })
       .expect(201);
   });
 
   it('exige Idempotency-Key na criação', async () => {
-    await http().post(rota()).set('Authorization', contaA.autorizacao).send({}).expect(400);
+    await http()
+      .post(rota())
+      .set('Authorization', contaA.autorizacao)
+      .send({ ...EXAME_TESTE })
+      .expect(400);
   });
 
   describe('concorrência e idempotência', () => {
@@ -187,7 +192,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
             .post(rota(novoAnimal))
             .set('Authorization', contaA.autorizacao)
             .set('Idempotency-Key', chave)
-            .send({ anamnese: 'simultâneo' }),
+            .send({ ...EXAME_TESTE, anamnese: 'simultâneo' }),
         ),
       );
 
@@ -208,7 +213,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
             .post(rota(novoAnimal))
             .set('Authorization', contaA.autorizacao)
             .set('Idempotency-Key', chave)
-            .send({ tratamento: 'mesmo corpo' }),
+            .send({ ...EXAME_TESTE, tratamento: 'mesmo corpo' }),
         ),
       );
 
@@ -224,7 +229,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         .post(rota(novoAnimal))
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({})
+        .send({ ...EXAME_TESTE })
         .expect(201);
 
       const respostas = await Promise.all(
@@ -232,7 +237,7 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
           http()
             .patch(`${rota(novoAnimal)}/${criado.body.id}`)
             .set('Authorization', contaA.autorizacao)
-            .send({ versao: 1, tratamento: `edição ${texto}` }),
+            .send({ ...EXAME_TESTE, versao: 1, tratamento: `edição ${texto}` }),
         ),
       );
 
@@ -252,14 +257,14 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         .post(rota(a))
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
-        .send({ anamnese: 'x' })
+        .send({ ...EXAME_TESTE, anamnese: 'x' })
         .expect(201);
 
       await http()
         .post(rota(b))
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
-        .send({ anamnese: 'x' })
+        .send({ ...EXAME_TESTE, anamnese: 'x' })
         .expect(409);
       expect(await ambiente.prisma.atendimentoClinico.count({ where: { animalId: b } })).toBe(0);
     });
@@ -271,14 +276,14 @@ describe('Atendimentos clínicos (e2e, banco real)', () => {
         .post(rota(novoAnimal))
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
-        .send({ anamnese: 'um' })
+        .send({ ...EXAME_TESTE, anamnese: 'um' })
         .expect(201);
 
       await http()
         .post(rota(novoAnimal))
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', chave)
-        .send({ anamnese: 'dois' })
+        .send({ ...EXAME_TESTE, anamnese: 'dois' })
         .expect(409);
     });
   });

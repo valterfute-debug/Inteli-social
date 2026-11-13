@@ -33,6 +33,13 @@ export function mapearAtendimentoClinico(atendimento: AtendimentoComRelacoes) {
     },
     anamnese: atendimento.anamnese,
     exameFisico: atendimento.exameFisico,
+    frequenciaRespiratoria: atendimento.frequenciaRespiratoria,
+    frequenciaCardiaca: atendimento.frequenciaCardiaca,
+    tpc: atendimento.tpc,
+    mucosa: atendimento.mucosa,
+    linfonodos: atendimento.linfonodos,
+    temperatura: atendimento.temperatura,
+
     examesComplementares: atendimento.examesComplementares,
     tratamento: atendimento.tratamento,
     versao: atendimento.version,

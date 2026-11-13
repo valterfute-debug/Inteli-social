@@ -9,6 +9,7 @@ const ENTIDADES_AUDITADAS = [
   'Responsible',
   'Breed',
   'AtendimentoClinico',
+  'AnexoClinico',
 ];
 
 export class ListarAuditoriaQueryDto {

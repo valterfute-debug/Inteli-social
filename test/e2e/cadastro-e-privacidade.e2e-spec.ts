@@ -1,3 +1,4 @@
+import { EXAME_TESTE } from '../exame-fisico-teste';
 import { randomUUID } from 'node:crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
@@ -311,7 +312,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
         .post(`/api/v1/animals/${animal.body.id}/atendimentos`)
         .set('Authorization', contaB.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'Texto clínico sigiloso' })
+        .send({ ...EXAME_TESTE, anamnese: 'Texto clínico sigiloso' })
         .expect(201);
 
       const trilha = await http()
@@ -362,12 +363,17 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
         .post(rota)
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ tipo: 'ADMISSAO' })
+        .send({ ...EXAME_TESTE, tipo: 'ADMISSAO' })
         .expect(409);
       const preenchida = await http()
         .patch(`${rota}/${admissao.id}`)
         .set('Authorization', contaA.autorizacao)
-        .send({ versao: 1, anamnese: 'Resgatado na rua', exameFisico: 'Temperatura 38,5' })
+        .send({
+          ...EXAME_TESTE,
+          versao: 1,
+          anamnese: 'Resgatado na rua',
+          exameFisico: 'Temperatura 38,5',
+        })
         .expect(200);
       expect(preenchida.body).toMatchObject({ anamnese: 'Resgatado na rua', versao: 2 });
     });
@@ -383,7 +389,7 @@ describe('Cadastro sem unidade/localização, onça e privacidade de responsáve
         .post(`/api/v1/animals/${animal.body.id}/atendimentos`)
         .set('Authorization', contaB.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'x' })
+        .send({ ...EXAME_TESTE, anamnese: 'x' })
         .expect(201);
 
       await http()

@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createClient } from '@supabase/supabase-js';
 import { Prisma } from '@prisma/client';
+import { createHash, randomBytes } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { UsuarioAutenticado } from '../auth/tipos';
 
@@ -19,13 +20,152 @@ export class EquipeService {
     private readonly config: ConfigService,
   ) {}
 
+  async criarConviteQr(usuario: UsuarioAutenticado) {
+    const token = randomBytes(32).toString('base64url');
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const expiraEm = new Date(Date.now() + 15 * 60_000);
+    await this.prisma.$transaction(async (tx) => {
+      const convite = await tx.conviteQr.create({
+        data: { tokenHash, criadoPorId: usuario.id, expiraEm },
+      });
+      await tx.eventoAuditoria.create({
+        data: {
+          usuarioId: usuario.id,
+          acao: 'CONVITE_QR_CRIADO',
+          entidade: 'ConviteQr',
+          entidadeId: convite.id,
+        },
+      });
+    });
+    return { token, expiraEm: expiraEm.toISOString() };
+  }
+
+  async aceitarConviteQr(token: string, email: string, senha: string) {
+    const normalizado = email.trim().toLowerCase();
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+    const url = this.config.get<string>('SUPABASE_URL');
+    const key = this.config.get<string>('SUPABASE_SERVICE_ROLE_KEY');
+    if (!url || !key) throw new ServiceUnavailableException('Serviço de acesso indisponível.');
+    const convite = await this.prisma.$transaction(async (tx) => {
+      const item = await tx.conviteQr.findUnique({ where: { tokenHash } });
+      if (!item || item.estado !== 'DISPONIVEL' || item.expiraEm <= new Date())
+        throw new ForbiddenException('Convite inválido ou expirado.');
+      const criador = await tx.usuario.findUnique({
+        where: { id: item.criadoPorId },
+        select: { ativo: true, gerenciaEquipe: true },
+      });
+      if (!criador?.ativo || !criador.gerenciaEquipe)
+        throw new ForbiddenException('Convite inválido ou expirado.');
+      const existente = await tx.usuario.findFirst({
+        where: { email: { equals: normalizado, mode: 'insensitive' } },
+        select: { id: true },
+      });
+      if (existente)
+        throw new ConflictException('Não foi possível criar a conta. Procure suporte.');
+      const reserva = await tx.conviteQr.updateMany({
+        where: { id: item.id, estado: 'DISPONIVEL', expiraEm: { gt: new Date() } },
+        data: { estado: 'PROCESSANDO', emailReservado: normalizado },
+      });
+      if (reserva.count !== 1)
+        throw new ConflictException('Convite já utilizado ou em processamento.');
+      return item;
+    });
+    const cliente = createClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await cliente.auth.admin
+      .createUser({ email: normalizado, password: senha, email_confirm: true })
+      .catch(() => {
+        throw new ServiceUnavailableException(
+          'Não foi possível confirmar o cadastro. Procure suporte.',
+        );
+      });
+    if (error || !data.user?.id)
+      throw new ServiceUnavailableException(
+        'Não foi possível confirmar o cadastro. Procure suporte.',
+      );
+    try {
+      await this.prisma.$transaction(async (tx) => {
+        await tx.usuario.create({ data: { id: data.user.id, email: normalizado, ativo: true } });
+        await tx.conviteQr.update({
+          where: { id: convite.id },
+          data: { estado: 'CONCLUIDO', utilizadoEm: new Date() },
+        });
+        await tx.eventoAuditoria.create({
+          data: {
+            usuarioId: convite.criadoPorId,
+            acao: 'CONVITE_QR_ACEITO',
+            entidade: 'Usuario',
+            entidadeId: data.user.id,
+          },
+        });
+      });
+    } catch {
+      throw new ServiceUnavailableException(
+        'Não foi possível confirmar o cadastro. Procure suporte.',
+      );
+    }
+    return { ok: true };
+  }
+
   async listar() {
     const pessoas = await this.prisma.usuario.findMany({
-      select: { id: true, nome: true, email: true, ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        email: true,
+        ativo: true,
+        gerenciaEquipe: true,
+        administradorMaster: true,
+      },
       orderBy: [{ nome: 'asc' }, { id: 'asc' }],
       take: 201,
     });
     return { itens: pessoas.slice(0, 200), temMais: pessoas.length > 200 };
+  }
+
+  async alterarAdministracao(usuario: UsuarioAutenticado, id: string, administrador: boolean) {
+    if (id === usuario.id)
+      throw new ForbiddenException('Não é possível alterar a própria permissão.');
+    return this.prisma.$transaction(async (tx) => {
+      const autor = await tx.usuario.findUnique({
+        where: { id: usuario.id },
+        select: { ativo: true, administradorMaster: true },
+      });
+      if (!autor?.ativo || !autor.administradorMaster)
+        throw new ForbiddenException('Apenas administradores master podem alterar esta permissão.');
+      const pessoa = await tx.usuario.findUnique({
+        where: { id },
+        select: { id: true, ativo: true, administradorMaster: true, gerenciaEquipe: true },
+      });
+      if (!pessoa) throw new NotFoundException('Pessoa não encontrada.');
+      if (pessoa.administradorMaster)
+        throw new ForbiddenException(
+          'A permissão de uma conta master não pode ser alterada por esta operação.',
+        );
+      if (!pessoa.ativo && administrador)
+        throw new ForbiddenException('Reative a conta antes de torná-la administradora.');
+      const alterada = await tx.usuario.updateMany({
+        where: {
+          id,
+          administradorMaster: false,
+          redefinicaoEmAndamento: false,
+          ...(administrador ? { ativo: true } : {}),
+        },
+        data: { gerenciaEquipe: administrador },
+      });
+      if (alterada.count !== 1)
+        throw new ConflictException('A conta está em alteração. Tente novamente.');
+      await tx.eventoAuditoria.create({
+        data: {
+          usuarioId: usuario.id,
+          acao: administrador ? 'ADMINISTRACAO_CONCEDIDA' : 'ADMINISTRACAO_REMOVIDA',
+          entidade: 'Usuario',
+          entidadeId: id,
+        },
+      });
+      return { id, gerenciaEquipe: administrador };
+    });
   }
 
   private acessoInicial() {
@@ -106,14 +246,29 @@ export class EquipeService {
     const { senha, cliente } = this.acessoInicial();
     const pessoa = await this.prisma.usuario.findUnique({
       where: { id },
-      select: { id: true, ativo: true },
+      select: { id: true, ativo: true, gerenciaEquipe: true, administradorMaster: true },
     });
     if (!pessoa) throw new NotFoundException('Pessoa não encontrada.');
     if (!pessoa.ativo) throw new ForbiddenException('Reative o acesso antes de redefinir a senha.');
+    const autor = await this.prisma.usuario.findUnique({
+      where: { id: usuario.id },
+      select: { ativo: true, administradorMaster: true },
+    });
+    if ((pessoa.gerenciaEquipe || pessoa.administradorMaster) && !autor?.administradorMaster)
+      throw new ForbiddenException(
+        'Apenas administradores master podem redefinir a senha de administradores.',
+      );
     const corte = new Date((Math.floor(Date.now() / 1000) + 1) * 1000);
     await this.prisma.$transaction(async (tx) => {
       const bloqueio = await tx.usuario.updateMany({
-        where: { id, ativo: true, redefinicaoEmAndamento: false },
+        where: {
+          id,
+          ativo: true,
+          redefinicaoEmAndamento: false,
+          ...(autor?.administradorMaster
+            ? {}
+            : { gerenciaEquipe: false, administradorMaster: false }),
+        },
         data: { deveTrocarSenha: true, tokensInvalidosAntes: corte, redefinicaoEmAndamento: true },
       });
       if (bloqueio.count !== 1)
@@ -147,15 +302,30 @@ export class EquipeService {
     return this.prisma.$transaction(async (tx) => {
       const pessoa = await tx.usuario.findUnique({
         where: { id },
-        select: { id: true, ativo: true },
+        select: { id: true, ativo: true, gerenciaEquipe: true, administradorMaster: true },
       });
       if (!pessoa) throw new NotFoundException('Pessoa não encontrada.');
-      if (pessoa.ativo === ativo) return pessoa;
-      const atualizada = await tx.usuario.update({
-        where: { id },
-        data: { ativo },
-        select: { id: true, ativo: true },
+      const autor = await tx.usuario.findUnique({
+        where: { id: usuario.id },
+        select: { ativo: true, administradorMaster: true },
       });
+      if ((pessoa.gerenciaEquipe || pessoa.administradorMaster) && !autor?.administradorMaster)
+        throw new ForbiddenException(
+          'Apenas administradores master podem alterar o acesso de administradores.',
+        );
+      if (pessoa.administradorMaster && !ativo)
+        throw new ForbiddenException('A desativação de uma conta master exige suporte.');
+      if (pessoa.ativo === ativo) return pessoa;
+      const resultado = await tx.usuario.updateMany({
+        where: {
+          id,
+          administradorMaster: false,
+          ...(autor?.administradorMaster ? {} : { gerenciaEquipe: false }),
+        },
+        data: { ativo },
+      });
+      if (resultado.count !== 1)
+        throw new ConflictException('A permissão da conta mudou. Atualize a lista.');
       await tx.eventoAuditoria.create({
         data: {
           usuarioId: usuario.id,
@@ -164,7 +334,7 @@ export class EquipeService {
           entidadeId: id,
         },
       });
-      return atualizada;
+      return { id, ativo };
     });
   }
 

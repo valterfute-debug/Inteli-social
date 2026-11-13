@@ -8,6 +8,7 @@ import { liberarUsuario } from '../../src/database/liberar-usuario';
 import { popularCatalogos } from '../../src/database/seed';
 import { SupabaseStorageService } from '../../src/storage/supabase-storage.service';
 import { criarEmissorDeTokens } from '../tokens-teste';
+import sharp from 'sharp';
 
 /** Storage simulado: o e2e testa a API e o banco; o Supabase Storage tem testes próprios. */
 export const storageSimulado = {
@@ -15,6 +16,9 @@ export const storageSimulado = {
     urlEnvio: `https://storage.invalid/envio/${caminho}`,
   }),
   obterMetadados: async () => ({ tamanhoBytes: 1000, tipoMidia: 'image/jpeg' }),
+  obterInicioArquivo: async () => Buffer.from([255, 216, 255]),
+  baixarFoto: async () => sharp({ create: { width: 2, height: 2, channels: 3, background: '#50a060' } }).jpeg().toBuffer(),
+  validadeLeituraSegundos: () => 900,
   removerArquivo: async () => undefined,
   situacaoBucket: async () => 'privado' as const,
   criarUrlsLeitura: async (caminhos: string[]) =>

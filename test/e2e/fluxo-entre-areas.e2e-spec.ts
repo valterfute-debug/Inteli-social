@@ -1,3 +1,4 @@
+import { EXAME_TESTE } from '../exame-fisico-teste';
 import { randomUUID } from 'node:crypto';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 import request = require('supertest');
@@ -440,7 +441,7 @@ describe('Identificação e passagem entre áreas (e2e, banco real)', () => {
         .post(`/api/v1/animals/${criado.body.id}/atendimentos`)
         .set('Authorization', contaA.autorizacao)
         .set('Idempotency-Key', randomUUID())
-        .send({ anamnese: 'Acompanhamento no CED' })
+        .send({ ...EXAME_TESTE, anamnese: 'Acompanhamento no CED' })
         .expect(201);
 
       await http()

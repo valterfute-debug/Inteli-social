@@ -27,7 +27,16 @@ describe('Backup/restauração PostgreSQL real com Auth e foto sintéticos', () 
     tool: string,
     args: string[],
     env: NodeJS.ProcessEnv = { PATH: process.env.PATH },
-  ) => execFileSync(tool, args, { env, stdio: 'pipe', timeout: 20000, maxBuffer: 1024 * 1024 });
+  ) =>
+    execFileSync(tool, args, {
+      env,
+      stdio:
+        process.platform === 'win32' && tool.endsWith('pg_ctl') && args.includes('start')
+          ? 'ignore'
+          : 'pipe',
+      timeout: 20000,
+      maxBuffer: 1024 * 1024,
+    });
   const connection = (database: string) =>
     `postgresql://postgres:synthetic-only@127.0.0.1:${port}/${database}`;
   async function availablePort(): Promise<number> {

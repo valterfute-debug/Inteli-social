@@ -10,7 +10,12 @@ const actor = { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', email: 'equipe@examp
 const other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 function fixture() {
   const tx = {
-    usuario: { findUnique: jest.fn(), update: jest.fn(), create: jest.fn() },
+    usuario: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+      create: jest.fn(),
+    },
     eventoAuditoria: { create: jest.fn() },
     conviteEquipe: { create: jest.fn().mockResolvedValue({ id: 'convite-1' }), update: jest.fn() },
   };
@@ -48,6 +53,45 @@ describe('Gestão de equipe', () => {
       ForbiddenException,
     );
     expect(f.prisma.$transaction).not.toHaveBeenCalled();
+  });
+  it('impede administrador comum de promover uma conta', async () => {
+    const f = fixture();
+    f.tx.usuario.findUnique.mockResolvedValueOnce({ ativo: true, administradorMaster: false });
+    await expect(f.service.alterarAdministracao(actor, other, true)).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+    expect(f.tx.usuario.updateMany).not.toHaveBeenCalled();
+  });
+  it('permite master conceder e audita a permissão', async () => {
+    const f = fixture();
+    f.tx.usuario.findUnique
+      .mockResolvedValueOnce({ ativo: true, administradorMaster: true })
+      .mockResolvedValueOnce({
+        id: other,
+        ativo: true,
+        administradorMaster: false,
+        gerenciaEquipe: false,
+      });
+    await expect(f.service.alterarAdministracao(actor, other, true)).resolves.toEqual({
+      id: other,
+      gerenciaEquipe: true,
+    });
+    expect(f.tx.eventoAuditoria.create).toHaveBeenCalledWith({
+      data: {
+        usuarioId: actor.id,
+        acao: 'ADMINISTRACAO_CONCEDIDA',
+        entidade: 'Usuario',
+        entidadeId: other,
+      },
+    });
+  });
+  it('impede administrador comum de desativar outro administrador', async () => {
+    const f = fixture();
+    f.tx.usuario.findUnique
+      .mockResolvedValueOnce({ id: other, ativo: true, gerenciaEquipe: true })
+      .mockResolvedValueOnce({ ativo: true, administradorMaster: false });
+    await expect(f.service.alterar(actor, other, false)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(f.tx.usuario.updateMany).not.toHaveBeenCalled();
   });
   it('desativa outra conta e registra auditoria na mesma transação', async () => {
     const f = fixture();

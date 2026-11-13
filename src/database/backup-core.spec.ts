@@ -79,9 +79,13 @@ function bancoValido(
     photo?: unknown;
     users?: unknown;
     count?: bigint;
+    attachmentExists?: boolean;
+    attachments?: unknown;
   } = {},
 ): BancoBackup {
   return banco((sql) => {
+    if (sql.includes('to_regclass')) return [{ existe: overrides.attachmentExists ?? false }];
+    if (sql.includes('FROM public."AnexoClinico"')) return overrides.attachments ?? [];
     if (sql.includes('c.relkind'))
       return [
         { esquema: 'auth', tabela: 'users' },
@@ -286,6 +290,15 @@ describe('backup recuperável', () => {
     });
     expect(fourth.reutilizados).toBe(0);
   });
+  it('copia anexos cujo total supera o teto anterior de 60 MiB', async () => {
+    const tamanho = 20 * 1024 * 1024;
+    const dados = Buffer.alloc(tamanho, 7);
+    const objetos = Array.from({ length: 4 }, (_, i) => ({ ...objeto, id: `anexo-${i}`, caminho: `anexos/${i}.pdf`, tamanhoBytes: tamanho }));
+    const resultado = await copiarStorage({ pasta: pasta(), origem, objetos, bytesBanco: 1024, baixar: async () => dados });
+    expect(resultado.bytes).toBe(4 * tamanho + 1024);
+    expect(resultado.objetos).toHaveLength(4);
+    expect(resultado.objetos.every((item) => item.sha256 === sha256(dados))).toBe(true);
+  });
   it('limite é aplicado antes do download e tamanho divergente falha', async () => {
     const baixar = jest.fn(async () => Buffer.from('jpg'));
     await expect(
@@ -355,6 +368,18 @@ describe('backup recuperável', () => {
   });
   it('restore confere contagens, UUID/hash Auth, FKs e existência da foto', async () => {
     await expect(verificarBancoRestaurado(bancoValido(), manifesto())).resolves.toBeUndefined();
+    await expect(
+      verificarBancoRestaurado(
+        bancoValido({ attachmentExists: true, attachments: [{ caminho: 'exames/ausente.pdf' }] }),
+        manifesto(),
+      ),
+    ).rejects.toThrow('Anexo clínico confirmado ausente');
+    await expect(
+      verificarBancoRestaurado(
+        bancoValido({ attachmentExists: true, attachments: [] }),
+        manifesto(),
+      ),
+    ).resolves.toBeUndefined();
     await expect(verificarBancoRestaurado(bancoValido({ count: 2n }), manifesto())).rejects.toThrow(
       'Contagens',
     );
